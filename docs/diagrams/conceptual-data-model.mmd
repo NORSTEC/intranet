@@ -1,0 +1,54 @@
+erDiagram
+    USER ||--o{ IDENTITY : authenticates_with
+    USER ||--o{ MEMBERSHIP : has
+    ORGANIZATION ||--o{ MEMBERSHIP : includes
+    ORGANIZATION ||--o{ TEAM : owns
+    USER ||--o{ TEAM_MEMBERSHIP : joins
+    TEAM ||--o{ TEAM_MEMBERSHIP : includes
+    USER ||--o{ AUDIT_EVENT : performs
+
+    USER {
+        uuid id PK
+        string display_name
+        string status
+    }
+
+    IDENTITY {
+        uuid id PK
+        uuid user_id FK
+        string provider
+        string provider_subject
+        string email
+    }
+
+    ORGANIZATION {
+        uuid id PK
+        string name
+        string status
+    }
+
+    MEMBERSHIP {
+        uuid id PK
+        uuid user_id FK
+        uuid organization_id FK
+        string role
+        string status
+    }
+
+    TEAM {
+        uuid id PK
+        uuid organization_id FK
+        string name
+    }
+
+    TEAM_MEMBERSHIP {
+        uuid user_id FK
+        uuid team_id FK
+    }
+
+    AUDIT_EVENT {
+        uuid id PK
+        uuid actor_user_id FK
+        string action
+        datetime created_at
+    }

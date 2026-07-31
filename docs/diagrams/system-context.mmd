@@ -1,0 +1,26 @@
+flowchart LR
+    Member["Member"]
+    OrgAdmin["Organization admin"]
+    NorstecAdmin["Norstec admin"]
+    Google["Google authentication"]
+    Slack["Slack API"]
+
+    subgraph OpenStack["NTNU OpenStack"]
+        Portal["Norstec Portal<br/>Next.js"]
+        Worker["Integration worker<br/>(optional)"]
+    end
+
+    Auth["Authentication provider"]
+    Database[("PostgreSQL")]
+
+    Member --> Portal
+    OrgAdmin --> Portal
+    NorstecAdmin --> Portal
+    Portal --> Auth
+    Auth --> Google
+    Google --> Auth
+    Auth --> Portal
+    Portal --> Database
+    Portal --> Worker
+    Worker --> Slack
+    Worker --> Database

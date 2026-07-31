@@ -1,0 +1,12 @@
+flowchart TD
+    Start((Start)) -->|Invitation or join request| Pending["Pending"]
+    Pending -->|Approved| Active["Active"]
+    Pending -->|Rejected| Rejected["Rejected"]
+    Active -->|Access suspended| Suspended["Suspended"]
+    Suspended -->|Reinstated| Active
+    Active -->|Membership ends| Alumni["Alumni"]
+    Alumni -->|Membership renewed| Active
+    Rejected -->|Retention period expires| Deleted["Deleted"]
+    Suspended -->|Membership removed| Deleted
+    Alumni -->|User requests deletion or retention expires| Deleted
+    Deleted --> End((End))
