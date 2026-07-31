@@ -43,22 +43,17 @@ of truth.
 
 ![System context](diagrams/system-context.png)
 
-[Mermaid source](diagrams/system-context.mmd)
-
 ## Authentication and membership flow
 
 ![Authentication and membership flow](diagrams/authentication-membership-flow.png)
 
-[Mermaid source](diagrams/authentication-membership-flow.mmd)
-
 Google establishes identity only. PostgreSQL membership records determine portal
-access and roles.
+access and roles. A Google Workspace domain may help suggest an organization,
+but it must not grant membership or an administrator role automatically.
 
 ## Conceptual data model
 
 ![Conceptual data model](diagrams/conceptual-data-model.png)
-
-[Mermaid source](diagrams/conceptual-data-model.mmd)
 
 The diagram is intentionally conceptual. Columns and constraints will be
 finalized after the membership lifecycle and permission rules are approved.

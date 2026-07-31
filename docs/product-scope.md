@@ -16,8 +16,6 @@ roles, teams, alumni transitions, and access to connected services.
 
 ![Membership lifecycle](diagrams/membership-lifecycle.png)
 
-[Mermaid source](diagrams/membership-lifecycle.mmd)
-
 ## Proposed first release
 
 - Sign in with Google

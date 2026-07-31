@@ -1,6 +1,0 @@
-flowchart TD
-    Member["member"] --> MemberAccess["Own profile and permitted member content"]
-    OrgAdmin["organization_admin"] --> Member
-    OrgAdmin --> OrgAccess["Manage members and teams in own organization"]
-    NorstecAdmin["norstec_admin"] --> OrgAdmin
-    NorstecAdmin --> GlobalAccess["Manage all organizations and system settings"]

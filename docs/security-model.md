@@ -31,8 +31,6 @@ separately in the data model.
 
 ![Role scope](diagrams/role-scope.png)
 
-[Mermaid source](diagrams/role-scope.mmd)
-
 The arrows represent additional permissions, not automatic role assignment.
 Roles must always be assigned through an authorized and audited operation.
 
