@@ -4,8 +4,9 @@ Norstec Portal is an internal membership system for Norstec and its member
 organizations. It will manage member profiles, organizations, teams, roles,
 alumni transitions, and access to connected services such as Slack.
 
-> **Status:** Frontend prototype. The portal pages currently use synthetic data.
-> Authentication, database access, and authorization are not connected yet.
+> **Status:** Authentication foundation and frontend prototype. Google OAuth is
+> connected through Supabase, while portal pages still use synthetic data.
+> Database authorization, memberships, and access requests are not connected yet.
 
 ## Stack
 
@@ -14,10 +15,11 @@ The current frontend uses:
 - Next.js App Router, React, and TypeScript
 - Tailwind CSS and Material Symbols
 - The shared Norstec visual identity and light/dark theme behavior
+- Supabase Auth with server-side session cookies
 - pnpm
 
-Google authentication, PostgreSQL, database-enforced authorization, automated
-tests, and deployment to NTNU OpenStack are planned but not implemented.
+PostgreSQL schema migrations, database-enforced authorization, automated tests,
+and deployment to NTNU OpenStack are planned but not implemented.
 
 ## Repository approach
 

@@ -1,12 +1,18 @@
-import Link from "next/link";
 import {
   AnimatedTagline,
   EggNorstecLogo,
   LoginStripes,
   MobileLoginHeader,
 } from "@/components/login/login-visual";
+import { GoogleSignInButton } from "@/components/login/google-sign-in-button";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
   return (
     <main className="grid min-h-screen bg-egg text-moody lg:grid-cols-2">
       <section className="relative hidden min-h-screen overflow-hidden bg-[#0f1118] p-12 lg:flex lg:items-center lg:justify-center xl:p-20">
@@ -42,10 +48,12 @@ export default function LoginPage() {
             />
           </h1>
 
-          <Link href="/" className="mt-8 flex min-h-12 w-full items-center justify-center gap-3 rounded-full border-2 border-moody bg-moody px-5 font-medium text-egg transition-colors hover:bg-transparent hover:text-moody lg:border-[#0f1118] lg:bg-[#0f1118] lg:text-[#EDE8DA] lg:hover:text-[#0f1118]">
-            Continue with Google
-            <span className="material-symbols-outlined">arrow_right_alt</span>
-          </Link>
+          <GoogleSignInButton />
+          {error === "oauth_callback" && (
+            <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
+              Google sign-in could not be completed. Please try again.
+            </p>
+          )}
 
           <div className="mt-12">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-50">Which account should I use?</p>
