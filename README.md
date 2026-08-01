@@ -4,21 +4,20 @@ Norstec Portal is an internal membership system for Norstec and its member
 organizations. It will manage member profiles, organizations, teams, roles,
 alumni transitions, and access to connected services such as Slack.
 
-> **Status:** Planning. The application has not been scaffolded yet. Development
-> must use synthetic data until the privacy and access-control design has been
-> reviewed.
+> **Status:** Frontend prototype. The portal pages currently use synthetic data.
+> Authentication, database access, and authorization are not connected yet.
 
-## Proposed stack
+## Stack
 
-The stack is not final. The current proposal is:
+The current frontend uses:
 
 - Next.js App Router, React, and TypeScript
-- Tailwind CSS and shadcn/ui
-- Zod for input validation
-- Google-only authentication
-- PostgreSQL with database-enforced access control
-- pnpm, Vitest, and Playwright
-- Docker on NTNU OpenStack
+- Tailwind CSS and Material Symbols
+- The shared Norstec visual identity and light/dark theme behavior
+- pnpm
+
+Google authentication, PostgreSQL, database-enforced authorization, automated
+tests, and deployment to NTNU OpenStack are planned but not implemented.
 
 ## Repository approach
 
@@ -35,9 +34,30 @@ demonstrated need arises.
 
 ## Development
 
-The application is not initialized yet. Setup commands and required environment
-variables will be documented after the architecture and data model have been
-approved.
+Install dependencies and start the local development server:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Open `http://localhost:3000`. The current prototype includes:
+
+- `/` — dashboard
+- `/login` — Google-only sign-in concept
+- `/access` — membership request
+- `/profile` — member profile
+- `/teams` — team directory
+- `/organization` — organization administration
+- `/admin` — Norstec administration
+
+Before submitting changes, run:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm build
+```
 
 Never commit real member data, credentials, tokens, or production environment
 files to this repository.

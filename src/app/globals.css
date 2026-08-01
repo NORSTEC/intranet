@@ -1,0 +1,219 @@
+@import "@savaryna/tailwindcss-material-symbols";
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Oughter";
+  src: url("/fonts/Oughter.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+@theme {
+  --color-egg: #ede8da;
+  --color-copper: #e8804c;
+  --color-sun: #f3ad78;
+  --color-beachball: #30c3cd;
+  --color-moody: #0f1118;
+  --color-sky: #1697b7;
+  --font-sans: var(--font-barlow), "Arial Narrow", Arial, sans-serif;
+  --font-display: "Oughter", var(--font-barlow), sans-serif;
+}
+
+[data-theme="dark"] {
+  --color-egg: #0f1118;
+  --color-moody: #ede8da;
+  --color-copper: #e8804c;
+  --color-sun: #f3ad78;
+  --color-beachball: #30c3cd;
+  --color-sky: #1697b7;
+}
+
+@layer base {
+  html {
+    background: var(--color-egg);
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--color-egg);
+    color: var(--color-moody);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 300;
+    overflow-x: hidden;
+    transition: color 200ms ease, background-color 200ms ease;
+  }
+
+  p {
+    font-weight: 400;
+    line-height: 1.75;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    outline-color: var(--color-copper);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .text-h1 {
+    font-family: var(--font-barlow);
+    font-size: clamp(2.4rem, 5vw, 6.5rem);
+    font-weight: 300;
+    line-height: 0.95;
+    text-transform: uppercase;
+  }
+
+  .text-h2 {
+    font-family: var(--font-barlow);
+    font-size: clamp(1.35rem, 2.2vw, 2.5rem);
+    font-weight: 300;
+    text-transform: uppercase;
+  }
+
+  .portal-button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 2px solid var(--color-moody);
+    border-radius: 9999px;
+    background: var(--color-moody);
+    padding: 0.5rem 1.25rem;
+    color: var(--color-egg);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color 180ms ease, background-color 180ms ease;
+  }
+
+  .portal-button:hover {
+    background: transparent;
+    color: var(--color-moody);
+  }
+
+  .portal-button-secondary {
+    background: transparent;
+    color: var(--color-moody);
+  }
+
+  .portal-button-secondary:hover {
+    background: var(--color-moody);
+    color: var(--color-egg);
+  }
+
+  .portal-field {
+    width: 100%;
+    border: 2px solid color-mix(in srgb, var(--color-moody) 20%, transparent);
+    border-radius: 0.75rem;
+    background: transparent;
+    padding: 0.75rem 1rem;
+    color: var(--color-moody);
+    font-weight: 400;
+    transition: border-color 180ms ease;
+  }
+
+  .portal-field:focus {
+    border-color: var(--color-moody);
+    outline: none;
+  }
+
+  .portal-field::placeholder {
+    color: color-mix(in srgb, var(--color-moody) 40%, transparent);
+  }
+
+  .portal-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 400;
+    transition: opacity 160ms ease;
+  }
+
+  .portal-nav-item:hover {
+    opacity: 0.65;
+  }
+
+  .portal-nav-item::before {
+    content: "";
+    width: 1.15rem;
+    height: 1.15rem;
+    flex: none;
+    background: url("/images/star-outline.png") center / contain no-repeat;
+    opacity: 0;
+  }
+
+  .portal-nav-item:hover::before {
+    opacity: 0.55;
+  }
+
+  .portal-nav-item-active {
+    color: var(--color-copper);
+    font-style: italic;
+  }
+
+  .portal-nav-item-active::before {
+    background-image: url("/images/star-orange.svg");
+    opacity: 1;
+  }
+
+  .page-star {
+    display: inline-block;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-left: 0.6rem;
+    background: url("/images/star.svg") center / contain no-repeat;
+    vertical-align: -0.15em;
+  }
+
+  [data-theme="dark"] .page-star {
+    background-image: url("/images/star-egg.png");
+  }
+
+  .contrast-star {
+    background: url("/images/star-egg.png") center / contain no-repeat;
+  }
+
+  [data-theme="dark"] .contrast-star {
+    background-image: url("/images/star.svg");
+  }
+
+  [data-theme="light"] .portal-logo {
+    filter: brightness(0) saturate(100%) invert(7%) sepia(7%) saturate(1918%) hue-rotate(190deg) brightness(94%) contrast(94%);
+  }
+
+  [data-theme="dark"] .portal-logo {
+    filter: none;
+  }
+
+  .norstec-stripes {
+    display: flex;
+    height: 0.45rem;
+    gap: 0.35rem;
+  }
+
+  .norstec-stripes > span {
+    flex: 1;
+  }
+
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+}
+
+::selection {
+  background: var(--color-beachball);
+  color: var(--color-moody);
+}
