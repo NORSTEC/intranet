@@ -192,6 +192,7 @@ export type Database = {
         Row: {
           created_at: string
           ended_at: string | null
+          ends_on: string | null
           id: number
           joined_at: string
           organization_id: number
@@ -205,6 +206,7 @@ export type Database = {
         Insert: {
           created_at?: string
           ended_at?: string | null
+          ends_on?: string | null
           id?: never
           joined_at?: string
           organization_id: number
@@ -218,6 +220,7 @@ export type Database = {
         Update: {
           created_at?: string
           ended_at?: string | null
+          ends_on?: string | null
           id?: never
           joined_at?: string
           organization_id?: number
@@ -298,6 +301,7 @@ export type Database = {
           id: number
           last_name: string | null
           linkedin_url: string | null
+          phone_number: string | null
           portal_access_status: string
           source: string
           study_year: number | null
@@ -313,6 +317,7 @@ export type Database = {
           id?: never
           last_name?: string | null
           linkedin_url?: string | null
+          phone_number?: string | null
           portal_access_status?: string
           source?: string
           study_year?: number | null
@@ -328,6 +333,7 @@ export type Database = {
           id?: never
           last_name?: string | null
           linkedin_url?: string | null
+          phone_number?: string | null
           portal_access_status?: string
           source?: string
           study_year?: number | null
@@ -414,28 +420,34 @@ export type Database = {
       team_memberships: {
         Row: {
           created_at: string
+          ends_on: string | null
           id: number
           person_id: number
           role_title: string | null
           sort_order: number
+          starts_on: string | null
           team_id: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          ends_on?: string | null
           id?: never
           person_id: number
           role_title?: string | null
           sort_order?: number
+          starts_on?: string | null
           team_id: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          ends_on?: string | null
           id?: never
           person_id?: number
           role_title?: string | null
           sort_order?: number
+          starts_on?: string | null
           team_id?: number
           updated_at?: string
         }

@@ -17,6 +17,8 @@ export type PortalProfile = {
   lastName: string | null;
   fieldOfStudy: string | null;
   studyYear: number | null;
+  phoneNumber: string | null;
+  linkedinUrl: string | null;
 };
 
 export type PortalAccessState =

@@ -6,6 +6,10 @@ import { motion, useReducedMotion } from "motion/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { HamburgerSpin } from "@/components/portal/hamburger-spin";
+import {
+  PortalBreadcrumbProvider,
+  usePortalBreadcrumbLabels,
+} from "@/components/portal/portal-breadcrumb-data";
 import { PortalLogoToggle } from "@/components/portal/portal-logo-toggle";
 import { useTheme } from "@/hooks/use-theme";
 import type { PortalRole } from "@/lib/auth/types";
@@ -273,15 +277,19 @@ function AccountSummary({
 
 function Breadcrumbs() {
   const pathname = usePathname();
+  const dynamicLabels = usePortalBreadcrumbLabels();
   const segments = pathname.split("/").filter(Boolean);
   const crumbs = segments.flatMap((segment, index) => {
     const isTeamCollectionSegment =
       segment === "teams" && segments[0] === "organizations" && index === 2;
-    if (isTeamCollectionSegment) return [];
+    const isMemberCollectionSegment =
+      segment === "members" && segments[0] === "organizations" && index === 4;
+    if (isTeamCollectionSegment || isMemberCollectionSegment) return [];
 
     const href = `/${segments.slice(0, index + 1).join("/")}`;
     const decoded = decodeURIComponent(segment).replaceAll("-", " ");
     const label =
+      dynamicLabels[href] ??
       breadcrumbLabels[segment] ??
       decoded.replace(/\b\w/g, (letter) => letter.toUpperCase());
     return [{ href, label }];
@@ -429,7 +437,8 @@ export function PortalShell({
     : { type: "spring" as const, stiffness: 280, damping: 30, mass: 0.9 };
 
   return (
-    <div className="min-h-screen bg-egg text-moody">
+    <PortalBreadcrumbProvider>
+      <div className="min-h-screen bg-egg text-moody">
       <DesktopSidebar
         displayName={displayName}
         organizationName={organizationName}
@@ -517,6 +526,7 @@ export function PortalShell({
           {children}
         </div>
       </main>
-    </div>
+      </div>
+    </PortalBreadcrumbProvider>
   );
 }

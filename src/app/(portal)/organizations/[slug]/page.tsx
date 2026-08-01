@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OrganizationLogo } from "@/components/portal/organization-logo";
+import { PortalBreadcrumbData } from "@/components/portal/portal-breadcrumb-data";
 import { requirePortalAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
@@ -68,6 +69,9 @@ export default async function OrganizationDetailsPage({
 
   return (
     <>
+      <PortalBreadcrumbData
+        labels={{ [`/organizations/${organization.slug}`]: organization.name }}
+      />
       <section className="grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-center lg:gap-12">
         <OrganizationLogo
           logoPath={organization.logo_path}

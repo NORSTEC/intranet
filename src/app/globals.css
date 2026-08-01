@@ -535,6 +535,24 @@ html.theme-switching *::after {
     transform: scale(0.98);
   }
 
+  .portal-contact-button {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--color-moody);
+    border-radius: 9999px;
+    background: var(--color-moody);
+    color: var(--color-egg);
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .portal-contact-button:hover {
+    background: transparent;
+    color: var(--color-moody);
+  }
+
   @media (min-width: 1280px) {
     .portal-surface {
       border-width: 1px;
@@ -550,26 +568,6 @@ html.theme-switching *::after {
 
   .organization-logo-white {
     filter: brightness(0) invert(1);
-  }
-
-  .portal-social-button {
-    display: inline-flex;
-    height: 2.25rem;
-    width: 2.25rem;
-    flex-shrink: 0;
-    cursor: pointer;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--color-moody);
-    border-radius: 9999px;
-    background: var(--color-moody);
-    color: var(--color-egg);
-    transition: background-color 180ms ease, color 180ms ease;
-  }
-
-  .portal-social-button:hover {
-    background: transparent;
-    color: var(--color-moody);
   }
 
   .section-label {

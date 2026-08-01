@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(31);
+select plan(41);
 
 insert into public.people (
   full_name,
@@ -31,6 +31,22 @@ select
 from public.people as person
 where person.full_name = 'Pre-created Member';
 
+insert into public.person_emails (
+  person_id,
+  email,
+  email_type,
+  is_primary,
+  source
+)
+select
+  person.id,
+  'precreated.personal@example.com',
+  'personal',
+  false,
+  'manual'
+from public.people as person
+where person.full_name = 'Pre-created Member';
+
 insert into public.memberships (
   person_id,
   organization_id,
@@ -48,6 +64,31 @@ from public.people as person
 cross join public.organizations as organization
 where person.full_name = 'Pre-created Member'
   and organization.slug = 'norstec';
+
+insert into public.organizations (slug, name, status)
+values ('history-organization', 'History Organization', 'active');
+
+insert into public.memberships (
+  person_id,
+  organization_id,
+  role,
+  status,
+  provisioning_method,
+  starts_on,
+  ends_on
+)
+select
+  person.id,
+  organization.id,
+  'member',
+  'ended',
+  'manual',
+  '2023-08-01'::date,
+  '2024-06-30'::date
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Pre-created Member'
+  and organization.slug = 'history-organization';
 
 insert into public.teams (
   organization_id,
@@ -292,6 +333,99 @@ select set_config(
   true
 );
 
+select lives_ok(
+  $$
+    update public.people
+    set phone_number = '+47 900 00 000'
+    where id = (select private.current_person_id())
+  $$,
+  'a member can update their own phone number'
+);
+
+select is(
+  (
+    select phone_number
+    from public.people
+    where id = (select private.current_person_id())
+  ),
+  '+47 900 00 000',
+  'the updated phone number is stored on the member'
+);
+
+update public.people
+set phone_number = '+47 911 11 111'
+where full_name = 'Pre-created Member';
+
+select is(
+  (
+    select phone_number
+    from public.people
+    where full_name = 'Pre-created Member'
+  ),
+  null::text,
+  'a member cannot update another person phone number'
+);
+
+select lives_ok(
+  $$
+    update public.memberships
+    set starts_on = '2025-08-01',
+        ends_on = null
+    where person_id = (select private.current_person_id())
+      and organization_id = (
+        select id from public.organizations where slug = 'norstec'
+      )
+  $$,
+  'a member can update their own organization history dates'
+);
+
+select is(
+  (
+    select starts_on
+    from public.memberships
+    where person_id = (select private.current_person_id())
+      and organization_id = (
+        select id from public.organizations where slug = 'norstec'
+      )
+  ),
+  '2025-08-01'::date,
+  'the organization history start date is stored'
+);
+
+select lives_ok(
+  $$
+    insert into public.team_memberships (
+      team_id,
+      person_id,
+      role_title,
+      starts_on,
+      ends_on
+    )
+    select
+      team.id,
+      (select private.current_person_id()),
+      'Project Engineer',
+      '2025-09-01'::date,
+      null
+    from public.teams as team
+    where team.slug = 'pre-created-team'
+  $$,
+  'a member can add their own history in a team from their organization'
+);
+
+select is(
+  (
+    select role_title
+    from public.team_memberships
+    where person_id = (select private.current_person_id())
+      and team_id = (
+        select id from public.teams where slug = 'pre-created-team'
+      )
+  ),
+  'Project Engineer',
+  'the self-authored team role is stored'
+);
+
 select is(
   (
     select count(*)
@@ -320,6 +454,31 @@ select is(
   ),
   1::bigint,
   'an active member can read team memberships'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where person_id = (
+      select id from public.people where full_name = 'Pre-created Member'
+    )
+  ),
+  1::bigint,
+  'a member can read an organization email but not a personal email'
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships
+    where organization_id = (
+      select id from public.organizations where slug = 'history-organization'
+    )
+      and status = 'ended'
+  ),
+  1::bigint,
+  'an active member can read another member public organization history'
 );
 
 select is(
@@ -422,6 +581,18 @@ select is(
   'a Norstec admin can read audit events'
 );
 
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where person_id = (
+      select id from public.people where full_name = 'Pre-created Member'
+    )
+  ),
+  2::bigint,
+  'a Norstec admin can read both organization and personal emails'
+);
+
 reset role;
 
 select is(
@@ -498,8 +669,11 @@ select is(
     select count(*)
     from public.memberships as membership
     join public.people as person on person.id = membership.person_id
+    join public.organizations as organization
+      on organization.id = membership.organization_id
     where person.full_name = 'Pre-created Member'
       and membership.provisioning_method = 'manual'
+      and organization.slug = 'norstec'
   ),
   1::bigint,
   'claiming a record preserves its manually created membership'

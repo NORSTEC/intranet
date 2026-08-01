@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PortalBreadcrumbData } from "@/components/portal/portal-breadcrumb-data";
 import { TeamMemberCard } from "@/components/portal/team-member-card";
 import { requirePortalAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -13,14 +14,23 @@ type TeamMemberRow = {
         id: number;
         full_name: string | null;
         avatar_path: string | null;
+        phone_number: string | null;
         linkedin_url: string | null;
       }
     | Array<{
         id: number;
         full_name: string | null;
         avatar_path: string | null;
+        phone_number: string | null;
         linkedin_url: string | null;
       }>;
+};
+
+type PersonEmailRow = {
+  person_id: number;
+  email: string;
+  email_type: string;
+  is_primary: boolean;
 };
 
 export default async function TeamDetailsPage({
@@ -34,7 +44,7 @@ export default async function TeamDetailsPage({
 
   const organizationResult = await supabase
     .from("organizations")
-    .select("id")
+    .select("id, name")
     .eq("slug", slug)
     .eq("status", "active")
     .maybeSingle();
@@ -56,7 +66,7 @@ export default async function TeamDetailsPage({
   const membersResult = await supabase
     .from("team_memberships")
     .select(
-      "id, role_title, sort_order, people (id, full_name, avatar_path, linkedin_url)",
+      "id, role_title, sort_order, people (id, full_name, avatar_path, phone_number, linkedin_url)",
     )
     .eq("team_id", teamResult.data.id)
     .order("sort_order");
@@ -71,12 +81,36 @@ export default async function TeamDetailsPage({
         : membership.people,
     }))
     .filter((membership) => Boolean(membership.person));
-  const avatarUrls = await getMemberAvatarUrls(
-    members.map((membership) => membership.person.avatar_path),
-  );
+  const [avatarUrls, emailsResult] = await Promise.all([
+    getMemberAvatarUrls(members.map((membership) => membership.person.avatar_path)),
+    members.length
+      ? supabase
+          .from("person_emails")
+          .select("person_id, email, email_type, is_primary")
+          .in(
+            "person_id",
+            members.map((membership) => membership.person.id),
+          )
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (emailsResult.error) throw new Error("Could not load member contact details");
+
+  const emailsByPerson = new Map<number, PersonEmailRow[]>();
+  for (const personEmail of emailsResult.data as PersonEmailRow[]) {
+    const emails = emailsByPerson.get(personEmail.person_id) ?? [];
+    emails.push(personEmail);
+    emailsByPerson.set(personEmail.person_id, emails);
+  }
 
   return (
     <>
+      <PortalBreadcrumbData
+        labels={{
+          [`/organizations/${slug}`]: organizationResult.data.name,
+          [`/organizations/${slug}/teams/${teamSlug}`]: teamResult.data.name,
+        }}
+      />
       <header className="max-w-3xl">
         <h1 className="text-h2">{teamResult.data.name}</h1>
         {teamResult.data.description && (
@@ -89,13 +123,21 @@ export default async function TeamDetailsPage({
           {members.map((membership) => {
             const name = membership.person.full_name ?? "Unnamed member";
             const avatarPath = membership.person.avatar_path;
+            const personEmails = emailsByPerson.get(membership.person.id) ?? [];
+            const preferredEmail =
+              personEmails.find((email) => email.email_type === "organization") ??
+              personEmails.find((email) => email.is_primary) ??
+              personEmails[0];
 
             return (
               <TeamMemberCard
                 avatarUrl={avatarPath ? avatarUrls.get(avatarPath) : undefined}
+                email={preferredEmail?.email}
+                href={`/organizations/${slug}/teams/${teamSlug}/members/${membership.person.id}`}
                 key={membership.id}
                 linkedinUrl={membership.person.linkedin_url}
                 name={name}
+                phoneNumber={membership.person.phone_number}
                 roleTitle={membership.role_title}
               />
             );

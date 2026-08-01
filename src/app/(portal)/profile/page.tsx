@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requirePortalAccess } from "@/lib/auth/access";
 
 const roleLabels = {
@@ -13,6 +14,8 @@ export default async function ProfilePage() {
     ["Email", access.profile.email],
     ["Field of study", access.profile.fieldOfStudy ?? "Not provided"],
     ["Study year", access.profile.studyYear?.toString() ?? "Not provided"],
+    ["Phone", access.profile.phoneNumber ?? "Not provided"],
+    ["LinkedIn", access.profile.linkedinUrl ?? "Not provided"],
   ];
 
   return (
@@ -22,9 +25,9 @@ export default async function ProfilePage() {
           <h2 className="text-h2">Personal information</h2>
           <p className="mt-2 text-sm opacity-50">Visible to your organization</p>
         </div>
-        <button className="portal-button portal-button-secondary" type="button">
+        <Link className="portal-button portal-button-secondary" href="/profile/edit">
           <span className="material-symbols-outlined text-[1.1rem]">edit</span>Edit
-        </button>
+        </Link>
       </div>
 
       <dl className="mt-7 grid gap-4 sm:grid-cols-2">

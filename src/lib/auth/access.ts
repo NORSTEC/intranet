@@ -16,6 +16,8 @@ type ProfileRow = {
   last_name: string | null;
   field_of_study: string | null;
   study_year: number | null;
+  phone_number: string | null;
+  linkedin_url: string | null;
 };
 
 type PortalAccountRow = {
@@ -54,7 +56,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   const accountResult = await supabase
     .from("portal_accounts")
     .select(
-      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year)",
+      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url)",
     )
     .eq("auth_user_id", user.id)
     .maybeSingle();
@@ -96,6 +98,8 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     lastName: profileRow.last_name,
     fieldOfStudy: profileRow.field_of_study,
     studyYear: profileRow.study_year,
+    phoneNumber: profileRow.phone_number,
+    linkedinUrl: profileRow.linkedin_url,
   };
 
   const memberships: PortalMembership[] = [];
