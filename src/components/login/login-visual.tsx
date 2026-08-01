@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "motion/react";
+import { useTheme } from "@/hooks/use-theme";
 
 const COLORS = ["#1697B7", "#30C3CD", "#F3AD78", "#E8804C"] as const;
 const LETTER_DELAY = 0.04;
@@ -97,5 +99,48 @@ export function EggNorstecLogo() {
         maskSize: "contain",
       }}
     />
+  );
+}
+
+export function MobileLoginHeader() {
+  const { resolvedTheme, toggleTheme } = useTheme();
+  const themeIcon = resolvedTheme === "dark" ? "light_mode" : "dark_mode";
+
+  return (
+    <div className="flex items-center justify-between lg:hidden">
+      <div className="flex items-center gap-4">
+        <div className="relative size-11" aria-hidden="true">
+          <motion.div
+            className="absolute inset-0 bg-moody [mask:url('/images/logo.png')_center/contain_no-repeat]"
+            initial={false}
+            animate={{ opacity: resolvedTheme === "dark" ? 0 : 1 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.8, 0.5, 1] }}
+          />
+          <motion.div
+            className="absolute inset-0"
+            initial={false}
+            animate={{ opacity: resolvedTheme === "dark" ? 1 : 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.8, 0.5, 1] }}
+          >
+            <Image src="/images/logo.png" alt="" fill priority className="object-contain" />
+          </motion.div>
+        </div>
+        <div>
+          <p className="-ml-[0.06em] text-xl font-light uppercase tracking-[0.14em]">Norstec</p>
+          <p className="mt-0.5 text-left text-xs font-medium uppercase tracking-[0.34em] opacity-55">
+            Portal
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors duration-200"
+        aria-label="Toggle color theme"
+      >
+        <span className="icon icon-24">{themeIcon}</span>
+      </button>
+    </div>
   );
 }

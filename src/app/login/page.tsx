@@ -3,11 +3,12 @@ import {
   AnimatedTagline,
   EggNorstecLogo,
   LoginStripes,
+  MobileLoginHeader,
 } from "@/components/login/login-visual";
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-screen bg-[#EDE8DA] text-[#0f1118] lg:grid-cols-2">
+    <main className="grid min-h-screen bg-egg text-moody lg:grid-cols-2">
       <section className="relative hidden min-h-screen overflow-hidden bg-[#0f1118] p-12 lg:flex lg:items-center lg:justify-center xl:p-20">
         <LoginStripes />
 
@@ -29,25 +30,19 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <section className="flex min-h-screen flex-col bg-[#EDE8DA] px-5 py-8 sm:px-10 lg:px-16 xl:px-24">
-        <div className="flex items-center gap-4 lg:hidden">
-          <div className="size-11 bg-[#0f1118] [mask:url('/images/logo.png')_center/contain_no-repeat]" aria-hidden="true" />
-          <div>
-            <p className="-ml-[0.06em] text-xl font-light uppercase tracking-[0.14em]">Norstec</p>
-            <p className="mt-0.5 text-left text-xs font-medium uppercase tracking-[0.34em] opacity-55">Portal</p>
-          </div>
-        </div>
+      <section className="flex min-h-screen flex-col bg-egg px-5 py-8 text-moody transition-colors duration-200 sm:px-10 lg:bg-[#EDE8DA] lg:px-16 lg:text-[#0f1118] xl:px-24">
+        <MobileLoginHeader />
 
         <div className="my-auto w-full max-w-md self-center py-16">
           <h1 className="flex items-center gap-2 text-4xl font-light uppercase sm:text-5xl">
             Sign in
             <span
               aria-hidden="true"
-              className="inline-block size-6 shrink-0 bg-[url('/images/star.svg')] bg-contain bg-center bg-no-repeat md:size-8"
+              className="login-heading-star inline-block shrink-0"
             />
           </h1>
 
-          <Link href="/" className="mt-8 flex min-h-12 w-full items-center justify-center gap-3 rounded-full border-2 border-[#0f1118] bg-[#0f1118] px-5 font-medium text-[#EDE8DA] transition-colors hover:bg-transparent hover:text-[#0f1118]">
+          <Link href="/" className="mt-8 flex min-h-12 w-full items-center justify-center gap-3 rounded-full border-2 border-moody bg-moody px-5 font-medium text-egg transition-colors hover:bg-transparent hover:text-moody lg:border-[#0f1118] lg:bg-[#0f1118] lg:text-[#EDE8DA] lg:hover:text-[#0f1118]">
             Continue with Google
             <span className="material-symbols-outlined">arrow_right_alt</span>
           </Link>
@@ -60,7 +55,7 @@ export default function LoginPage() {
                 <div><p className="text-sm font-medium">Organization account</p><p className="mt-1 text-sm leading-5 opacity-55">Use the Google account provided by a Norstec member organization. Approved organization accounts get direct access.</p></div>
               </li>
               <li className="flex gap-4">
-                <span className="material-symbols-outlined mt-0.5 text-[1.3rem]">person_add</span>
+                <span className="material-symbols-outlined mt-0.5 text-[1.3rem]">person</span>
                 <div><p className="text-sm font-medium">Personal account</p><p className="mt-1 text-sm leading-5 opacity-55">Use your personal Google account if your organization does not provide one, or if you are an alumnus. You can request access after signing in.</p></div>
               </li>
             </ol>

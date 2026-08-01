@@ -175,6 +175,29 @@
     vertical-align: -0.15em;
   }
 
+  .login-heading-star {
+    width: 1.5rem;
+    height: 1.5rem;
+    background: url("/images/star.svg") center / contain no-repeat;
+  }
+
+  [data-theme="dark"] .login-heading-star {
+    background-image: url("/images/star-egg.png");
+  }
+
+  @media (min-width: 768px) {
+    .login-heading-star {
+      width: 2rem;
+      height: 2rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    [data-theme="dark"] .login-heading-star {
+      background-image: url("/images/star.svg");
+    }
+  }
+
   [data-theme="dark"] .page-star {
     background-image: url("/images/star-egg.png");
   }

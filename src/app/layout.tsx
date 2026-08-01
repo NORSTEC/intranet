@@ -16,7 +16,10 @@ export const metadata: Metadata = {
     template: "%s | Norstec Portal",
   },
   description: "The internal portal for Norstec member organizations.",
-  icons: { icon: "/images/logo.png" },
+  icons: {
+    icon: [{ url: "/favicon.ico?v=3", type: "image/x-icon" }],
+    shortcut: "/favicon.ico?v=3",
+  },
 };
 
 const themeInitScript = `
