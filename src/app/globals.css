@@ -250,6 +250,14 @@ html.theme-switching *::after {
     transition: width 300ms ease, background-color 200ms ease, color 200ms ease;
   }
 
+  .portal-sidebar-navigation {
+    scrollbar-width: none;
+  }
+
+  .portal-sidebar-navigation::-webkit-scrollbar {
+    display: none;
+  }
+
   [data-theme="dark"] .portal-sidebar {
     border-right-color: #ede8da;
   }
@@ -465,8 +473,9 @@ html.theme-switching *::after {
   }
 
   .portal-surface {
-    border-radius: 1.5rem;
-    background: color-mix(in srgb, var(--color-moody) 6%, transparent);
+    border: 2px solid var(--color-moody);
+    border-radius: 2rem;
+    background: var(--color-egg);
   }
 
   .portal-surface-strong {
@@ -519,12 +528,48 @@ html.theme-switching *::after {
   }
 
   .portal-card-link {
-    transition: transform 180ms ease, background-color 180ms ease;
+    transition: transform 180ms ease;
   }
 
   .portal-card-link:hover {
-    transform: scale(0.985);
-    background: color-mix(in srgb, var(--color-moody) 10%, transparent);
+    transform: scale(0.98);
+  }
+
+  @media (min-width: 1280px) {
+    .portal-surface {
+      border-width: 1px;
+    }
+  }
+
+  .organization-logo-norstec {
+    display: block;
+    background: #ede8da;
+    -webkit-mask: url("/images/logo.png") center / contain no-repeat;
+    mask: url("/images/logo.png") center / contain no-repeat;
+  }
+
+  .organization-logo-white {
+    filter: brightness(0) invert(1);
+  }
+
+  .portal-social-button {
+    display: inline-flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--color-moody);
+    border-radius: 9999px;
+    background: var(--color-moody);
+    color: var(--color-egg);
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .portal-social-button:hover {
+    background: transparent;
+    color: var(--color-moody);
   }
 
   .section-label {

@@ -10,7 +10,6 @@ export default async function ProfilePage() {
   const access = await requirePortalAccess();
   const details = [
     ["Name", access.profile.fullName ?? "Not provided"],
-    ["Organization", access.membership.organizationName],
     ["Email", access.profile.email],
     ["Field of study", access.profile.fieldOfStudy ?? "Not provided"],
     ["Study year", access.profile.studyYear?.toString() ?? "Not provided"],
@@ -37,15 +36,19 @@ export default async function ProfilePage() {
             </dd>
           </div>
         ))}
-        <div className="portal-surface min-h-32 p-6">
-          <dt className="section-label opacity-45">Role</dt>
-          <dd className="mt-4">
-            <span className="portal-pill">
-              {roleLabels[access.membership.role]}
-            </span>
-          </dd>
-        </div>
       </dl>
+
+      <section className="mt-12">
+        <h2 className="text-h2">Organizations</h2>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {access.memberships.map((membership) => (
+            <article key={membership.id} className="portal-surface flex min-h-32 flex-col items-start p-6">
+              <p className="font-medium">{membership.organizationName}</p>
+              <span className="portal-pill mt-auto">{roleLabels[membership.role]}</span>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <div className="portal-surface mt-8 flex items-start gap-4 p-5 text-sm">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-beachball text-moody-static">

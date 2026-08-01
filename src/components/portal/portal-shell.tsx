@@ -10,33 +10,63 @@ import { PortalLogoToggle } from "@/components/portal/portal-logo-toggle";
 import { useTheme } from "@/hooks/use-theme";
 import type { PortalRole } from "@/lib/auth/types";
 
-const navigationGroups = [
+type NavigationItem = {
+  label: string;
+  href: string;
+  icon: string;
+  nested?: boolean;
+  admin?: "organization" | "norstec";
+};
+
+const navigationGroups: { label: string; items: NavigationItem[] }[] = [
   {
     label: "Portal",
     items: [
       { label: "Dashboard", href: "/", icon: "dashboard" },
-      { label: "Teams", href: "/teams", icon: "groups" },
+      { label: "Organizations", href: "/organizations", icon: "domain", nested: true },
+      { label: "Members", href: "/members", icon: "groups" },
+      { label: "Statistics", href: "/statistics", icon: "monitoring" },
     ],
   },
   {
     label: "Account",
-    items: [{ label: "Profile", href: "/profile", icon: "person" }],
+    items: [{ label: "My profile", href: "/profile", icon: "person" }],
   },
   {
     label: "Administration",
     items: [
-      { label: "Organization", href: "/organization", icon: "domain" },
-      { label: "Norstec admin", href: "/admin", icon: "admin_panel_settings" },
+      { label: "Access requests", href: "/administration/access-requests", icon: "person_check", admin: "organization" },
+      { label: "Member status", href: "/administration/members", icon: "manage_accounts", admin: "organization" },
+      { label: "Organization settings", href: "/administration/organization", icon: "settings", admin: "organization" },
+      { label: "Team management", href: "/administration/teams", icon: "group_work", admin: "organization" },
+    ],
+  },
+  {
+    label: "Norstec administration",
+    items: [
+      { label: "Portal management", href: "/admin", icon: "admin_panel_settings", admin: "norstec" },
+      { label: "Audit log", href: "/admin/audit-log", icon: "history", admin: "norstec" },
     ],
   },
 ];
 
 const breadcrumbLabels: Record<string, string> = {
-  admin: "Norstec admin",
+  admin: "Portal management",
+  administration: "Administration",
+  "access-requests": "Access requests",
+  "audit-log": "Audit log",
+  members: "Members",
   organization: "Organization",
+  organizations: "Organizations",
   profile: "Profile",
+  statistics: "Statistics",
   teams: "Teams",
 };
+
+function isActiveNavigationItem(pathname: string, href: string, nested?: boolean) {
+  if (href === "/") return pathname === href;
+  return pathname === href || Boolean(nested && pathname.startsWith(`${href}/`));
+}
 
 function Navigation({
   role,
@@ -50,14 +80,14 @@ function Navigation({
   desktop?: boolean;
 }) {
   const pathname = usePathname();
+  const isNorstecAdmin = role === "norstec_admin";
+  const canAdministerOrganization = role === "organization_admin" || isNorstecAdmin;
   const groups = navigationGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter(({ href }) => {
-        if (href === "/admin") return role === "norstec_admin";
-        if (href === "/organization") {
-          return role === "organization_admin" || role === "norstec_admin";
-        }
+      items: group.items.filter(({ admin }) => {
+        if (admin === "norstec") return isNorstecAdmin;
+        if (admin === "organization") return canAdministerOrganization;
         return true;
       }),
     }))
@@ -68,8 +98,8 @@ function Navigation({
       return (
         <nav aria-label="Portal navigation" className="flex flex-col gap-2.5">
           {groups.flatMap((group) =>
-            group.items.map(({ label, href, icon }) => {
-              const isActive = pathname === href;
+            group.items.map(({ label, href, icon, nested }) => {
+              const isActive = isActiveNavigationItem(pathname, href, nested);
 
               return (
                 <Link
@@ -96,8 +126,8 @@ function Navigation({
           <div key={group.label}>
             <p className="portal-nav-group-title">{group.label}</p>
             <div className="mt-3 flex flex-col gap-1">
-              {group.items.map(({ label, href, icon }) => {
-                const isActive = pathname === href;
+              {group.items.map(({ label, href, icon, nested }) => {
+                const isActive = isActiveNavigationItem(pathname, href, nested);
 
                 return (
                   <Link
@@ -128,8 +158,8 @@ function Navigation({
             {group.label}
           </p>
           <div className="mt-3 flex flex-col gap-2.5">
-            {group.items.map(({ label, href }) => {
-              const isActive = pathname === href;
+            {group.items.map(({ label, href, nested }) => {
+              const isActive = isActiveNavigationItem(pathname, href, nested);
 
               return (
                 <Link
@@ -244,11 +274,17 @@ function AccountSummary({
 function Breadcrumbs() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
-  const crumbs = segments.map((segment, index) => {
+  const crumbs = segments.flatMap((segment, index) => {
+    const isTeamCollectionSegment =
+      segment === "teams" && segments[0] === "organizations" && index === 2;
+    if (isTeamCollectionSegment) return [];
+
     const href = `/${segments.slice(0, index + 1).join("/")}`;
     const decoded = decodeURIComponent(segment).replaceAll("-", " ");
-    const label = breadcrumbLabels[segment] ?? decoded.replace(/\b\w/g, (letter) => letter.toUpperCase());
-    return { href, label };
+    const label =
+      breadcrumbLabels[segment] ??
+      decoded.replace(/\b\w/g, (letter) => letter.toUpperCase());
+    return [{ href, label }];
   });
 
   if (segments.length === 0) {
@@ -319,7 +355,7 @@ function DesktopSidebar({
           </Link>
         </div>
 
-        <div className="mt-14">
+        <div className="portal-sidebar-navigation mt-10 min-h-0 flex-1 overflow-y-auto">
           <Navigation role={role} collapsed={collapsed} desktop />
         </div>
 

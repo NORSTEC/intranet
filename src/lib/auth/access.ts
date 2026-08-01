@@ -10,13 +10,19 @@ import type {
 } from "@/lib/auth/types";
 
 type ProfileRow = {
-  user_id: string;
-  email: string;
+  id: number;
   full_name: string | null;
   first_name: string | null;
   last_name: string | null;
   field_of_study: string | null;
   study_year: number | null;
+};
+
+type PortalAccountRow = {
+  auth_user_id: string;
+  person_id: number;
+  account_email: string;
+  people: ProfileRow | ProfileRow[];
 };
 
 type MembershipRow = {
@@ -45,34 +51,46 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     return { status: "unauthenticated" };
   }
 
-  const [profileResult, membershipsResult] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(
-        "user_id, email, full_name, first_name, last_name, field_of_study, study_year",
-      )
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("memberships")
-      .select("id, organization_id, role, organizations (id, name, slug)")
-      .eq("user_id", user.id)
-      .eq("status", "active"),
-  ]);
+  const accountResult = await supabase
+    .from("portal_accounts")
+    .select(
+      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year)",
+    )
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
 
-  if (profileResult.error || membershipsResult.error || !profileResult.data) {
+  if (accountResult.error || !accountResult.data) {
     return { status: "error" };
   }
 
-  const profileRow = profileResult.data as ProfileRow;
+  const accountRow = accountResult.data as PortalAccountRow;
+  const [membershipsResult] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select("id, organization_id, role, organizations (id, name, slug)")
+      .eq("person_id", accountRow.person_id)
+      .eq("status", "active"),
+  ]);
+
+  if (membershipsResult.error) {
+    return { status: "error" };
+  }
+
+  const profileRow = Array.isArray(accountRow.people)
+    ? accountRow.people[0]
+    : accountRow.people;
+  if (!profileRow) {
+    return { status: "error" };
+  }
   const membershipRows = (membershipsResult.data ?? []) as MembershipRow[];
-  const primaryMembershipRow = membershipRows.sort(
+  const sortedMembershipRows = membershipRows.sort(
     (left, right) => rolePriority[right.role] - rolePriority[left.role],
-  )[0];
+  );
 
   const profile: PortalProfile = {
-    userId: profileRow.user_id,
-    email: profileRow.email,
+    personId: profileRow.id,
+    userId: accountRow.auth_user_id,
+    email: accountRow.account_email,
     fullName: profileRow.full_name,
     firstName: profileRow.first_name,
     lastName: profileRow.last_name,
@@ -80,26 +98,31 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     studyYear: profileRow.study_year,
   };
 
-  let membership: PortalMembership | null = null;
-  if (primaryMembershipRow) {
-    const organization = Array.isArray(primaryMembershipRow.organizations)
-      ? primaryMembershipRow.organizations[0]
-      : primaryMembershipRow.organizations;
+  const memberships: PortalMembership[] = [];
+  for (const membershipRow of sortedMembershipRows) {
+    const organization = Array.isArray(membershipRow.organizations)
+      ? membershipRow.organizations[0]
+      : membershipRow.organizations;
 
     if (!organization) {
       return { status: "error" };
     }
 
-    membership = {
-      id: primaryMembershipRow.id,
-      organizationId: primaryMembershipRow.organization_id,
+    memberships.push({
+      id: membershipRow.id,
+      organizationId: membershipRow.organization_id,
       organizationName: organization.name,
       organizationSlug: organization.slug,
-      role: primaryMembershipRow.role,
-    };
+      role: membershipRow.role,
+    });
   }
 
-  return { status: "authenticated", profile, membership };
+  return {
+    status: "authenticated",
+    profile,
+    membership: memberships[0] ?? null,
+    memberships,
+  };
 }
 
 export async function requirePortalAccess() {

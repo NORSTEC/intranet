@@ -49,7 +49,7 @@ export default async function AccessPage({
     supabase
       .from("access_requests")
       .select("id, status, organizations (name)")
-      .eq("user_id", access.profile.userId)
+      .eq("person_id", access.profile.personId)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(1)

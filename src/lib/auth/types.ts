@@ -9,6 +9,7 @@ export type PortalMembership = {
 };
 
 export type PortalProfile = {
+  personId: number;
   userId: string;
   email: string;
   fullName: string | null;
@@ -25,4 +26,5 @@ export type PortalAccessState =
       status: "authenticated";
       profile: PortalProfile;
       membership: PortalMembership | null;
+      memberships: PortalMembership[];
     };

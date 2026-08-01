@@ -25,10 +25,20 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=oauth_callback", requestUrl.origin));
   }
 
+  const { data: account, error: accountError } = await supabase
+    .from("portal_accounts")
+    .select("person_id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (accountError || !account) {
+    return NextResponse.redirect(new URL("/login?error=authorization", requestUrl.origin));
+  }
+
   const { data: membership, error: membershipError } = await supabase
     .from("memberships")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("person_id", account.person_id)
     .eq("status", "active")
     .limit(1)
     .maybeSingle();

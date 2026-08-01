@@ -17,12 +17,12 @@ export type Database = {
           id: number
           message: string | null
           organization_id: number
+          person_id: number
           reviewed_at: string | null
-          reviewed_by: string | null
+          reviewed_by_person_id: number | null
           status: string
           study_year: number | null
           updated_at: string
-          user_id: string
         }
         Insert: {
           created_at?: string
@@ -31,12 +31,12 @@ export type Database = {
           id?: never
           message?: string | null
           organization_id: number
+          person_id: number
           reviewed_at?: string | null
-          reviewed_by?: string | null
+          reviewed_by_person_id?: number | null
           status?: string
           study_year?: number | null
           updated_at?: string
-          user_id: string
         }
         Update: {
           created_at?: string
@@ -45,12 +45,12 @@ export type Database = {
           id?: never
           message?: string | null
           organization_id?: number
+          person_id?: number
           reviewed_at?: string | null
-          reviewed_by?: string | null
+          reviewed_by_person_id?: number | null
           status?: string
           study_year?: number | null
           updated_at?: string
-          user_id?: string
         }
         Relationships: [
           {
@@ -61,56 +61,56 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "access_requests_reviewed_by_fkey"
-            columns: ["reviewed_by"]
+            foreignKeyName: "access_requests_person_id_fkey"
+            columns: ["person_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "access_requests_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "access_requests_reviewed_by_person_id_fkey"
+            columns: ["reviewed_by_person_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
         ]
       }
       audit_events: {
         Row: {
           action: string
-          actor_user_id: string | null
+          actor_person_id: number | null
           created_at: string
           details: Json
           id: number
           organization_id: number | null
-          target_user_id: string | null
+          target_person_id: number | null
         }
         Insert: {
           action: string
-          actor_user_id?: string | null
+          actor_person_id?: number | null
           created_at?: string
           details?: Json
           id?: never
           organization_id?: number | null
-          target_user_id?: string | null
+          target_person_id?: number | null
         }
         Update: {
           action?: string
-          actor_user_id?: string | null
+          actor_person_id?: number | null
           created_at?: string
           details?: Json
           id?: never
           organization_id?: number | null
-          target_user_id?: string | null
+          target_person_id?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "audit_events_actor_user_id_fkey"
-            columns: ["actor_user_id"]
+            foreignKeyName: "audit_events_actor_person_id_fkey"
+            columns: ["actor_person_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "audit_events_organization_id_fkey"
@@ -120,11 +120,71 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "audit_events_target_user_id_fkey"
-            columns: ["target_user_id"]
+            foreignKeyName: "audit_events_target_person_id_fkey"
+            columns: ["target_person_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_accounts: {
+        Row: {
+          account_email: string | null
+          created_at: string
+          deprovisioned_at: string | null
+          external_id: string | null
+          id: number
+          last_error: string | null
+          organization_id: number
+          person_id: number
+          provider: string
+          provisioned_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_email?: string | null
+          created_at?: string
+          deprovisioned_at?: string | null
+          external_id?: string | null
+          id?: never
+          last_error?: string | null
+          organization_id: number
+          person_id: number
+          provider: string
+          provisioned_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_email?: string | null
+          created_at?: string
+          deprovisioned_at?: string | null
+          external_id?: string | null
+          id?: never
+          last_error?: string | null
+          organization_id?: number
+          person_id?: number
+          provider?: string
+          provisioned_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_accounts_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -135,11 +195,12 @@ export type Database = {
           id: number
           joined_at: string
           organization_id: number
+          person_id: number
           provisioning_method: string
           role: string
+          starts_on: string | null
           status: string
           updated_at: string
-          user_id: string
         }
         Insert: {
           created_at?: string
@@ -147,11 +208,12 @@ export type Database = {
           id?: never
           joined_at?: string
           organization_id: number
+          person_id: number
           provisioning_method?: string
           role?: string
+          starts_on?: string | null
           status?: string
           updated_at?: string
-          user_id: string
         }
         Update: {
           created_at?: string
@@ -159,11 +221,12 @@ export type Database = {
           id?: never
           joined_at?: string
           organization_id?: number
+          person_id?: number
           provisioning_method?: string
           role?: string
+          starts_on?: string | null
           status?: string
           updated_at?: string
-          user_id?: string
         }
         Relationships: [
           {
@@ -174,11 +237,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "memberships_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "memberships_person_id_fkey"
+            columns: ["person_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -186,64 +249,253 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          location: string | null
+          logo_path: string | null
           name: string
+          short_description: string | null
+          slug: string
+          specialization: string | null
+          status: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          location?: string | null
+          logo_path?: string | null
+          name: string
+          short_description?: string | null
+          slug: string
+          specialization?: string | null
+          status?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          location?: string | null
+          logo_path?: string | null
+          name?: string
+          short_description?: string | null
+          slug?: string
+          specialization?: string | null
+          status?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      people: {
+        Row: {
+          avatar_alt: string | null
+          avatar_path: string | null
+          created_at: string
+          field_of_study: string | null
+          first_name: string | null
+          full_name: string | null
+          id: number
+          last_name: string | null
+          linkedin_url: string | null
+          portal_access_status: string
+          source: string
+          study_year: number | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_alt?: string | null
+          avatar_path?: string | null
+          created_at?: string
+          field_of_study?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: never
+          last_name?: string | null
+          linkedin_url?: string | null
+          portal_access_status?: string
+          source?: string
+          study_year?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_alt?: string | null
+          avatar_path?: string | null
+          created_at?: string
+          field_of_study?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: never
+          last_name?: string | null
+          linkedin_url?: string | null
+          portal_access_status?: string
+          source?: string
+          study_year?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      person_emails: {
+        Row: {
+          created_at: string
+          email: string
+          email_type: string
+          id: number
+          is_primary: boolean
+          person_id: number
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          email_type?: string
+          id?: never
+          is_primary?: boolean
+          person_id: number
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          email_type?: string
+          id?: never
+          is_primary?: boolean
+          person_id?: number
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_emails_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portal_accounts: {
+        Row: {
+          account_email: string
+          auth_user_id: string
+          last_seen_at: string
+          linked_at: string
+          person_id: number
+          provider: string
+        }
+        Insert: {
+          account_email: string
+          auth_user_id: string
+          last_seen_at?: string
+          linked_at?: string
+          person_id: number
+          provider?: string
+        }
+        Update: {
+          account_email?: string
+          auth_user_id?: string
+          last_seen_at?: string
+          linked_at?: string
+          person_id?: number
+          provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_accounts_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_memberships: {
+        Row: {
+          created_at: string
+          id: number
+          person_id: number
+          role_title: string | null
+          sort_order: number
+          team_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          person_id: number
+          role_title?: string | null
+          sort_order?: number
+          team_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          person_id?: number
+          role_title?: string | null
+          sort_order?: number
+          team_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_memberships_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_memberships_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: number
+          name: string
+          organization_id: number
           slug: string
           status: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: never
           name: string
+          organization_id: number
           slug: string
           status?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: never
           name?: string
+          organization_id?: number
           slug?: string
           status?: string
           updated_at?: string
         }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          created_at: string
-          email: string
-          field_of_study: string | null
-          first_name: string | null
-          full_name: string | null
-          last_name: string | null
-          study_year: number | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          field_of_study?: string | null
-          first_name?: string | null
-          full_name?: string | null
-          last_name?: string | null
-          study_year?: number | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          field_of_study?: string | null
-          first_name?: string | null
-          full_name?: string | null
-          last_name?: string | null
-          study_year?: number | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "teams_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -393,4 +645,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
