@@ -12,11 +12,12 @@ These are separate concepts:
 3. An active membership connects the user to an organization.
 4. Membership and system roles determine what the user may access.
 
-A successful Google sign-in must not automatically grant access to member data.
-An authenticated user without an active membership may only access onboarding.
+A verified Google account from an approved Workspace domain receives an active
+`member` membership automatically. A personal Google account receives only a
+profile and onboarding access until its request is approved.
 
-Workspace domains may help suggest or verify an organization, but must never
-grant an administrative role automatically.
+Domain matching must never grant an administrative role. `organization_admin`
+and `norstec_admin` are assigned through authorized, audited operations.
 
 ## Proposed roles
 
@@ -24,8 +25,8 @@ grant an administrative role automatically.
 - `organization_admin`
 - `norstec_admin`
 
-Organization-scoped roles and global Norstec roles should be represented
-separately in the data model.
+Roles are attached to memberships. An active `norstec_admin` membership grants
+global portal administration.
 
 ## Role scope
 
@@ -55,7 +56,8 @@ Roles must always be assigned through an authorized and audited operation.
   permission functions.
 - Privileged service credentials are never included in browser bundles.
 - Global administrator roles are assigned manually and audited.
-- Administrative access requires an additional authentication factor.
+- Administrative access requires an additional authentication factor before
+  production launch.
 
 ## Data and environment rules
 

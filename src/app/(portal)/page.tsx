@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/portal/page-header";
+import { requirePortalAccess } from "@/lib/auth/access";
 
 const activity = [
   ["Ada Fjell joined Propulsion", "Today"],
@@ -7,10 +8,13 @@ const activity = [
   ["Mina Isaksen became an alumnus", "28 July"],
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const access = await requirePortalAccess();
+  const canAdminister = access.membership.role !== "member";
+
   return (
     <>
-      <PageHeader title="Dashboard" description="Orbit NTNU" />
+      <PageHeader title="Dashboard" description={access.membership.organizationName} />
 
       <section className="grid border-b-2 border-moody md:grid-cols-3 md:divide-x-2 md:divide-moody">
         <div className="border-t-2 border-moody py-5 md:border-0 md:px-6 md:first:pl-0">
@@ -35,10 +39,12 @@ export default function DashboardPage() {
               <span><span className="block font-medium">Complete your profile</span><span className="text-sm opacity-50">Add study year</span></span>
               <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_right_alt</span>
             </Link>
-            <Link href="/organization" className="group flex items-center justify-between border-b border-moody/25 py-5">
-              <span><span className="block font-medium">Review access requests</span><span className="text-sm opacity-50">3 pending</span></span>
-              <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_right_alt</span>
-            </Link>
+            {canAdminister && (
+              <Link href="/organization" className="group flex items-center justify-between border-b border-moody/25 py-5">
+                <span><span className="block font-medium">Review access requests</span></span>
+                <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_right_alt</span>
+              </Link>
+            )}
           </div>
         </section>
 

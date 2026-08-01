@@ -16,7 +16,28 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=oauth_callback", requestUrl.origin));
   }
 
-  // Membership and role provisioning is intentionally handled in the next
-  // backend step. Authentication alone must never grant portal access.
-  return NextResponse.redirect(new URL("/access?status=authenticated", requestUrl.origin));
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.redirect(new URL("/login?error=oauth_callback", requestUrl.origin));
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("memberships")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) {
+    return NextResponse.redirect(new URL("/login?error=authorization", requestUrl.origin));
+  }
+
+  return NextResponse.redirect(
+    new URL(membership ? "/" : "/access", requestUrl.origin),
+  );
 }

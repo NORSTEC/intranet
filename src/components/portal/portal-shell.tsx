@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useTheme } from "@/hooks/use-theme";
+import type { PortalRole } from "@/lib/auth/types";
 
 const mainNavigation = [
   { label: "Dashboard", href: "/" },
@@ -36,7 +37,13 @@ function PortalMark({ light = false }: { light?: boolean }) {
   );
 }
 
-function Navigation({ onNavigate }: { onNavigate?: () => void }) {
+function Navigation({
+  role,
+  onNavigate,
+}: {
+  role: PortalRole;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const link = ({ label, href }: { label: string; href: string }) => (
     <Link
@@ -49,12 +56,21 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
     </Link>
   );
 
+  const visibleAdminNavigation = adminNavigation.filter(({ href }) => {
+    if (href === "/admin") return role === "norstec_admin";
+    return role === "organization_admin" || role === "norstec_admin";
+  });
+
   return (
     <nav aria-label="Portal navigation" className="flex flex-col">
       <p className="section-label mb-2 px-3 opacity-45">Portal</p>
       {mainNavigation.map(link)}
-      <p className="section-label mb-2 mt-8 px-3 opacity-45">Administration</p>
-      {adminNavigation.map(link)}
+      {visibleAdminNavigation.length > 0 && (
+        <>
+          <p className="section-label mb-2 mt-8 px-3 opacity-45">Administration</p>
+          {visibleAdminNavigation.map(link)}
+        </>
+      )}
     </nav>
   );
 }
@@ -77,7 +93,17 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function PortalShell({ children }: { children: React.ReactNode }) {
+export function PortalShell({
+  children,
+  displayName,
+  organizationName,
+  role,
+}: {
+  children: React.ReactNode;
+  displayName: string;
+  organizationName: string;
+  role: PortalRole;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -87,15 +113,17 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         <div className="norstec-stripes mb-10 px-7" aria-hidden="true">
           <span className="bg-copper" /><span className="bg-sun" /><span className="bg-beachball" /><span className="bg-sky" />
         </div>
-        <div className="flex-1 px-4"><Navigation /></div>
+        <div className="flex-1 px-4"><Navigation role={role} /></div>
         <div className="border-t-2 border-moody px-5 py-4">
-          <p className="px-2 text-sm font-medium">Eirik Engen Kvam</p>
-          <p className="px-2 text-xs opacity-50">Orbit NTNU</p>
+          <p className="truncate px-2 text-sm font-medium">{displayName}</p>
+          <p className="truncate px-2 text-xs opacity-50">{organizationName}</p>
           <div className="mt-3 flex items-center justify-between">
             <ThemeToggle />
-            <Link href="/login" className="flex size-10 items-center justify-center" aria-label="Sign out">
-              <span className="material-symbols-outlined text-[1.25rem]">logout</span>
-            </Link>
+            <form action="/auth/signout" method="post">
+              <button type="submit" className="flex size-10 items-center justify-center" aria-label="Sign out">
+                <span className="material-symbols-outlined text-[1.25rem]">logout</span>
+              </button>
+            </form>
           </div>
         </div>
       </aside>
@@ -118,7 +146,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
               <span className="material-symbols-outlined">close</span>
             </button>
           </div>
-          <div className="px-5 py-10"><Navigation onNavigate={() => setMenuOpen(false)} /></div>
+          <div className="px-5 py-10"><Navigation role={role} onNavigate={() => setMenuOpen(false)} /></div>
         </div>
       )}
 

@@ -4,9 +4,9 @@ Norstec Portal is an internal membership system for Norstec and its member
 organizations. It will manage member profiles, organizations, teams, roles,
 alumni transitions, and access to connected services such as Slack.
 
-> **Status:** Authentication foundation and frontend prototype. Google OAuth is
-> connected through Supabase, while portal pages still use synthetic data.
-> Database authorization, memberships, and access requests are not connected yet.
+> **Status:** Google authentication, membership provisioning, access requests,
+> role checks, database migrations, and Row Level Security are implemented.
+> Several portal feature pages still contain prototype data.
 
 ## Stack
 
@@ -16,10 +16,10 @@ The current frontend uses:
 - Tailwind CSS and Material Symbols
 - The shared Norstec visual identity and light/dark theme behavior
 - Supabase Auth with server-side session cookies
+- Supabase Postgres with versioned migrations and Row Level Security
 - pnpm
 
-PostgreSQL schema migrations, database-enforced authorization, automated tests,
-and deployment to NTNU OpenStack are planned but not implemented.
+Deployment to NTNU OpenStack is not implemented yet.
 
 ## Repository approach
 
@@ -52,6 +52,14 @@ Open `http://localhost:3000`. The current prototype includes:
 - `/teams` — team directory
 - `/organization` — organization administration
 - `/admin` — Norstec administration
+
+Run the local database migration and authorization tests with Docker running:
+
+```bash
+pnpm exec supabase db start
+pnpm exec supabase db reset --local
+pnpm exec supabase test db --local supabase/tests/database/authorization.test.sql
+```
 
 Before submitting changes, run:
 

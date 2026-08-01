@@ -1,15 +1,23 @@
 import { PageHeader } from "@/components/portal/page-header";
+import { requirePortalAccess } from "@/lib/auth/access";
 
-const details = [
-  ["Name", "Eirik Engen Kvam"],
-  ["Organization", "Orbit NTNU"],
-  ["Email", "eirik@orbitntnu.com"],
-  ["Field of study", "Cybernetics and Robotics"],
-  ["Study year", "Not provided"],
-  ["Role", "Organization admin"],
-];
+const roleLabels = {
+  member: "Member",
+  organization_admin: "Organization admin",
+  norstec_admin: "Norstec admin",
+};
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const access = await requirePortalAccess();
+  const details = [
+    ["Name", access.profile.fullName ?? "Not provided"],
+    ["Organization", access.membership.organizationName],
+    ["Email", access.profile.email],
+    ["Field of study", access.profile.fieldOfStudy ?? "Not provided"],
+    ["Study year", access.profile.studyYear?.toString() ?? "Not provided"],
+    ["Role", roleLabels[access.membership.role]],
+  ];
+
   return (
     <>
       <PageHeader title="Profile" />

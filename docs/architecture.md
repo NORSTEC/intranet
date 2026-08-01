@@ -28,8 +28,9 @@ out of browser bundles.
 │       ├── db/
 │       ├── permissions/
 │       └── services/
-├── database/
-│   └── migrations/
+├── supabase/
+│   ├── migrations/
+│   └── tests/
 ├── docs/
 ├── tests/
 └── deploy/
@@ -47,9 +48,10 @@ of truth.
 
 ![Authentication and membership flow](diagrams/authentication-membership-flow.png)
 
-Google establishes identity only. PostgreSQL membership records determine portal
-access and roles. A Google Workspace domain may help suggest an organization,
-but it must not grant membership or an administrator role automatically.
+Google establishes identity. A verified account from an approved Workspace
+domain receives the `member` role automatically. PostgreSQL membership records
+determine all subsequent access, and administrative roles are always assigned
+separately.
 
 ## Conceptual data model
 
@@ -63,11 +65,11 @@ finalized after the membership lifecycle and permission rules are approved.
 | Area | Proposal | Status |
 | --- | --- | --- |
 | Web application | Next.js App Router, React, TypeScript | Preferred |
-| User interface | Tailwind CSS, shadcn/ui | Preferred |
-| Validation | Zod | Proposed |
-| Authentication | Google through an authentication provider | Provider undecided |
-| Database | PostgreSQL | Preferred |
-| Authorization | Membership tables plus PostgreSQL Row Level Security | Proposed |
+| User interface | Tailwind CSS and Material Symbols | Selected |
+| Validation | Server-side validation and database constraints | Implemented for access requests |
+| Authentication | Google through Supabase Auth | Selected |
+| Database | Supabase Postgres | Selected |
+| Authorization | Membership tables plus PostgreSQL Row Level Security | Implemented foundation |
 | Unit testing | Vitest and React Testing Library | Proposed |
 | End-to-end testing | Playwright | Proposed |
 | Hosting | Docker on NTNU OpenStack | Preferred |
@@ -78,4 +80,3 @@ finalized after the membership lifecycle and permission rules are approved.
 
 - [Next.js App Router](https://nextjs.org/docs/app)
 - [Next.js Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers)
-- [shadcn/ui for Next.js](https://ui.shadcn.com/docs/installation/next)

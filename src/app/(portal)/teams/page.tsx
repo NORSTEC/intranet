@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/portal/page-header";
+import { requirePortalAccess } from "@/lib/auth/access";
 
 const teams = [
   ["Propulsion", "Engine development and testing", "16"],
@@ -7,13 +8,18 @@ const teams = [
   ["Business", "Partnerships and operations", "9"],
 ];
 
-export default function TeamsPage() {
+export default async function TeamsPage() {
+  const access = await requirePortalAccess();
+  const canAdminister = access.membership.role !== "member";
+
   return (
     <>
-      <PageHeader title="Teams" description="Orbit NTNU" />
-      <div className="flex justify-end pb-5">
-        <button className="portal-button" type="button"><span className="material-symbols-outlined text-[1.15rem]">add</span>New team</button>
-      </div>
+      <PageHeader title="Teams" description={access.membership.organizationName} />
+      {canAdminister && (
+        <div className="flex justify-end pb-5">
+          <button className="portal-button" type="button"><span className="material-symbols-outlined text-[1.15rem]">add</span>New team</button>
+        </div>
+      )}
       <div className="border-t-2 border-moody">
         {teams.map(([name, description, members]) => (
           <button key={name} type="button" className="group grid w-full items-center gap-2 border-b border-moody/25 py-6 text-left sm:grid-cols-[1fr_1.4fr_auto]">

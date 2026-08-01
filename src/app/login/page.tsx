@@ -54,6 +54,11 @@ export default async function LoginPage({
               Google sign-in could not be completed. Please try again.
             </p>
           )}
+          {error === "authorization" && (
+            <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
+              Portal access could not be checked. Please try again.
+            </p>
+          )}
 
           <div className="mt-12">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-50">Which account should I use?</p>

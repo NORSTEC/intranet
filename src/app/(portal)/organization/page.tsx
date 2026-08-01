@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/portal/page-header";
+import { requirePortalRole } from "@/lib/auth/access";
 
 const requests = [
   ["Emilie Moe", "emilie@orbitntnu.com"],
@@ -13,10 +14,12 @@ const members = [
   ["Lars Krogh", "Propulsion", "Member", "Active"],
 ];
 
-export default function OrganizationPage() {
+export default async function OrganizationPage() {
+  const access = await requirePortalRole(["organization_admin", "norstec_admin"]);
+
   return (
     <>
-      <PageHeader title="Organization" description="Orbit NTNU" />
+      <PageHeader title="Organization" description={access.membership.organizationName} />
 
       <section>
         <div className="flex items-center justify-between"><h2 className="text-h2">Access requests</h2><span className="text-sm text-copper">3 pending</span></div>

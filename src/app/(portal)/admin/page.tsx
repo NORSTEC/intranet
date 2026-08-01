@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/portal/page-header";
+import { requirePortalRole } from "@/lib/auth/access";
 
 const organizations = [
   ["Orbit NTNU", "orbitntnu.com", "128", "Active"],
@@ -7,7 +8,9 @@ const organizations = [
   ["Propulse NTNU", "propulsentnu.no", "54", "Active"],
 ];
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  await requirePortalRole(["norstec_admin"]);
+
   return (
     <>
       <PageHeader title="Norstec admin" />
