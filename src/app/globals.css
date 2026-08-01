@@ -18,6 +18,7 @@
   --color-sky: #1697b7;
   --font-sans: var(--font-barlow), "Arial Narrow", Arial, sans-serif;
   --font-display: "Oughter", var(--font-barlow), sans-serif;
+  --breakpoint-3xl: 125rem;
 }
 
 [data-theme="dark"] {
@@ -27,6 +28,13 @@
   --color-sun: #f3ad78;
   --color-beachball: #30c3cd;
   --color-sky: #1697b7;
+}
+
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition-delay: 0ms !important;
+  transition-duration: 0ms !important;
 }
 
 @layer base {
@@ -50,20 +58,38 @@
     line-height: 1.75;
   }
 
-  button,
-  a,
-  input,
-  select,
-  textarea {
-    outline-color: var(--color-copper);
-    outline-offset: 3px;
+}
+
+@layer utilities {
+  .bg-moody-static {
+    background-color: #0f1118;
+  }
+
+  .text-egg-static {
+    color: #ede8da;
+  }
+
+  .bg-egg-static {
+    background-color: #ede8da;
+  }
+
+  .text-moody-static {
+    color: #0f1118;
+  }
+
+  .border-moody-static {
+    border-color: #0f1118;
+  }
+
+  .border-egg-static {
+    border-color: #ede8da;
   }
 }
 
 @layer components {
   .text-h1 {
     font-family: var(--font-barlow);
-    font-size: clamp(2.4rem, 5vw, 6.5rem);
+    font-size: clamp(2.5rem, 5vw, 5.75rem);
     font-weight: 300;
     line-height: 0.95;
     text-transform: uppercase;
@@ -74,6 +100,12 @@
     font-size: clamp(1.35rem, 2.2vw, 2.5rem);
     font-weight: 300;
     text-transform: uppercase;
+  }
+
+  .text-h3 {
+    font-family: var(--font-barlow);
+    font-size: clamp(1.05rem, 1.35vw, 1.4rem);
+    font-weight: 400;
   }
 
   .portal-button {
@@ -99,13 +131,13 @@
   }
 
   .portal-button-secondary {
-    background: transparent;
-    color: var(--color-moody);
+    background: var(--color-moody);
+    color: var(--color-egg);
   }
 
   .portal-button-secondary:hover {
-    background: var(--color-moody);
-    color: var(--color-egg);
+    background: transparent;
+    color: var(--color-moody);
   }
 
   .portal-field {
@@ -128,42 +160,264 @@
     color: color-mix(in srgb, var(--color-moody) 40%, transparent);
   }
 
-  .portal-nav-item {
+  .portal-menu-link {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
     min-height: 2.75rem;
-    padding: 0.4rem 0.75rem;
-    font-size: 0.95rem;
+    align-items: center;
+    gap: 0.55rem;
+    width: fit-content;
+    color: inherit;
+    font-size: clamp(1.05rem, 1.25vw, 1.2rem);
     font-weight: 400;
+    line-height: 1.3;
+    white-space: nowrap;
+    transition: color 180ms ease;
+  }
+
+  .portal-menu-link::after {
+    content: "";
+    display: inline-block;
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: 0 0 auto;
+    background-image: url("/images/star-outline.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: 0;
     transition: opacity 160ms ease;
   }
 
-  .portal-nav-item:hover {
-    opacity: 0.65;
+  .portal-menu-link:hover {
+    color: inherit;
   }
 
-  .portal-nav-item::before {
-    content: "";
-    width: 1.15rem;
-    height: 1.15rem;
-    flex: none;
-    background: url("/images/star-outline.png") center / contain no-repeat;
-    opacity: 0;
+  .portal-menu-link:hover::after {
+    opacity: 1;
   }
 
-  .portal-nav-item:hover::before {
-    opacity: 0.55;
-  }
-
-  .portal-nav-item-active {
-    color: var(--color-copper);
+  .portal-menu-link-active {
+    color: #e8804c;
     font-style: italic;
   }
 
-  .portal-nav-item-active::before {
-    background-image: url("/images/star-orange.svg");
+  .portal-menu-link-active::after,
+  .portal-menu-link-active:hover::after {
     opacity: 1;
+    background-image: url("/images/star-orange.svg");
+  }
+
+  .portal-menu-link-active:hover {
+    color: #e8804c;
+  }
+
+  .portal-menu-link-collapsed {
+    width: 2.75rem;
+    height: 3.25rem;
+    gap: 0;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 9999px;
+  }
+
+  .portal-menu-link-desktop {
+    height: 2.25rem;
+    min-height: 0;
+  }
+
+  .portal-menu-link-collapsed::after {
+    display: none;
+  }
+
+  .portal-menu-link-collapsed:hover {
+    background: transparent;
+    color: #e8804c;
+  }
+
+  .portal-nav-group-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    line-height: 1;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+
+  .portal-sidebar {
+    border-right: 1px solid #0f1118;
+    background: var(--color-egg);
+    color: var(--color-moody);
+    transition: width 300ms ease, background-color 200ms ease, color 200ms ease;
+  }
+
+  [data-theme="dark"] .portal-sidebar {
+    border-right-color: #ede8da;
+  }
+
+  .portal-sidebar-brand-wrap {
+    position: relative;
+    display: block;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: 0 0 auto;
+  }
+
+  .portal-sidebar-brand-mark,
+  .portal-sidebar-brand-color {
+    position: absolute;
+    inset: 0;
+    transition: opacity 200ms ease;
+  }
+
+  .portal-sidebar-brand-mark {
+    background-color: currentColor;
+    -webkit-mask: url("/images/logo.png") center / contain no-repeat;
+    mask: url("/images/logo.png") center / contain no-repeat;
+  }
+
+  .portal-sidebar-brand-color {
+    opacity: 0;
+  }
+
+  [data-theme="dark"] .portal-sidebar-brand-mark {
+    opacity: 0;
+  }
+
+  [data-theme="dark"] .portal-sidebar-brand-color {
+    opacity: 1;
+  }
+
+  .portal-account-button {
+    display: inline-flex;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 2px solid var(--color-moody);
+    border-radius: 9999px;
+    background: var(--color-moody);
+    padding: 0 1rem;
+    color: var(--color-egg);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .portal-sidebar-action {
+    gap: 0.5rem;
+    justify-content: flex-start;
+    overflow: hidden;
+    padding: 0 0.9rem;
+    white-space: nowrap;
+    transition: width 280ms ease, padding 280ms ease, background-color 180ms ease, color 180ms ease;
+  }
+
+  .portal-sidebar-action-signout {
+    width: 7.25rem;
+  }
+
+  .portal-sidebar-action-theme {
+    width: 8.375rem;
+  }
+
+  .portal-sidebar-action-collapsed {
+    width: 2.75rem;
+    gap: 0;
+    justify-content: flex-start;
+    padding: 0 0 0 0.5rem;
+  }
+
+  .portal-sidebar-action-label {
+    max-width: 8rem;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 280ms ease, opacity 150ms ease;
+  }
+
+  .portal-sidebar-action-collapsed .portal-sidebar-action-label {
+    max-width: 0;
+  }
+
+  .portal-account-button:hover {
+    background: transparent;
+    color: var(--color-moody);
+  }
+
+  .portal-account-icon-button,
+  .portal-sidebar-toggle {
+    display: inline-flex;
+    width: 2.5rem;
+    height: 2.5rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--color-moody);
+    border-radius: 9999px;
+    background: var(--color-moody);
+    color: var(--color-egg);
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .portal-sidebar-toggle {
+    right: 0;
+  }
+
+  .portal-sidebar-toggle-collapsed {
+    right: -0.375rem;
+  }
+
+  .portal-account-icon-button:hover {
+    background: transparent;
+    color: var(--color-moody);
+  }
+
+  .portal-sidebar-toggle:hover {
+    border-color: var(--color-moody);
+    background: var(--color-egg);
+    color: var(--color-moody);
+  }
+
+  #portal-menu .portal-account-button {
+    border-color: #ede8da;
+    background: #ede8da;
+    color: #0f1118;
+  }
+
+  #portal-menu .portal-account-button:hover {
+    background: transparent;
+    color: #ede8da;
+  }
+
+  .portal-breadcrumbs {
+    margin-bottom: 2rem;
+    color: color-mix(in srgb, var(--color-moody) 48%, transparent);
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+
+  .portal-breadcrumbs a {
+    transition: color 160ms ease;
+  }
+
+  .portal-breadcrumbs a:hover {
+    color: var(--color-moody);
+  }
+
+  .portal-breadcrumbs [aria-current="page"] {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  @media (max-width: 1023px) {
+    .portal-menu-link {
+      font-size: 1.2rem;
+    }
+  }
+
+  .portal-logo-monochrome {
+    filter: brightness(0) saturate(100%) invert(7%) sepia(7%) saturate(1918%) hue-rotate(190deg) brightness(94%) contrast(94%);
   }
 
   .page-star {
@@ -210,22 +464,67 @@
     background-image: url("/images/star.svg");
   }
 
-  [data-theme="light"] .portal-logo {
-    filter: brightness(0) saturate(100%) invert(7%) sepia(7%) saturate(1918%) hue-rotate(190deg) brightness(94%) contrast(94%);
+  .portal-surface {
+    border-radius: 1.5rem;
+    background: color-mix(in srgb, var(--color-moody) 6%, transparent);
   }
 
-  [data-theme="dark"] .portal-logo {
-    filter: none;
+  .portal-surface-strong {
+    border-radius: 1.5rem;
+    background: var(--color-moody);
+    color: var(--color-egg);
   }
 
-  .norstec-stripes {
-    display: flex;
-    height: 0.45rem;
-    gap: 0.35rem;
+  .portal-pill {
+    display: inline-flex;
+    width: fit-content;
+    min-height: 2rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: 2px solid var(--color-moody);
+    border-radius: 9999px;
+    background: transparent;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--color-moody);
   }
 
-  .norstec-stripes > span {
-    flex: 1;
+  .portal-pill-filled {
+    border-color: var(--color-moody);
+    background: var(--color-moody);
+    color: var(--color-egg);
+  }
+
+  .portal-pill-outline {
+    background: transparent;
+    color: var(--color-moody);
+  }
+
+  button.portal-pill {
+    cursor: pointer;
+    border-color: var(--color-moody);
+    background: var(--color-moody);
+    color: var(--color-egg);
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  button.portal-pill:hover {
+    background: transparent;
+    color: var(--color-moody);
+  }
+
+  .portal-card-link {
+    transition: transform 180ms ease, background-color 180ms ease;
+  }
+
+  .portal-card-link:hover {
+    transform: scale(0.985);
+    background: color-mix(in srgb, var(--color-moody) 10%, transparent);
   }
 
   .section-label {

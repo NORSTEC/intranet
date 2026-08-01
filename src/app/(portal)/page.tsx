@@ -14,35 +14,44 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" description={access.membership.organizationName} />
+      <PageHeader description={access.membership.organizationName} />
 
-      <section className="grid border-b-2 border-moody md:grid-cols-3 md:divide-x-2 md:divide-moody">
-        <div className="border-t-2 border-moody py-5 md:border-0 md:px-6 md:first:pl-0">
-          <p className="section-label opacity-50">Membership</p>
-          <p className="mt-2 text-xl">Active</p>
-        </div>
-        <div className="border-t-2 border-moody py-5 md:border-0 md:px-6">
-          <p className="section-label opacity-50">Team</p>
-          <p className="mt-2 text-xl">Propulsion</p>
-        </div>
-        <div className="border-t-2 border-moody py-5 md:border-0 md:px-6">
-          <p className="section-label opacity-50">Members</p>
-          <p className="mt-2 text-xl">128</p>
-        </div>
+      <section aria-label="Membership overview" className="flex flex-wrap gap-3">
+        <span className="portal-pill">
+          <span className="size-2 rounded-full bg-beachball" />Active membership
+        </span>
+        <span className="portal-pill portal-pill-outline">Propulsion team</span>
+        <span className="portal-pill portal-pill-outline">128 members</span>
       </section>
 
-      <div className="mt-14 grid gap-14 lg:grid-cols-2 lg:gap-20">
+      <div className="mt-14 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
         <section>
           <h2 className="text-h2">Next</h2>
-          <div className="mt-5 border-t-2 border-moody">
-            <Link href="/profile" className="group flex items-center justify-between border-b border-moody/25 py-5">
-              <span><span className="block font-medium">Complete your profile</span><span className="text-sm opacity-50">Add study year</span></span>
-              <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_right_alt</span>
+          <div className="mt-6 grid gap-4">
+            <Link
+              href="/profile"
+              className="portal-surface portal-card-link group flex items-center justify-between gap-6 p-6 sm:p-7"
+            >
+              <span>
+                <span className="block text-h3 font-medium">Complete your profile</span>
+                <span className="mt-2 block text-sm opacity-55">Add your study year</span>
+              </span>
+              <span className="portal-pill portal-pill-filled">
+                Open<span className="material-symbols-outlined text-[1rem]">trending_flat</span>
+              </span>
             </Link>
             {canAdminister && (
-              <Link href="/organization" className="group flex items-center justify-between border-b border-moody/25 py-5">
-                <span><span className="block font-medium">Review access requests</span></span>
-                <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_right_alt</span>
+              <Link
+                href="/organization"
+                className="portal-surface portal-card-link group flex items-center justify-between gap-6 p-6 sm:p-7"
+              >
+                <span>
+                  <span className="block text-h3 font-medium">Review access requests</span>
+                  <span className="mt-2 block text-sm opacity-55">3 requests are waiting</span>
+                </span>
+                <span className="portal-pill portal-pill-filled">
+                  Review<span className="material-symbols-outlined text-[1rem]">trending_flat</span>
+                </span>
               </Link>
             )}
           </div>
@@ -50,10 +59,14 @@ export default async function DashboardPage() {
 
         <section>
           <h2 className="text-h2">Recent activity</h2>
-          <div className="mt-5 border-t-2 border-moody">
+          <div className="portal-surface mt-6 space-y-3 p-4 sm:p-5">
             {activity.map(([label, date]) => (
-              <div key={label} className="flex items-start justify-between gap-5 border-b border-moody/25 py-5">
-                <p className="text-sm">{label}</p><time className="shrink-0 text-xs opacity-45">{date}</time>
+              <div
+                key={label}
+                className="flex items-start justify-between gap-5 rounded-2xl bg-egg/60 p-4"
+              >
+                <p className="text-sm">{label}</p>
+                <time className="portal-pill portal-pill-outline shrink-0">{date}</time>
               </div>
             ))}
           </div>

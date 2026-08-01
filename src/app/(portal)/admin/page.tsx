@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/portal/page-header";
 import { requirePortalRole } from "@/lib/auth/access";
 
 const organizations = [
@@ -13,24 +12,52 @@ export default async function AdminPage() {
 
   return (
     <>
-      <PageHeader title="Norstec admin" />
-      <section className="grid border-b-2 border-moody md:grid-cols-3 md:divide-x-2 md:divide-moody">
+      <section className="grid gap-4 sm:grid-cols-3">
         {[["Organizations", "8"], ["Members", "624"], ["Admins", "23"]].map(([label, value]) => (
-          <div key={label} className="border-t-2 border-moody py-5 md:border-0 md:px-6 md:first:pl-0"><p className="section-label opacity-50">{label}</p><p className="mt-2 text-2xl">{value}</p></div>
+          <article key={label} className="portal-surface p-6">
+            <p className="section-label opacity-50">{label}</p>
+            <p className="mt-3 text-4xl font-light">{value}</p>
+          </article>
         ))}
       </section>
-      <section className="mt-14">
-        <div className="flex items-center justify-between"><h2 className="text-h2">Organizations</h2><button className="portal-button" type="button"><span className="material-symbols-outlined text-[1.15rem]">add</span>Add</button></div>
-        <div className="mt-5 border-t-2 border-moody">
+
+      <section className="mt-16">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-h2">Organizations</h2>
+          <button className="portal-button" type="button">
+            <span className="material-symbols-outlined text-[1.15rem]">add</span>Add
+          </button>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
           {organizations.map(([name, domain, members, status]) => (
-            <button key={name} type="button" className="group grid w-full items-center gap-2 border-b border-moody/25 py-5 text-left sm:grid-cols-[1fr_1fr_auto_auto] sm:gap-8">
-              <span className="font-medium">{name}</span><span className="text-sm opacity-50">{domain}</span><span className="text-sm">{members} members</span><span className={`flex items-center gap-3 text-sm ${status === "Review" ? "text-copper" : ""}`}>{status}<span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_right_alt</span></span>
+            <button
+              key={name}
+              type="button"
+              className="portal-surface portal-card-link group flex min-h-44 flex-col items-start p-6 text-left"
+            >
+              <div className="flex w-full items-start justify-between gap-4">
+                <span className="portal-pill">
+                  {status}
+                </span>
+                <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">trending_flat</span>
+              </div>
+              <span className="mt-7 text-xl font-medium">{name}</span>
+              <span className="mt-1 text-sm opacity-50">{domain}</span>
+              <span className="portal-pill portal-pill-outline mt-auto">{members} members</span>
             </button>
           ))}
         </div>
       </section>
-      <section className="mt-14 border-t-2 border-moody pt-5">
-        <div className="flex items-start gap-3"><span className="material-symbols-outlined text-copper">warning</span><div><h2 className="font-medium">Access review</h2><p className="mt-1 text-sm opacity-55">2 administrator roles need review.</p></div><button className="portal-button portal-button-secondary ml-auto" type="button">Review</button></div>
+
+      <section className="portal-surface mt-10 flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
+        <span className="flex size-11 items-center justify-center rounded-full bg-copper text-moody-static">
+          <span className="material-symbols-outlined">warning</span>
+        </span>
+        <div>
+          <h2 className="font-medium">Access review</h2>
+          <p className="mt-1 text-sm opacity-55">2 administrator roles need review.</p>
+        </div>
+        <button className="portal-button sm:ml-auto" type="button">Review</button>
       </section>
     </>
   );

@@ -24,6 +24,26 @@ function resolveTheme(theme: ThemeSetting) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = React.useState<ThemeSetting>("system");
   const [resolvedTheme, setResolvedTheme] = React.useState<"light" | "dark">("light");
+  const transitionFrame = React.useRef<number | null>(null);
+
+  const applyResolvedTheme = React.useCallback((next: "light" | "dark") => {
+    const root = document.documentElement;
+
+    if (transitionFrame.current !== null) {
+      window.cancelAnimationFrame(transitionFrame.current);
+    }
+
+    root.classList.add("theme-switching");
+    setResolvedTheme(next);
+    root.dataset.theme = next;
+
+    transitionFrame.current = window.requestAnimationFrame(() => {
+      transitionFrame.current = window.requestAnimationFrame(() => {
+        root.classList.remove("theme-switching");
+        transitionFrame.current = null;
+      });
+    });
+  }, []);
 
   React.useEffect(() => {
     const stored = localStorage.getItem("theme-preference");
@@ -41,23 +61,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
       const next = query.matches ? "dark" : "light";
-      setResolvedTheme(next);
-      document.documentElement.dataset.theme = next;
+      applyResolvedTheme(next);
     };
     apply();
     query.addEventListener("change", apply);
     return () => query.removeEventListener("change", apply);
-  }, [theme]);
+  }, [applyResolvedTheme, theme]);
 
   React.useEffect(() => {
     const next = resolveTheme(theme);
-    // Keep the icon state in sync with the theme applied to the document.
+    // Keep React state and the pre-hydration document theme synchronized.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setResolvedTheme(next);
-    document.documentElement.dataset.theme = next;
+    applyResolvedTheme(next);
     if (theme === "system") localStorage.removeItem("theme-preference");
     else localStorage.setItem("theme-preference", theme);
-  }, [theme]);
+  }, [applyResolvedTheme, theme]);
+
+  React.useEffect(() => {
+    return () => {
+      if (transitionFrame.current !== null) {
+        window.cancelAnimationFrame(transitionFrame.current);
+      }
+      document.documentElement.classList.remove("theme-switching");
+    };
+  }, []);
 
   const toggleTheme = React.useCallback(() => {
     setTheme((current) => (resolveTheme(current) === "dark" ? "light" : "dark"));

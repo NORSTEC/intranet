@@ -70,7 +70,7 @@ export default async function AccessPage({
 
   return (
     <main className="min-h-screen bg-egg px-5 py-6 text-moody sm:px-8 lg:px-12">
-      <header className="mx-auto flex max-w-5xl items-center justify-between border-b-2 border-moody pb-5">
+      <header className="mx-auto flex max-w-5xl items-center justify-between">
         <Link href="/login" className="flex items-center gap-3"><Image src="/images/logo.png" alt="Norstec" width={36} height={36} className="portal-logo" /><span className="font-display text-xl tracking-wide">NORSTEC</span></Link>
         <ThemeToggle compact />
       </header>
@@ -87,9 +87,9 @@ export default async function AccessPage({
         </p>
 
         {(submitted === "true" || pendingRequest) ? (
-          <section className="mt-12 border-y-2 border-moody py-7">
-            <p className="section-label opacity-50">Request received</p>
-            <p className="mt-2 text-xl">Pending approval</p>
+          <section className="portal-surface mt-12 p-7 sm:p-9">
+            <span className="portal-pill">Request received</span>
+            <p className="mt-5 text-xl">Pending approval</p>
             {pendingOrganization && (
               <p className="mt-2 text-sm opacity-55">{pendingOrganization}</p>
             )}
