@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ThemeToggle } from "@/components/portal/portal-shell";
 import { submitAccessRequest } from "@/app/access/actions";
+import { STUDY_FIELDS } from "@/lib/profile/study-fields";
 import { getPortalAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
@@ -113,12 +114,20 @@ export default async function AccessPage({
               </select>
             </label>
             <div className="grid gap-6 sm:grid-cols-2">
-              <label className="flex flex-col gap-2"><span className="section-label">Field of study</span><input name="fieldOfStudy" className="portal-field" defaultValue={access.profile.fieldOfStudy ?? ""} maxLength={160} /></label>
+              <label className="flex flex-col gap-2">
+                <span className="section-label">Field of study</span>
+                <select name="fieldOfStudy" className="portal-field" defaultValue="">
+                  <option value="">Not provided</option>
+                  {STUDY_FIELDS.map((field) => (
+                    <option key={field} value={field}>{field}</option>
+                  ))}
+                </select>
+              </label>
               <label className="flex flex-col gap-2">
                 <span className="section-label">Study year</span>
                 <select name="studyYear" className="portal-field" defaultValue={access.profile.studyYear ?? ""} required>
                   <option value="" disabled>Select year</option>
-                  {Array.from({ length: 10 }, (_, index) => index + 1).map((year) => (
+                  {[1, 2, 3, 4, 5, 6].map((year) => (
                     <option key={year} value={year}>{year}</option>
                   ))}
                 </select>

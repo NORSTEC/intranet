@@ -28,7 +28,8 @@ export default async function DashboardPage() {
     supabase
       .from("team_memberships")
       .select("id, role_title, teams (name, slug, organizations (name, slug))")
-      .eq("person_id", access.profile.personId),
+      .eq("person_id", access.profile.personId)
+      .is("archived_at", null),
     canAdminister
       ? supabase
           .from("access_requests")
@@ -55,18 +56,24 @@ export default async function DashboardPage() {
     })
     .filter((team): team is NonNullable<typeof team> => Boolean(team));
   const profileIncomplete = !access.profile.fullName || !access.profile.fieldOfStudy;
+  const activeMemberships = access.memberships.filter(
+    (membership) => membership.status === "active",
+  );
 
   return (
     <>
       <PageHeader description={
-        access.memberships.length === 1
-          ? access.membership.organizationName
+        activeMemberships.length === 1
+          ? activeMemberships[0].organizationName
+          : activeMemberships.length === 0
+            ? "Alumni"
           : `${access.memberships.length} organizations`
       } />
 
       <section aria-label="Membership overview" className="flex flex-wrap gap-3">
         <span className="portal-pill">
-          <span className="size-2 rounded-full bg-beachball" />Active membership
+          <span className="size-2 rounded-full bg-beachball" />
+          {activeMemberships.length > 0 ? "Active member" : "Alumni"}
         </span>
         <span className="portal-pill portal-pill-outline">
           {access.memberships.length} organizations

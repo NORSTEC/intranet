@@ -130,6 +130,16 @@ html.theme-switching *::after {
     color: var(--color-moody);
   }
 
+  .portal-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  .portal-button:disabled:hover {
+    background: var(--color-moody);
+    color: var(--color-egg);
+  }
+
   .portal-button-secondary {
     background: var(--color-moody);
     color: var(--color-egg);
@@ -156,8 +166,113 @@ html.theme-switching *::after {
     outline: none;
   }
 
+  .portal-field:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
   .portal-field::placeholder {
     color: color-mix(in srgb, var(--color-moody) 40%, transparent);
+  }
+
+  .portal-toast {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 120;
+    display: flex;
+    width: min(24rem, calc(100vw - 2rem));
+    align-items: center;
+    gap: 0.75rem;
+    border: 2px solid #0f1118;
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    color: #0f1118;
+    animation: portal-toast-in 220ms ease-out both;
+  }
+
+  .portal-toast-exit {
+    animation: portal-toast-out 220ms ease-in both;
+  }
+
+  .profile-experience-card:has(.experience-remove-toggle:checked) {
+    border-color: color-mix(in srgb, var(--color-moody) 35%, transparent);
+  }
+
+  .profile-experience-card:has(.experience-remove-toggle:checked) > header,
+  .experience-remove-toggle:checked ~ .experience-removable-content {
+    opacity: 0.35;
+  }
+
+  .profile-experience-card > header,
+  .experience-removable-content {
+    transition: opacity 180ms ease;
+  }
+
+  .profile-value {
+    min-height: 1.5rem;
+    line-height: 1.5rem;
+  }
+
+  .profile-edit-field {
+    height: 1.75rem;
+    min-height: 1.75rem;
+    line-height: 1.75rem;
+  }
+
+  .profile-edit-field,
+  .profile-linkedin-field {
+    width: 100%;
+    border: 2px solid color-mix(in srgb, var(--color-moody) 35%, transparent);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-moody);
+    font-weight: 500;
+    transition: border-color 180ms ease;
+  }
+
+  .profile-edit-field {
+    padding: 0 0.5rem;
+  }
+
+  .profile-linkedin-field {
+    height: 2.75rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .profile-edit-field:focus,
+  .profile-linkedin-field:focus {
+    border-color: var(--color-moody);
+    outline: none;
+  }
+
+  .profile-edit-field::placeholder,
+  .profile-linkedin-field::placeholder {
+    color: color-mix(in srgb, var(--color-moody) 50%, transparent);
+  }
+
+  .profile-image-button {
+    border-color: #0f1118;
+    background: #0f1118;
+    color: #ede8da;
+  }
+
+  .profile-image-button:hover {
+    border-color: #0f1118;
+    background: #ede8da;
+    color: #0f1118;
+  }
+
+  .portal-field[type="date"] {
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] .portal-field[type="date"] {
+    color-scheme: dark;
+  }
+
+  .profile-date-field {
+    min-width: 0;
   }
 
   .portal-menu-link {
@@ -372,10 +487,6 @@ html.theme-switching *::after {
     right: 0;
   }
 
-  .portal-sidebar-toggle-collapsed {
-    right: -0.375rem;
-  }
-
   .portal-account-icon-button:hover {
     background: transparent;
     color: var(--color-moody);
@@ -566,6 +677,22 @@ html.theme-switching *::after {
     mask: url("/images/logo.png") center / contain no-repeat;
   }
 
+  .organization-logo-experience-mark {
+    background: #0f1118;
+  }
+
+  .organization-logo-experience-image {
+    filter: brightness(0);
+  }
+
+  [data-theme="dark"] .organization-logo-experience-mark {
+    background: #ede8da;
+  }
+
+  [data-theme="dark"] .organization-logo-experience-image {
+    filter: brightness(0) invert(1);
+  }
+
   .organization-logo-white {
     filter: brightness(0) invert(1);
   }
@@ -575,6 +702,28 @@ html.theme-switching *::after {
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+  }
+}
+
+@keyframes portal-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(100% + 2rem));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes portal-toast-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(100% + 2rem));
   }
 }
 

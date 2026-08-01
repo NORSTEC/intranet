@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isStudyField } from "@/lib/profile/study-fields";
 import { createClient } from "@/lib/supabase/server";
 
 function optionalText(formData: FormData, key: string) {
@@ -24,11 +25,11 @@ export async function submitAccessRequest(formData: FormData) {
     firstName.length > 80 ||
     lastName.length < 1 ||
     lastName.length > 80 ||
-    fieldOfStudy.length > 160 ||
+    (fieldOfStudy && !isStudyField(fieldOfStudy)) ||
     message.length > 2000 ||
     !Number.isInteger(studyYear) ||
     studyYear < 1 ||
-    studyYear > 10
+    studyYear > 6
   ) {
     redirect("/access?error=invalid_request");
   }

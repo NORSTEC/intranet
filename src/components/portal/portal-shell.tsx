@@ -22,35 +22,55 @@ type NavigationItem = {
   admin?: "organization" | "norstec";
 };
 
-const navigationGroups: { label: string; items: NavigationItem[] }[] = [
+const generalNavigation: NavigationItem[] = [
+  { label: "Dashboard", href: "/", icon: "dashboard" },
+  { label: "My profile", href: "/profile", icon: "person", nested: true },
   {
-    label: "Portal",
-    items: [
-      { label: "Dashboard", href: "/", icon: "dashboard" },
-      { label: "Organizations", href: "/organizations", icon: "domain", nested: true },
-      { label: "Members", href: "/members", icon: "groups" },
-      { label: "Statistics", href: "/statistics", icon: "monitoring" },
-    ],
+    label: "Organizations",
+    href: "/organizations",
+    icon: "domain",
+    nested: true,
+  },
+  { label: "Members", href: "/members", icon: "groups" },
+  { label: "Statistics", href: "/statistics", icon: "monitoring" },
+];
+
+const administrationNavigation: NavigationItem[] = [
+  {
+    label: "Access requests",
+    href: "/administration/access-requests",
+    icon: "person_check",
+    admin: "organization",
   },
   {
-    label: "Account",
-    items: [{ label: "My profile", href: "/profile", icon: "person" }],
+    label: "Member status",
+    href: "/administration/members",
+    icon: "manage_accounts",
+    admin: "organization",
   },
   {
-    label: "Administration",
-    items: [
-      { label: "Access requests", href: "/administration/access-requests", icon: "person_check", admin: "organization" },
-      { label: "Member status", href: "/administration/members", icon: "manage_accounts", admin: "organization" },
-      { label: "Organization settings", href: "/administration/organization", icon: "settings", admin: "organization" },
-      { label: "Team management", href: "/administration/teams", icon: "group_work", admin: "organization" },
-    ],
+    label: "Organization settings",
+    href: "/administration/organization",
+    icon: "settings",
+    admin: "organization",
   },
   {
-    label: "Norstec administration",
-    items: [
-      { label: "Portal management", href: "/admin", icon: "admin_panel_settings", admin: "norstec" },
-      { label: "Audit log", href: "/admin/audit-log", icon: "history", admin: "norstec" },
-    ],
+    label: "Team management",
+    href: "/administration/teams",
+    icon: "group_work",
+    admin: "organization",
+  },
+  {
+    label: "Portal management",
+    href: "/admin",
+    icon: "admin_panel_settings",
+    admin: "norstec",
+  },
+  {
+    label: "Audit log",
+    href: "/admin/audit-log",
+    icon: "history",
+    admin: "norstec",
   },
 ];
 
@@ -86,16 +106,17 @@ function Navigation({
   const pathname = usePathname();
   const isNorstecAdmin = role === "norstec_admin";
   const canAdministerOrganization = role === "organization_admin" || isNorstecAdmin;
-  const groups = navigationGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(({ admin }) => {
-        if (admin === "norstec") return isNorstecAdmin;
-        if (admin === "organization") return canAdministerOrganization;
-        return true;
-      }),
-    }))
-    .filter((group) => group.items.length > 0);
+  const administrationItems = administrationNavigation.filter(({ admin }) => {
+    if (admin === "norstec") return isNorstecAdmin;
+    return canAdministerOrganization;
+  });
+  const groups: Array<{ label: string | null; items: NavigationItem[] }> =
+    canAdministerOrganization
+      ? [
+          { label: "General", items: generalNavigation },
+          { label: "Administration", items: administrationItems },
+        ]
+      : [{ label: null, items: generalNavigation }];
 
   if (desktop) {
     if (collapsed) {
@@ -128,8 +149,10 @@ function Navigation({
       <nav aria-label="Portal navigation" className="space-y-6">
         {groups.map((group) => (
           <div key={group.label}>
-            <p className="portal-nav-group-title">{group.label}</p>
-            <div className="mt-3 flex flex-col gap-1">
+            {group.label && (
+              <p className="portal-nav-group-title">{group.label}</p>
+            )}
+            <div className={`${group.label ? "mt-3" : ""} flex flex-col gap-1`}>
               {group.items.map(({ label, href, icon, nested }) => {
                 const isActive = isActiveNavigationItem(pathname, href, nested);
 
@@ -158,10 +181,12 @@ function Navigation({
     <nav aria-label="Portal navigation" className="space-y-7">
       {groups.map((group) => (
         <div key={group.label}>
-          <p className={`portal-nav-group-title whitespace-nowrap transition-opacity duration-150 ${collapsed ? "opacity-0" : ""}`}>
-            {group.label}
-          </p>
-          <div className="mt-3 flex flex-col gap-2.5">
+          {group.label && (
+            <p className={`portal-nav-group-title whitespace-nowrap transition-opacity duration-150 ${collapsed ? "opacity-0" : ""}`}>
+              {group.label}
+            </p>
+          )}
+          <div className={`${group.label ? "mt-3" : ""} flex flex-col gap-2.5`}>
             {group.items.map(({ label, href, nested }) => {
               const isActive = isActiveNavigationItem(pathname, href, nested);
 
@@ -336,7 +361,7 @@ function DesktopSidebar({
   return (
     <aside
       className={`portal-sidebar fixed inset-y-0 left-0 z-40 hidden overflow-visible lg:block ${
-        collapsed ? "w-24" : "w-64"
+        collapsed ? "w-24" : "w-72"
       }`}
     >
       <div className="relative z-10 flex h-full w-full flex-col overflow-hidden px-[1.625rem] py-8">
@@ -353,7 +378,7 @@ function DesktopSidebar({
               />
             </span>
               <span className={`whitespace-nowrap transition-opacity duration-150 ${collapsed ? "opacity-0" : "opacity-100"}`}>
-                <span className="block font-display text-xl font-light uppercase tracking-[0.14em]">
+                <span className="relative -left-px block font-display text-xl font-light uppercase tracking-[0.14em]">
                   Norstec
                 </span>
                 <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.34em] opacity-55">
@@ -379,9 +404,7 @@ function DesktopSidebar({
       <button
         type="button"
         onClick={onToggle}
-        className={`portal-sidebar-toggle absolute top-[2.1875rem] z-20 translate-x-1/2 ${
-          collapsed ? "portal-sidebar-toggle-collapsed" : ""
-        }`}
+        className="portal-sidebar-toggle absolute top-[2.1875rem] z-20 translate-x-1/2"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
@@ -518,7 +541,7 @@ export function PortalShell({
 
       <main
         className={`relative min-h-screen overflow-hidden pt-16 transition-[margin] duration-300 lg:pt-0 ${
-          sidebarCollapsed ? "lg:ml-24" : "lg:ml-64"
+          sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
         }`}
       >
         <div className="relative z-10 mx-auto w-full max-w-[100rem] px-5 py-12 sm:px-8 lg:px-16 lg:py-20 xl:px-20 2xl:px-28">

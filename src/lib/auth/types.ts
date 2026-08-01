@@ -6,12 +6,15 @@ export type PortalMembership = {
   organizationName: string;
   organizationSlug: string;
   role: PortalRole;
+  status: "active" | "ended";
 };
 
 export type PortalProfile = {
   personId: number;
   userId: string;
   email: string;
+  avatarPath: string | null;
+  avatarAlt: string | null;
   fullName: string | null;
   firstName: string | null;
   lastName: string | null;

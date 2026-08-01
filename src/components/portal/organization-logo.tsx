@@ -42,7 +42,7 @@ export function OrganizationLogo({
   if (!logoPath) {
     return (
       <span
-        className={`${wrapperSize} ${surfaceClass} flex shrink-0 items-center justify-center text-2xl font-semibold ${isExperience ? "text-moody-static" : "text-egg-static"}`}
+        className={`${wrapperSize} ${surfaceClass} flex shrink-0 items-center justify-center text-2xl font-semibold ${isExperience ? "text-moody" : "text-egg-static"}`}
       >
         {name
           .split(/\s+/)
@@ -61,7 +61,7 @@ export function OrganizationLogo({
         className={`${wrapperSize} ${surfaceClass} flex shrink-0 items-center justify-center`}
         role="img"
       >
-        <span className={`organization-logo-norstec ${isExperience ? "size-12" : "size-20"}`} />
+        <span className={`organization-logo-norstec ${isExperience ? "organization-logo-experience-mark size-12" : "size-20"}`} />
       </span>
     );
   }
@@ -73,7 +73,7 @@ export function OrganizationLogo({
       <span className={`absolute ${innerInset}`}>
         <Image
           alt={`${name} logo`}
-          className={`object-contain ${logoPath.includes("polarix-uit") ? "organization-logo-white" : ""}`}
+          className={`object-contain ${isExperience ? "organization-logo-experience-image" : logoPath.includes("polarix-uit") ? "organization-logo-white" : ""}`}
           fill
           sizes={
             isExperience

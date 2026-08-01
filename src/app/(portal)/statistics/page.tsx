@@ -20,7 +20,7 @@ export default async function StatisticsPage() {
     supabase
       .from("memberships")
       .select("person_id, organization_id, status, organizations (name)")
-      .in("status", ["active", "alumni"]),
+      .in("status", ["active", "ended"]),
   ]);
 
   if (organizationsResult.error || teamsResult.error || membershipsResult.error) {
@@ -36,8 +36,9 @@ export default async function StatisticsPage() {
   );
   const alumniPeople = new Set(
     memberships
-      .filter((membership) => membership.status === "alumni")
-      .map((membership) => membership.person_id),
+      .filter((membership) => membership.status === "ended")
+      .map((membership) => membership.person_id)
+      .filter((personId) => !activePeople.has(personId)),
   );
   const organizationCounts = new Map<string, Set<number>>();
   for (const membership of memberships) {

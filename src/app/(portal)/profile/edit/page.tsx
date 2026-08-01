@@ -1,345 +1,296 @@
-import Link from "next/link";
+import { saveProfile } from "@/app/(portal)/profile/actions";
+import { AddTeamExperience } from "@/components/portal/add-team-experience";
+import { ExperienceRolesEditor } from "@/components/portal/experience-roles-editor";
+import { OrganizationLogo } from "@/components/portal/organization-logo";
+import { ProfileImageEditor } from "@/components/portal/profile-image-editor";
 import {
-  removeTeamHistory,
-  saveTeamHistory,
-  updateOrganizationHistory,
-  updatePersonalProfile,
-} from "@/app/(portal)/profile/actions";
+  ProfileEditForm,
+  ProfileEditorActions,
+} from "@/components/portal/profile-edit-form";
+import { Toast } from "@/components/portal/toast";
 import { requirePortalAccess } from "@/lib/auth/access";
+import { STUDY_FIELDS } from "@/lib/profile/study-fields";
+import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
-type OrganizationMembership = {
+type ExperienceRole = {
   id: number;
-  organization_id: number;
-  starts_on: string | null;
-  ends_on: string | null;
-  status: string;
-  organizations:
-    | { id: number; name: string; slug: string }
-    | Array<{ id: number; name: string; slug: string }>;
-};
-
-type TeamMembership = {
-  id: number;
-  team_id: number;
+  team_name: string;
   role_title: string | null;
   starts_on: string | null;
   ends_on: string | null;
-  teams:
-    | { id: number; name: string; organization_id: number }
-    | Array<{ id: number; name: string; organization_id: number }>;
+  updated_at: string;
+};
+
+type ProfileExperience = {
+  id: number;
+  organization_id: number | null;
+  organization_name: string;
+  description: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  updated_at: string;
+  organizations:
+    | { logo_path: string | null }
+    | Array<{ logo_path: string | null }>
+    | null;
+  profile_experience_roles: ExperienceRole[];
 };
 
 const errorMessages: Record<string, string> = {
   invalid_profile: "Check the profile fields and try again.",
-  profile_update_failed: "The profile could not be updated.",
-  invalid_history: "Check the organization dates and try again.",
-  history_update_failed: "The organization history could not be updated.",
-  invalid_team_history: "Add a role and valid dates before saving.",
-  team_history_update_failed: "The team history could not be updated.",
+  invalid_avatar: "Choose a JPG, PNG, WebP, or AVIF image up to 5 MB.",
+  avatar_upload_failed: "The profile image could not be uploaded.",
+  invalid_experience: "Check the experience fields and dates and try again.",
+  profile_conflict:
+    "Your profile changed after this page was opened. Review the latest values and try again.",
+  profile_update_failed: "The profile could not be saved.",
 };
 
 export default async function EditProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const access = await requirePortalAccess();
-  const { error, saved } = await searchParams;
+  const { error } = await searchParams;
   const supabase = await createClient();
-
-  const [membershipsResult, teamMembershipsResult] = await Promise.all([
-    supabase
-      .from("memberships")
-      .select(
-        "id, organization_id, starts_on, ends_on, status, organizations (id, name, slug)",
-      )
-      .eq("person_id", access.profile.personId)
-      .in("status", ["active", "alumni", "ended"])
-      .order("starts_on", { ascending: false, nullsFirst: false }),
-    supabase
-      .from("team_memberships")
-      .select(
-        "id, team_id, role_title, starts_on, ends_on, teams (id, name, organization_id)",
-      )
-      .eq("person_id", access.profile.personId)
-      .order("starts_on", { ascending: false, nullsFirst: false }),
-  ]);
-
-  if (membershipsResult.error || teamMembershipsResult.error) {
-    throw new Error("Could not load editable profile history");
-  }
-
-  const memberships = membershipsResult.data as OrganizationMembership[];
-  const teamMemberships = teamMembershipsResult.data as TeamMembership[];
-  const editableOrganizationIds = memberships
-    .filter((membership) => ["active", "alumni", "ended"].includes(membership.status))
-    .map((membership) => membership.organization_id);
-  const teamsResult = editableOrganizationIds.length
-    ? await supabase
+  const [personResult, experiencesResult, organizationsResult, teamsResult, avatarUrls] =
+    await Promise.all([
+      supabase
+        .from("people")
+        .select("profile_updated_at")
+        .eq("id", access.profile.personId)
+        .single(),
+      supabase
+        .from("profile_experiences")
+        .select(
+          "id, organization_id, organization_name, description, starts_on, ends_on, updated_at, organizations (logo_path), profile_experience_roles (id, team_name, role_title, starts_on, ends_on, updated_at)",
+        )
+        .eq("person_id", access.profile.personId)
+        .order("starts_on", { ascending: false, nullsFirst: false }),
+      supabase
+        .from("organizations")
+        .select("id, name")
+        .eq("status", "active")
+        .order("name"),
+      supabase
         .from("teams")
         .select("id, name, organization_id")
-        .in("organization_id", editableOrganizationIds)
         .eq("status", "active")
-        .order("name")
-    : { data: [], error: null };
+        .order("name"),
+      getMemberAvatarUrls([access.profile.avatarPath]),
+    ]);
 
-  if (teamsResult.error) throw new Error("Could not load available teams");
+  if (
+    personResult.error ||
+    experiencesResult.error ||
+    organizationsResult.error ||
+    teamsResult.error
+  ) {
+    throw new Error("Could not load editable profile");
+  }
 
-  const existingTeamIds = new Set(teamMemberships.map((membership) => membership.team_id));
-  const availableTeams = teamsResult.data.filter((team) => !existingTeamIds.has(team.id));
-  const organizationNames = new Map(
-    memberships.flatMap((membership) => {
-      const organization = Array.isArray(membership.organizations)
-        ? membership.organizations[0]
-        : membership.organizations;
-      return organization ? [[organization.id, organization.name] as const] : [];
-    }),
+  const experiences = experiencesResult.data as ProfileExperience[];
+  const avatarUrl = access.profile.avatarPath
+    ? avatarUrls.get(access.profile.avatarPath)
+    : undefined;
+  const hasLegacyStudyField = Boolean(
+    access.profile.fieldOfStudy &&
+      !(STUDY_FIELDS as readonly string[]).includes(access.profile.fieldOfStudy),
   );
+  const status = access.memberships.some((membership) => membership.status === "active")
+    ? "Active"
+    : access.memberships.some((membership) => membership.status === "ended")
+      ? "Alumni"
+      : "Pending";
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-h2">Edit profile</h1>
-          <p className="mt-2 max-w-2xl text-sm opacity-55">
-            Keep your contact information and Norstec experience up to date.
-          </p>
-        </div>
-        <Link className="portal-button" href="/profile">
-          Done
-        </Link>
+    <ProfileEditForm action={saveProfile}>
+      <input
+        name="expectedProfileUpdatedAt"
+        type="hidden"
+        value={personResult.data.profile_updated_at}
+      />
+
+      {error && <Toast clearParams={["error"]} message={errorMessages[error] ?? "The profile could not be saved."} status="error" />}
+
+      <div className="mb-8 flex min-h-11 items-center justify-end overflow-x-auto">
+        <ProfileEditorActions />
       </div>
 
-      {(error || saved) && (
-        <p
-          className={`mt-6 text-sm font-medium ${error ? "text-copper" : ""}`}
-          role="status"
-        >
-          {error ? errorMessages[error] ?? "The change could not be saved." : "Changes saved."}
-        </p>
-      )}
+      <section className="grid gap-8 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-center lg:gap-12">
+        <ProfileImageEditor
+          alt={access.profile.avatarAlt ?? access.profile.fullName ?? "Profile image"}
+          initialUrl={avatarUrl}
+        />
 
-      <section className="mt-10">
-        <h2 className="text-xl font-medium">Personal information</h2>
-        <form action={updatePersonalProfile} className="portal-surface mt-5 p-6 sm:p-8">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <label className="grid gap-2">
-              <span className="section-label">Name</span>
-              <input
-                className="portal-field"
-                defaultValue={access.profile.fullName ?? ""}
-                maxLength={160}
-                name="fullName"
-                required
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="section-label">Phone</span>
-              <input
-                className="portal-field"
-                defaultValue={access.profile.phoneNumber ?? ""}
-                inputMode="tel"
-                maxLength={40}
-                name="phoneNumber"
-                placeholder="+47 900 00 000"
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="section-label">Field of study</span>
-              <input
-                className="portal-field"
-                defaultValue={access.profile.fieldOfStudy ?? ""}
-                maxLength={160}
-                name="fieldOfStudy"
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="section-label">Study year</span>
-              <input
-                className="portal-field"
-                defaultValue={access.profile.studyYear ?? ""}
-                max={10}
-                min={1}
-                name="studyYear"
-                type="number"
-              />
-            </label>
-            <label className="grid gap-2 sm:col-span-2">
-              <span className="section-label">LinkedIn</span>
-              <input
-                className="portal-field"
-                defaultValue={access.profile.linkedinUrl ?? ""}
-                maxLength={2048}
-                name="linkedinUrl"
-                placeholder="https://www.linkedin.com/in/..."
-                type="url"
-              />
-            </label>
-          </div>
-          <button className="portal-button mt-6" type="submit">
-            Save personal information
-          </button>
-        </form>
-      </section>
-
-      <section className="mt-14">
-        <h2 className="text-xl font-medium">Organization history</h2>
-        <p className="mt-2 text-sm opacity-55">
-          Your organizations are predefined. Add the dates shown on your profile.
-        </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          {memberships.map((membership) => {
-            const organization = Array.isArray(membership.organizations)
-              ? membership.organizations[0]
-              : membership.organizations;
-            if (!organization) return null;
-
-            return (
-              <form
-                action={updateOrganizationHistory}
-                className="portal-surface p-6"
-                key={membership.id}
-              >
-                <input name="membershipId" type="hidden" value={membership.id} />
-                <h3 className="text-lg font-medium">{organization.name}</h3>
-                <div className="mt-5 grid grid-cols-2 gap-4">
-                  <label className="grid gap-2">
-                    <span className="section-label">Start</span>
-                    <input
-                      className="portal-field"
-                      defaultValue={membership.starts_on ?? ""}
-                      name="startsOn"
-                      type="date"
-                    />
-                  </label>
-                  <label className="grid gap-2">
-                    <span className="section-label">End</span>
-                    <input
-                      className="portal-field"
-                      defaultValue={membership.ends_on ?? ""}
-                      name="endsOn"
-                      type="date"
-                    />
-                  </label>
-                </div>
-                <button className="portal-button mt-5" type="submit">
-                  Save dates
-                </button>
-              </form>
-            );
-          })}
+        <div>
+          <h1 className="text-h2">
+            {access.profile.fullName ?? access.profile.email}
+          </h1>
+          <input
+            name="fullName"
+            type="hidden"
+            value={access.profile.fullName ?? access.profile.email}
+          />
+          <dl className="mt-8 grid gap-x-10 gap-y-6 sm:grid-cols-2">
+            <div>
+              <dt className="section-label opacity-45">Status</dt>
+              <dd className="profile-value mt-2 font-medium">{status}</dd>
+            </div>
+            <div>
+              <dt className="section-label opacity-45">Phone</dt>
+              <dd className="mt-1 font-medium">
+                <input
+                  aria-label="Phone"
+                  className="profile-edit-field"
+                  defaultValue={access.profile.phoneNumber ?? ""}
+                  inputMode="tel"
+                  maxLength={40}
+                  name="phoneNumber"
+                  placeholder="Not provided"
+                />
+              </dd>
+            </div>
+            <div>
+              <dt className="section-label opacity-45">Field of study</dt>
+              <dd className="mt-1 font-medium">
+                <select
+                  aria-label="Field of study"
+                  className="profile-edit-field"
+                  defaultValue={access.profile.fieldOfStudy ?? ""}
+                  name="fieldOfStudy"
+                >
+                  <option value="">Not provided</option>
+                  {hasLegacyStudyField && (
+                    <option value={access.profile.fieldOfStudy ?? ""}>
+                      {access.profile.fieldOfStudy}
+                    </option>
+                  )}
+                  {STUDY_FIELDS.map((field) => (
+                    <option key={field} value={field}>{field}</option>
+                  ))}
+                </select>
+              </dd>
+            </div>
+            <div>
+              <dt className="section-label opacity-45">Study year</dt>
+              <dd className="mt-1 font-medium">
+                <select
+                  aria-label="Study year"
+                  className="profile-edit-field"
+                  defaultValue={access.profile.studyYear ?? ""}
+                  name="studyYear"
+                >
+                  <option value="">Not provided</option>
+                  {[1, 2, 3, 4, 5, 6].map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </dd>
+            </div>
+            <div>
+              <dt className="section-label opacity-45">Email</dt>
+              <dd className="profile-value mt-2 font-medium">{access.profile.email}</dd>
+            </div>
+          </dl>
+          <label className="mt-8 block h-11 max-w-lg">
+            <input
+              aria-label="LinkedIn"
+              className="profile-linkedin-field"
+              defaultValue={access.profile.linkedinUrl ?? ""}
+              maxLength={2048}
+              name="linkedinUrl"
+              placeholder="LinkedIn profile URL"
+              type="url"
+            />
+          </label>
         </div>
       </section>
 
-      <section className="mt-14">
-        <h2 className="text-xl font-medium">Team history</h2>
-        <p className="mt-2 text-sm opacity-55">
-          Choose a team from one of your organizations and describe your role.
-        </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          {teamMemberships.map((membership) => {
-            const team = Array.isArray(membership.teams)
-              ? membership.teams[0]
-              : membership.teams;
-            if (!team) return null;
-
+      <section className="mt-20">
+        <AddTeamExperience
+          organizations={organizationsResult.data}
+          teams={teamsResult.data}
+        />
+        <div className="mt-8 grid gap-6">
+          {experiences.map((experience) => {
+            const organization = Array.isArray(experience.organizations)
+              ? experience.organizations[0]
+              : experience.organizations;
             return (
-              <article className="portal-surface p-6" key={membership.id}>
-                <p className="section-label opacity-45">
-                  {organizationNames.get(team.organization_id)}
-                </p>
-                <h3 className="mt-2 text-lg font-medium">{team.name}</h3>
-                <form action={saveTeamHistory} className="mt-5">
-                  <input
-                    name="teamMembershipId"
-                    type="hidden"
-                    value={membership.id}
-                  />
-                  <input name="teamId" type="hidden" value={team.id} />
-                  <label className="grid gap-2">
-                    <span className="section-label">Role</span>
+              <article
+                className="profile-experience-card portal-surface px-6 pb-5 pt-6 transition-opacity sm:px-8 sm:pb-6 sm:pt-8"
+                key={experience.id}
+              >
+                <input name="experienceId" type="hidden" value={experience.id} />
+                <input
+                  name={`experience-${experience.id}-expectedUpdatedAt`}
+                  type="hidden"
+                  value={experience.updated_at}
+                />
+                <input
+                  name={`experience-${experience.id}-organizationId`}
+                  type="hidden"
+                  value={experience.organization_id ?? ""}
+                />
+                <header className="flex items-start justify-between gap-6">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3">
+                      <p className="section-label opacity-45">Organization <span className="text-copper" aria-hidden="true">*</span></p>
+                    </div>
                     <input
-                      className="portal-field"
-                      defaultValue={membership.role_title ?? ""}
+                      aria-label="Organization name"
+                      className="portal-field mt-2 max-w-lg"
+                      defaultValue={experience.organization_name}
                       maxLength={160}
-                      name="roleTitle"
+                      name={`experience-${experience.id}-organizationName`}
                       required
                     />
-                  </label>
-                  <div className="mt-4 grid grid-cols-2 gap-4">
-                    <label className="grid gap-2">
-                      <span className="section-label">Start</span>
-                      <input
-                        className="portal-field"
-                        defaultValue={membership.starts_on ?? ""}
-                        name="startsOn"
-                        type="date"
-                      />
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="section-label">End</span>
-                      <input
-                        className="portal-field"
-                        defaultValue={membership.ends_on ?? ""}
-                        name="endsOn"
-                        type="date"
-                      />
-                    </label>
+                    <div className="mt-4 grid max-w-md gap-3 sm:grid-cols-2">
+                      <label className="grid gap-2">
+                        <span className="section-label opacity-45">From</span>
+                        <input className="portal-field profile-date-field" defaultValue={experience.starts_on ?? ""} name={`experience-${experience.id}-startsOn`} aria-label={`${experience.organization_name} start date`} lang="en-GB" type="date" />
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="section-label opacity-45">To</span>
+                        <input className="portal-field profile-date-field" defaultValue={experience.ends_on ?? ""} name={`experience-${experience.id}-endsOn`} aria-label={`${experience.organization_name} end date`} lang="en-GB" type="date" />
+                      </label>
+                    </div>
+                    <textarea
+                      aria-label={`${experience.organization_name} description`}
+                      className="portal-field mt-3 min-h-20 max-w-2xl resize-y"
+                      defaultValue={experience.description ?? ""}
+                      maxLength={2000}
+                      name={`experience-${experience.id}-description`}
+                      placeholder="Describe the work, responsibilities, or results"
+                    />
                   </div>
-                  <button className="portal-button mt-5" type="submit">
-                    Save role
-                  </button>
-                </form>
-                <form action={removeTeamHistory} className="mt-3">
-                  <input
-                    name="teamMembershipId"
-                    type="hidden"
-                    value={membership.id}
-                  />
-                  <button className="text-sm transition-colors hover:text-copper" type="submit">
-                    Remove from history
-                  </button>
-                </form>
+                  {organization?.logo_path && (
+                    <OrganizationLogo logoPath={organization.logo_path} name={experience.organization_name} size="experience" />
+                  )}
+                </header>
+
+                <ExperienceRolesEditor
+                  experienceId={experience.id}
+                  experienceUpdatedAt={experience.updated_at}
+                  roles={experience.profile_experience_roles}
+                  suggestedTeams={teamsResult.data
+                    .filter((team) => team.organization_id === experience.organization_id)
+                    .map((team) => team.name)}
+                />
               </article>
             );
           })}
-
-          {availableTeams.length > 0 && (
-            <form action={saveTeamHistory} className="portal-surface p-6">
-              <h3 className="text-lg font-medium">Add team experience</h3>
-              <label className="mt-5 grid gap-2">
-                <span className="section-label">Team</span>
-                <select className="portal-field" name="teamId" required>
-                  <option value="">Choose a team</option>
-                  {availableTeams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {organizationNames.get(team.organization_id)} · {team.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="mt-4 grid gap-2">
-                <span className="section-label">Role</span>
-                <input className="portal-field" maxLength={160} name="roleTitle" required />
-              </label>
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <label className="grid gap-2">
-                  <span className="section-label">Start</span>
-                  <input className="portal-field" name="startsOn" type="date" />
-                </label>
-                <label className="grid gap-2">
-                  <span className="section-label">End</span>
-                  <input className="portal-field" name="endsOn" type="date" />
-                </label>
-              </div>
-              <button className="portal-button mt-5" type="submit">
-                Add experience
-              </button>
-            </form>
-          )}
         </div>
       </section>
+
+      <div className="mt-10 flex min-h-11 items-center justify-end overflow-x-auto">
+        <ProfileEditorActions />
+      </div>
+    </ProfileEditForm>
     </>
   );
 }

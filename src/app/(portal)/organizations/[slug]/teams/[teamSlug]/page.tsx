@@ -66,9 +66,10 @@ export default async function TeamDetailsPage({
   const membersResult = await supabase
     .from("team_memberships")
     .select(
-      "id, role_title, sort_order, people (id, full_name, avatar_path, phone_number, linkedin_url)",
+      "id, role_title, sort_order, people!team_memberships_person_id_fkey (id, full_name, avatar_path, phone_number, linkedin_url)",
     )
     .eq("team_id", teamResult.data.id)
+    .is("archived_at", null)
     .order("sort_order");
 
   if (membersResult.error) throw new Error("Could not load team members");

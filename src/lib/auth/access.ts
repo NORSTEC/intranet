@@ -11,6 +11,8 @@ import type {
 
 type ProfileRow = {
   id: number;
+  avatar_path: string | null;
+  avatar_alt: string | null;
   full_name: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -31,6 +33,7 @@ type MembershipRow = {
   id: number;
   organization_id: number;
   role: PortalRole;
+  status: "active" | "ended";
   organizations:
     | { id: number; name: string; slug: string }
     | { id: number; name: string; slug: string }[];
@@ -56,7 +59,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   const accountResult = await supabase
     .from("portal_accounts")
     .select(
-      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url)",
+      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt)",
     )
     .eq("auth_user_id", user.id)
     .maybeSingle();
@@ -69,9 +72,9 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   const [membershipsResult] = await Promise.all([
     supabase
       .from("memberships")
-      .select("id, organization_id, role, organizations (id, name, slug)")
+      .select("id, organization_id, role, status, organizations (id, name, slug)")
       .eq("person_id", accountRow.person_id)
-      .eq("status", "active"),
+      .in("status", ["active", "ended"]),
   ]);
 
   if (membershipsResult.error) {
@@ -86,13 +89,17 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   }
   const membershipRows = (membershipsResult.data ?? []) as MembershipRow[];
   const sortedMembershipRows = membershipRows.sort(
-    (left, right) => rolePriority[right.role] - rolePriority[left.role],
+    (left, right) =>
+      Number(right.status === "active") - Number(left.status === "active") ||
+      rolePriority[right.role] - rolePriority[left.role],
   );
 
   const profile: PortalProfile = {
     personId: profileRow.id,
     userId: accountRow.auth_user_id,
     email: accountRow.account_email,
+    avatarPath: profileRow.avatar_path,
+    avatarAlt: profileRow.avatar_alt,
     fullName: profileRow.full_name,
     firstName: profileRow.first_name,
     lastName: profileRow.last_name,
@@ -117,7 +124,9 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
       organizationId: membershipRow.organization_id,
       organizationName: organization.name,
       organizationSlug: organization.slug,
-      role: membershipRow.role,
+      // An old administrator role is history, never current authorization.
+      role: membershipRow.status === "active" ? membershipRow.role : "member",
+      status: membershipRow.status,
     });
   }
 

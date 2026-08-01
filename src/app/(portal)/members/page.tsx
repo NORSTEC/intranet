@@ -46,10 +46,11 @@ export default async function MembersPage({
       .select(
         "id, status, people (id, full_name, avatar_path), organizations (id, name, slug)",
       )
-      .in("status", ["active", "alumni"]),
+      .in("status", ["active", "ended"]),
     supabase
       .from("team_memberships")
-      .select("person_id, teams (name, slug, organizations (slug))"),
+      .select("person_id, teams (name, slug, organizations (slug))")
+      .is("archived_at", null),
   ]);
 
   if (membershipsResult.error || teamMembershipsResult.error) {
@@ -94,7 +95,10 @@ export default async function MembersPage({
 
   const normalizedQuery = q.trim().toLocaleLowerCase("en");
   const members = [...membersById.values()]
-    .filter((member) => status === "all" || member.statuses.has(status))
+    .filter((member) => {
+      const derivedStatus = member.statuses.has("active") ? "active" : "alumni";
+      return status === "all" || derivedStatus === status;
+    })
     .filter((member) => {
       if (!normalizedQuery) return true;
       const searchable = [

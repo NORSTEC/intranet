@@ -302,6 +302,7 @@ export type Database = {
           last_name: string | null
           linkedin_url: string | null
           phone_number: string | null
+          profile_updated_at: string
           portal_access_status: string
           source: string
           study_year: number | null
@@ -318,6 +319,7 @@ export type Database = {
           last_name?: string | null
           linkedin_url?: string | null
           phone_number?: string | null
+          profile_updated_at?: string
           portal_access_status?: string
           source?: string
           study_year?: number | null
@@ -334,6 +336,7 @@ export type Database = {
           last_name?: string | null
           linkedin_url?: string | null
           phone_number?: string | null
+          profile_updated_at?: string
           portal_access_status?: string
           source?: string
           study_year?: number | null
@@ -382,6 +385,134 @@ export type Database = {
           },
         ]
       }
+      profile_experience_roles: {
+        Row: {
+          created_at: string
+          ends_on: string | null
+          experience_id: number
+          id: number
+          role_title: string | null
+          sort_order: number
+          starts_on: string | null
+          team_id: number | null
+          team_membership_id: number | null
+          team_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ends_on?: string | null
+          experience_id: number
+          id?: never
+          role_title?: string | null
+          sort_order?: number
+          starts_on?: string | null
+          team_id?: number | null
+          team_membership_id?: number | null
+          team_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ends_on?: string | null
+          experience_id?: number
+          id?: never
+          role_title?: string | null
+          sort_order?: number
+          starts_on?: string | null
+          team_id?: number | null
+          team_membership_id?: number | null
+          team_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_experience_roles_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "profile_experiences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_experience_roles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_experience_roles_team_membership_id_fkey"
+            columns: ["team_membership_id"]
+            isOneToOne: false
+            referencedRelation: "team_memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_experiences: {
+        Row: {
+          created_at: string
+          description: string | null
+          ends_on: string | null
+          id: number
+          membership_id: number | null
+          organization_id: number | null
+          organization_name: string
+          person_id: number
+          source: string
+          starts_on: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          ends_on?: string | null
+          id?: never
+          membership_id?: number | null
+          organization_id?: number | null
+          organization_name: string
+          person_id: number
+          source?: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          ends_on?: string | null
+          id?: never
+          membership_id?: number | null
+          organization_id?: number | null
+          organization_name?: string
+          person_id?: number
+          source?: string
+          starts_on?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_experiences_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: true
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_experiences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_experiences_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portal_accounts: {
         Row: {
           account_email: string
@@ -419,6 +550,8 @@ export type Database = {
       }
       team_memberships: {
         Row: {
+          archived_at: string | null
+          archived_by_person_id: number | null
           created_at: string
           ends_on: string | null
           id: number
@@ -430,6 +563,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by_person_id?: number | null
           created_at?: string
           ends_on?: string | null
           id?: never
@@ -441,6 +576,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by_person_id?: number | null
           created_at?: string
           ends_on?: string | null
           id?: never
@@ -452,6 +589,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "team_memberships_archived_by_person_id_fkey"
+            columns: ["archived_by_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "team_memberships_person_id_fkey"
             columns: ["person_id"]
@@ -514,6 +658,112 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_own_profile_experience: {
+        Args: {
+          p_description: string | null
+          p_ends_on: string | null
+          p_organization_id: number | null
+          p_organization_name: string
+          p_role_title: string | null
+          p_starts_on: string | null
+          p_team_name: string | null
+        }
+        Returns: number
+      }
+      create_own_profile_experience_v2: {
+        Args: {
+          p_description: string | null
+          p_ends_on: string | null
+          p_organization_id: number | null
+          p_organization_name: string
+          p_roles: Json
+          p_starts_on: string | null
+        }
+        Returns: number
+      }
+      restore_own_team_experience: {
+        Args: {
+          p_expected_updated_at: string
+          p_team_membership_id: number
+        }
+        Returns: string
+      }
+      review_access_request: {
+        Args: {
+          p_decision: string
+          p_decision_note: string | null
+          p_request_id: number
+        }
+        Returns: undefined
+      }
+      save_own_profile: {
+        Args: {
+          p_avatar_alt: string | null
+          p_avatar_path: string | null
+          p_expected_people_updated_at: string
+          p_field_of_study: string | null
+          p_full_name: string
+          p_linkedin_url: string | null
+          p_memberships: Json
+          p_new_team_memberships: Json
+          p_phone_number: string | null
+          p_study_year: number | null
+          p_team_memberships: Json
+        }
+        Returns: string
+      }
+      save_own_profile_v4: {
+        Args: {
+          p_avatar_alt: string | null
+          p_avatar_path: string | null
+          p_deleted_experiences: Json
+          p_deleted_roles: Json
+          p_expected_people_updated_at: string
+          p_experiences: Json
+          p_field_of_study: string | null
+          p_linkedin_url: string | null
+          p_new_roles: Json
+          p_phone_number: string | null
+          p_roles: Json
+          p_study_year: number | null
+        }
+        Returns: string
+      }
+      save_own_profile_v5: {
+        Args: {
+          p_avatar_alt: string | null
+          p_avatar_path: string | null
+          p_deleted_experiences: Json
+          p_deleted_roles: Json
+          p_expected_profile_updated_at: string
+          p_experiences: Json
+          p_field_of_study: string | null
+          p_linkedin_url: string | null
+          p_new_roles: Json
+          p_phone_number: string | null
+          p_roles: Json
+          p_study_year: number | null
+        }
+        Returns: string
+      }
+      save_own_profile_v6: {
+        Args: {
+          p_avatar_alt: string | null
+          p_avatar_path: string | null
+          p_deleted_experiences: Json
+          p_deleted_roles: Json
+          p_expected_profile_updated_at: string
+          p_experiences: Json
+          p_field_of_study: string | null
+          p_linkedin_url: string | null
+          p_new_experiences: Json
+          p_new_roles: Json
+          p_phone_number: string | null
+          p_roles: Json
+          p_study_year: number | null
+        }
+        Returns: string
+      }
       submit_access_request: {
         Args: {
           requested_field_of_study: string

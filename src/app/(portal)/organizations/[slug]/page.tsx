@@ -45,7 +45,7 @@ export default async function OrganizationDetailsPage({
       .from("memberships")
       .select("id")
       .eq("organization_id", organization.id)
-      .in("status", ["active", "alumni"]),
+      .eq("status", "active"),
   ]);
 
   if (teamsResult.error || membershipsResult.error) {
@@ -54,7 +54,7 @@ export default async function OrganizationDetailsPage({
 
   const teamIds = teamsResult.data.map((team) => team.id);
   const teamMembershipsResult = teamIds.length
-    ? await supabase.from("team_memberships").select("team_id").in("team_id", teamIds)
+    ? await supabase.from("team_memberships").select("team_id").in("team_id", teamIds).is("archived_at", null)
     : { data: [], error: null };
 
   if (teamMembershipsResult.error) throw new Error("Could not load team memberships");
