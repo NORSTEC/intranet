@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+type LinkedAccount = {
+  person_id: number;
+  people:
+    | { portal_access_status: string }
+    | Array<{ portal_access_status: string }>;
+};
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
@@ -27,7 +34,7 @@ export async function GET(request: Request) {
 
   const { data: account, error: accountError } = await supabase
     .from("portal_accounts")
-    .select("person_id")
+    .select("person_id, people (portal_access_status)")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -35,11 +42,25 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=authorization", requestUrl.origin));
   }
 
+  const linkedAccount = account as LinkedAccount;
+  const person = Array.isArray(linkedAccount.people)
+    ? linkedAccount.people[0]
+    : linkedAccount.people;
+  if (!person || person.portal_access_status !== "active") {
+    await supabase.auth.signOut();
+    const reason = person?.portal_access_status === "deactivated"
+      ? "deactivated"
+      : person?.portal_access_status === "suspended"
+        ? "suspended"
+        : "authorization";
+    return NextResponse.redirect(new URL(`/login?error=${reason}`, requestUrl.origin));
+  }
+
   const { data: membership, error: membershipError } = await supabase
     .from("memberships")
     .select("id")
-    .eq("person_id", account.person_id)
-    .eq("status", "active")
+    .eq("person_id", linkedAccount.person_id)
+    .in("status", ["active", "ended"])
     .limit(1)
     .maybeSingle();
 

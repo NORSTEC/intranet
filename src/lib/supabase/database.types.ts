@@ -248,6 +248,44 @@ export type Database = {
           },
         ]
       }
+      membership_periods: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          ends_on: string | null
+          id: number
+          membership_id: number
+          started_at: string
+          starts_on: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          ends_on?: string | null
+          id?: never
+          membership_id: number
+          started_at?: string
+          starts_on: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          ends_on?: string | null
+          id?: never
+          membership_id?: number
+          started_at?: string
+          starts_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_periods_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -548,6 +586,39 @@ export type Database = {
           },
         ]
       }
+      portal_administrators: {
+        Row: {
+          granted_at: string
+          granted_by_person_id: number | null
+          person_id: number
+        }
+        Insert: {
+          granted_at?: string
+          granted_by_person_id?: number | null
+          person_id: number
+        }
+        Update: {
+          granted_at?: string
+          granted_by_person_id?: number | null
+          person_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_administrators_granted_by_person_id_fkey"
+            columns: ["granted_by_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_administrators_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_memberships: {
         Row: {
           archived_at: string | null
@@ -658,6 +729,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      sync_linked_google_identities: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      deactivate_own_portal_access: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      set_organization_membership_status: {
+        Args: {
+          p_membership_id: number
+          p_status: string
+        }
+        Returns: undefined
+      }
       create_own_profile_experience: {
         Args: {
           p_description: string | null

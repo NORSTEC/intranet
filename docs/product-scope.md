@@ -9,21 +9,26 @@ roles, teams, alumni transitions, and access to connected services.
 
 - Members of Norstec member organizations
 - Member-organization administrators
-- Norstec administrators
+- Portal administrators
 - Alumni with limited access
 
 ## Membership lifecycle
 
 ![Membership lifecycle](diagrams/membership-lifecycle.png)
 
+The detailed lifecycle and edge-case decisions are documented in
+[Membership lifecycle](membership-lifecycle.md). Alumni is derived from ended
+organization memberships; it is not a separate membership type.
+
 ## Proposed first release
 
 - Sign in with Google
-- Invite or request membership
-- Review and approve membership requests
+- Provision a first membership through an approved organization domain
 - View and update a personal profile
 - Manage organizations, teams, and roles
-- Transition a member to suspended, alumni, or deleted status
+- End and reactivate organization memberships while retaining history
+- Link multiple verified Google accounts to one portal profile
+- Allow an alumnus with no active memberships to deactivate portal access
 - Synchronize approved membership changes with Slack
 - Record administrative and integration events in an audit log
 
@@ -34,13 +39,17 @@ roles, teams, alumni transitions, and access to connected services.
 - Expense reimbursement
 - Annual-meeting administration
 - Advanced alumni tracking
+- Alumni applications for future organization memberships
+- Automated lifecycle email notifications
+- Self-service GDPR erasure
 - Offering the portal as a product to member organizations
 
-## Open product questions
+## Remaining product questions
 
-- Who may approve and terminate a membership?
-- Can one person belong to multiple organizations or teams?
 - Which profile fields are required, optional, and visible to other members?
-- What access should alumni retain?
-- How long should inactive and alumni data be stored?
+- How long should inactive and alumni data be retained?
 - Which Slack channels follow each role or team?
+- What verified workflow should link a personal email without sending test
+  messages to real recipients?
+- What legal-retention and anonymization rules should a future GDPR-erasure
+  workflow follow?

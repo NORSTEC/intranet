@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(79);
+select plan(113);
 
 insert into public.people (
   full_name,
@@ -71,6 +71,14 @@ values ('history-organization', 'History Organization', 'active');
 insert into public.organizations (slug, name, status)
 values ('claimed-history-organization', 'Claimed History Organization', 'active');
 
+insert into public.organizations (slug, name, status)
+values ('orbit-ntnu', 'Orbit NTNU', 'active');
+
+insert into private.organization_domains (domain, organization_id)
+select 'orbitntnu.no', id
+from public.organizations
+where slug = 'orbit-ntnu';
+
 insert into public.teams (organization_id, slug, name)
 select id, 'historical-team', 'Historical Team'
 from public.organizations
@@ -125,6 +133,71 @@ from public.teams as team
 cross join public.people as person
 where team.slug = 'pre-created-team'
   and person.full_name = 'Pre-created Member';
+
+insert into public.people (
+  full_name,
+  portal_access_status,
+  source
+)
+values (
+  'Organization Email Only',
+  'active',
+  'manual'
+);
+
+insert into public.person_emails (
+  person_id,
+  email,
+  email_type,
+  is_primary,
+  source
+)
+select
+  person.id,
+  'orgonly@norstec.no',
+  'organization',
+  true,
+  'manual'
+from public.people as person
+where person.full_name = 'Organization Email Only';
+
+insert into public.memberships (
+  person_id,
+  organization_id,
+  role,
+  status,
+  provisioning_method,
+  starts_on
+)
+select
+  person.id,
+  organization.id,
+  'member',
+  'active',
+  'manual',
+  '2025-08-01'::date
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Organization Email Only'
+  and organization.slug = 'norstec';
+
+insert into public.team_memberships (
+  team_id,
+  person_id,
+  role_title,
+  starts_on,
+  sort_order
+)
+select
+  team.id,
+  person.id,
+  'Team member',
+  '2025-08-01'::date,
+  0
+from public.teams as team
+cross join public.people as person
+where team.slug = 'pre-created-team'
+  and person.full_name = 'Organization Email Only';
 
 insert into auth.users (
   id,
@@ -191,6 +264,53 @@ values
     now(),
     false,
     false
+  ),
+  (
+    '55555555-5555-4555-8555-555555555555',
+    'authenticated',
+    'authenticated',
+    'orgonly@norstec.no',
+    now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Organization Email Only"}'::jsonb,
+    now(),
+    now(),
+    false,
+    false
+  );
+
+insert into auth.identities (
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  created_at,
+  updated_at
+)
+values
+  (
+    'google-member-primary',
+    '11111111-1111-4111-8111-111111111111',
+    '{"email":"member@norstec.no","email_verified":true}'::jsonb,
+    'google',
+    now(),
+    now()
+  ),
+  (
+    'google-member-personal',
+    '11111111-1111-4111-8111-111111111111',
+    '{"email":"member.private@example.com","email_verified":true}'::jsonb,
+    'google',
+    now(),
+    now()
+  ),
+  (
+    'google-member-orbit',
+    '11111111-1111-4111-8111-111111111111',
+    '{"email":"eirikkvam@orbitntnu.no","email_verified":true}'::jsonb,
+    'google',
+    now(),
+    now()
   );
 
 select ok(
@@ -289,6 +409,99 @@ select is(
   ),
   'active',
   'claiming a person activates portal access'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.sync_linked_google_identities() $$,
+  'an active member can synchronize Google identities linked in Supabase Auth'
+);
+
+select is(
+  (
+    select email_type
+    from public.person_emails
+    where email = 'member.private@example.com'
+  ),
+  'personal',
+  'a linked private Google identity becomes a personal sign-in email'
+);
+
+select is(
+  (
+    select email_type
+    from public.person_emails
+    where email = 'eirikkvam@orbitntnu.no'
+  ),
+  'organization',
+  'a linked approved-domain identity becomes an organization email'
+);
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.portal_accounts as account on account.person_id = membership.person_id
+    join public.organizations as organization on organization.id = membership.organization_id
+    where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
+      and organization.slug = 'orbit-ntnu'
+  ),
+  'active',
+  'a linked approved-domain identity creates membership in that organization'
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.portal_accounts as account on account.person_id = membership.person_id
+    where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
+      and membership.status = 'active'
+  ),
+  2::bigint,
+  'one portal person can have active memberships in two organizations'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'auth.identity_linked'
+  ),
+  2::bigint,
+  'new linked sign-in emails are audited without duplicating the primary email'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.sync_linked_google_identities() $$,
+  'linked identity synchronization is idempotent'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'auth.identity_linked'
+  ),
+  2::bigint,
+  'repeated synchronization creates no duplicate audit events'
 );
 
 set local role authenticated;
@@ -919,8 +1132,10 @@ select is(
 select is(
   (
     select count(*)
-    from public.team_memberships
-    where role_title = 'Team member'
+    from public.team_memberships as team_membership
+    join public.people as person on person.id = team_membership.person_id
+    where team_membership.role_title = 'Team member'
+      and person.full_name = 'Pre-created Member'
   ),
   1::bigint,
   'an active member can read team memberships'
@@ -978,13 +1193,25 @@ select is(
 reset role;
 
 select is(
-  private.assign_norstec_admin('member@norstec.no'),
+  private.assign_portal_admin('member@norstec.no'),
   (
     select person_id
     from public.portal_accounts
     where auth_user_id = '11111111-1111-4111-8111-111111111111'
   ),
-  'the controlled bootstrap function returns the promoted person'
+  'the controlled portal-admin bootstrap returns the promoted person'
+);
+
+select is(
+  (
+    select count(*)
+    from public.portal_administrators as administrator
+    join public.portal_accounts as account
+      on account.person_id = administrator.person_id
+    where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  1::bigint,
+  'the bootstrap function grants the separate portal-admin permission'
 );
 
 select is(
@@ -993,10 +1220,13 @@ select is(
     from public.memberships as membership
     join public.portal_accounts as account
       on account.person_id = membership.person_id
+    join public.organizations as organization
+      on organization.id = membership.organization_id
     where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
+      and organization.slug = 'norstec'
   ),
-  'norstec_admin',
-  'the bootstrap function grants the Norstec admin role'
+  'member',
+  'portal administration does not rewrite organization membership roles'
 );
 
 select is(
@@ -1008,10 +1238,10 @@ select is(
       from public.portal_accounts
       where auth_user_id = '11111111-1111-4111-8111-111111111111'
     )
-      and action = 'membership.role_assigned'
+      and action = 'portal_admin.assigned'
   ),
   1::bigint,
-  'the bootstrap role assignment is audited'
+  'the portal-admin assignment is audited'
 );
 
 set local role authenticated;
@@ -1028,7 +1258,7 @@ select is(
     where full_name = 'Personal User'
   ),
   1::bigint,
-  'a Norstec admin can read an access requester person record'
+  'a portal admin can read an access requester for any organization'
 );
 
 select is(
@@ -1038,17 +1268,17 @@ select is(
     where status = 'pending'
   ),
   1::bigint,
-  'a Norstec admin can read pending access requests'
+  'a portal admin can administer access requests for every organization'
 );
 
 select is(
   (
     select count(*)
     from public.audit_events
-    where action = 'membership.role_assigned'
+    where action = 'portal_admin.assigned'
   ),
   1::bigint,
-  'a Norstec admin can read audit events'
+  'a portal admin can read audit events'
 );
 
 select is(
@@ -1059,8 +1289,324 @@ select is(
       select id from public.people where full_name = 'Pre-created Member'
     )
   ),
+  1::bigint,
+  'a portal admin receives organization-admin email visibility'
+);
+
+reset role;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select is(
+  private.is_organization_admin(
+    (select id from public.organizations where slug = 'norstec')
+  ),
+  true,
+  'a portal admin inherits organization administration'
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_membership_status(
+      (
+        select membership.id
+        from public.memberships as membership
+        join public.people as person on person.id = membership.person_id
+        where person.full_name = 'Pre-created Member'
+          and membership.organization_id = (
+            select id from public.organizations where slug = 'norstec'
+          )
+      ),
+      'ended'
+    )
+  $$,
+  'an organization admin can end a membership in the assigned organization'
+);
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Pre-created Member'
+      and membership.organization_id = (
+        select id from public.organizations where slug = 'norstec'
+      )
+  ),
+  'ended',
+  'ending a membership stores the alumni lifecycle state'
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_membership_status(
+      (
+        select membership.id
+        from public.memberships as membership
+        join public.people as person on person.id = membership.person_id
+        where person.full_name = 'Pre-created Member'
+          and membership.organization_id = (
+            select id from public.organizations where slug = 'norstec'
+          )
+      ),
+      'active'
+    )
+  $$,
+  'an organization admin can reactivate a member with an email address'
+);
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Pre-created Member'
+      and membership.organization_id = (
+        select id from public.organizations where slug = 'norstec'
+      )
+  ),
+  'active',
+  'reactivating a member clears the alumni lifecycle state'
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_membership_status(
+      (
+        select membership.id
+        from public.memberships as membership
+        join public.people as person on person.id = membership.person_id
+        where person.full_name = 'Organization Email Only'
+          and membership.organization_id = (
+            select id from public.organizations where slug = 'norstec'
+          )
+      ),
+      'ended'
+    )
+  $$,
+  'an organization admin can end membership when only an organization email exists'
+);
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Organization Email Only'
+  ),
+  'ended',
+  'the organization-email-only membership is ended'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails as person_email
+    join public.people as person on person.id = person_email.person_id
+    where person.full_name = 'Organization Email Only'
+      and person_email.email_type = 'personal'
+  ),
+  0::bigint,
+  'ending membership does not require or invent a personal email'
+);
+
+select is(
+  (
+    select count(*)
+    from public.membership_periods as period
+    join public.memberships as membership on membership.id = period.membership_id
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Organization Email Only'
+      and period.ends_on = current_date
+  ),
+  1::bigint,
+  'ending membership closes the active membership period'
+);
+
+select is(
+  (
+    select team_membership.ends_on
+    from public.team_memberships as team_membership
+    join public.people as person on person.id = team_membership.person_id
+    where person.full_name = 'Organization Email Only'
+  ),
+  current_date,
+  'ending membership closes open team memberships in the organization'
+);
+
+select is(
+  (
+    select experience.ends_on
+    from public.profile_experiences as experience
+    join public.people as person on person.id = experience.person_id
+    where person.full_name = 'Organization Email Only'
+      and experience.membership_id is not null
+  ),
+  current_date,
+  'ending membership closes its authoritative profile experience'
+);
+
+reset role;
+
+select lives_ok(
+  $$
+    update auth.users
+    set raw_app_meta_data = raw_app_meta_data || '{"lifecycle_refresh":1}'::jsonb
+    where id = '55555555-5555-4555-8555-555555555555'
+  $$,
+  'a later domain-account refresh succeeds after membership has ended'
+);
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Organization Email Only'
+  ),
+  'ended',
+  'domain sign-in provisioning never reactivates an ended membership'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_membership_status(
+      (
+        select membership.id
+        from public.memberships as membership
+        join public.people as person on person.id = membership.person_id
+        where person.full_name = 'Organization Email Only'
+      ),
+      'active'
+    )
+  $$,
+  'an organization admin can reactivate one ended organization membership'
+);
+
+select is(
+  (
+    select membership.status || ':' || membership.role
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Organization Email Only'
+  ),
+  'active:member',
+  'reactivation restores membership with the safe member role'
+);
+
+select is(
+  (
+    select count(*)
+    from public.membership_periods as period
+    join public.memberships as membership on membership.id = period.membership_id
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Organization Email Only'
+  ),
   2::bigint,
-  'a Norstec admin can read both organization and personal emails'
+  'reactivation starts a new membership period without rewriting history'
+);
+
+select is(
+  (
+    select count(*)
+    from public.team_memberships as team_membership
+    join public.people as person on person.id = team_membership.person_id
+    where person.full_name = 'Organization Email Only'
+      and team_membership.ends_on is null
+  ),
+  0::bigint,
+  'reactivation does not reopen former team memberships'
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_membership_status(
+      (
+        select membership.id
+        from public.memberships as membership
+        join public.people as person on person.id = membership.person_id
+        where person.full_name = 'Organization Email Only'
+      ),
+      'ended'
+    )
+  $$,
+  'the reactivated organization membership can be ended again'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.deactivate_own_portal_access() $$,
+  'an alumnus with no active memberships can leave the portal'
+);
+
+select is(
+  (
+    select person.portal_access_status
+    from public.people as person
+    where person.full_name = 'Organization Email Only'
+  ),
+  'deactivated',
+  'leaving the portal deactivates access without deleting membership history'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'portal_access.deactivated'
+      and actor_person_id = (
+        select id from public.people where full_name = 'Organization Email Only'
+      )
+  ),
+  1::bigint,
+  'self-service portal deactivation is audited'
+);
+
+select lives_ok(
+  $$
+    update auth.users
+    set raw_app_meta_data = raw_app_meta_data || '{"lifecycle_refresh":2}'::jsonb
+    where id = '55555555-5555-4555-8555-555555555555'
+  $$,
+  'a later identity refresh succeeds for a deactivated account'
+);
+
+select is(
+  (
+    select person.portal_access_status || ':' || membership.status
+    from public.people as person
+    join public.memberships as membership on membership.person_id = person.id
+    where person.full_name = 'Organization Email Only'
+  ),
+  'deactivated:ended',
+  'identity refresh never reactivates portal access or membership'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
 );
 
 select lives_ok(
@@ -1104,8 +1650,8 @@ select is(
     where person_id = (select private.current_person_id())
       and membership_id is not null
   ),
-  1::bigint,
-  'the authoritative membership created one default profile experience'
+  2::bigint,
+  'each authoritative organization membership created one default profile experience'
 );
 
 reset role;
@@ -1113,11 +1659,11 @@ reset role;
 select is(
   has_function_privilege(
     'authenticated',
-    'private.assign_norstec_admin(text)',
+    'private.assign_portal_admin(text)',
     'execute'
   ),
   false,
-  'authenticated users cannot invoke the admin bootstrap function'
+  'authenticated users cannot invoke the portal-admin bootstrap function'
 );
 
 select is(
@@ -1161,6 +1707,26 @@ select is(
 );
 
 select is(
+  has_function_privilege(
+    'anon',
+    'public.sync_linked_google_identities()',
+    'execute'
+  ),
+  false,
+  'anonymous users cannot synchronize linked identities'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'public.sync_linked_google_identities()',
+    'execute'
+  ),
+  true,
+  'authenticated portal users may synchronize their own linked identities'
+);
+
+select is(
   (
     select count(*)
     from pg_class
@@ -1172,6 +1738,7 @@ select is(
         'person_emails',
         'portal_accounts',
         'memberships',
+        'membership_periods',
         'teams',
         'team_memberships',
         'external_accounts',
@@ -1183,7 +1750,7 @@ select is(
       )
       and pg_class.relrowsecurity
   ),
-  13::bigint,
+  14::bigint,
   'RLS is enabled on every public portal table'
 );
 

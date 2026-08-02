@@ -36,6 +36,10 @@ export default async function AccessPage({
     redirect("/login?error=authorization");
   }
 
+  if (access.status === "inactive") {
+    redirect(`/login?error=${access.reason}`);
+  }
+
   if (access.membership) {
     redirect("/");
   }

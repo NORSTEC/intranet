@@ -7,6 +7,28 @@ import { requirePortalAccess } from "@/lib/auth/access";
 import { isStudyField } from "@/lib/profile/study-fields";
 import { createClient } from "@/lib/supabase/server";
 
+export type DeactivatePortalAccessResult =
+  | { ok: false; message: string }
+  | never;
+
+export async function deactivatePortalAccess(): Promise<DeactivatePortalAccessResult> {
+  await requirePortalAccess();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("deactivate_own_portal_access");
+
+  if (error) {
+    const message = error.message.includes("active_membership_exists")
+      ? "All active organization memberships must end before you can leave the portal."
+      : error.message.includes("portal_admin_transfer_required")
+        ? "Transfer your portal administrator responsibility before leaving the portal."
+        : "Portal access could not be deactivated.";
+    return { ok: false, message };
+  }
+
+  await supabase.auth.signOut({ scope: "global" });
+  redirect("/login?error=deactivated");
+}
+
 function textValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";

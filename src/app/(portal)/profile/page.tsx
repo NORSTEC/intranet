@@ -1,5 +1,10 @@
 import Link from "next/link";
+import {
+  LoginAccountsSettings,
+  type LinkedLoginAccount,
+} from "@/components/portal/login-accounts-settings";
 import { MemberProfileView } from "@/components/portal/member-profile-view";
+import { PortalAccessSettings } from "@/components/portal/portal-access-settings";
 import { Toast } from "@/components/portal/toast";
 import { requirePortalAccess } from "@/lib/auth/access";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
@@ -27,12 +32,16 @@ type ProfileExperience = {
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{
+    accountLinked?: string;
+    accountLinkError?: string;
+    saved?: string;
+  }>;
 }) {
   const access = await requirePortalAccess();
-  const { saved } = await searchParams;
+  const { accountLinked, accountLinkError, saved } = await searchParams;
   const supabase = await createClient();
-  const [experiencesResult, emailsResult, avatarUrls] =
+  const [experiencesResult, emailsResult, identitiesResult, avatarUrls] =
     await Promise.all([
       supabase
         .from("profile_experiences")
@@ -43,18 +52,43 @@ export default async function ProfilePage({
         .order("starts_on", { ascending: false, nullsFirst: false }),
       supabase
         .from("person_emails")
-        .select("id, email")
+        .select("id, email, email_type")
         .eq("person_id", access.profile.personId)
         .order("is_primary", { ascending: false }),
+      supabase.auth.getUserIdentities(),
       getMemberAvatarUrls([access.profile.avatarPath]),
     ]);
 
   if (
     experiencesResult.error ||
-    emailsResult.error
+    emailsResult.error ||
+    identitiesResult.error
   ) {
     throw new Error("Could not load profile");
   }
+
+  const emailTypes = new Map(
+    emailsResult.data.map((email) => [email.email, email.email_type]),
+  );
+  const loginAccounts: LinkedLoginAccount[] = identitiesResult.data.identities
+    .flatMap((identity) => {
+      const email = typeof identity.identity_data?.email === "string"
+        ? identity.identity_data.email.toLocaleLowerCase("en")
+        : null;
+      if (!email || identity.provider !== "google") return [];
+
+      const emailType = emailTypes.get(email);
+      return [{
+        email,
+        emailType:
+          emailType === "organization" || emailType === "personal"
+            ? emailType
+            : "unknown",
+        id: identity.id,
+        isPrimary: email === access.profile.email,
+      } satisfies LinkedLoginAccount];
+    })
+    .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
 
   const status = access.memberships.some((membership) => membership.status === "active")
     ? "Active"
@@ -93,6 +127,22 @@ export default async function ProfilePage({
       {saved === "true" && (
         <Toast clearParams={["saved"]} message="Changes saved." status="success" />
       )}
+      {accountLinked === "true" && (
+        <Toast
+          clearParams={["accountLinked"]}
+          message="Google account linked."
+          status="success"
+        />
+      )}
+      {accountLinkError && (
+        <Toast
+          clearParams={["accountLinkError"]}
+          message={accountLinkError === "conflict"
+            ? "That email belongs to another portal profile. Contact Norstec IT."
+            : "The Google account could not be linked. Please try again."}
+          status="error"
+        />
+      )}
       <MemberProfileView
       action={
         <Link className="portal-button" href="/profile/edit">
@@ -110,6 +160,13 @@ export default async function ProfilePage({
       phoneNumber={access.profile.phoneNumber}
       status={status}
       studyYear={access.profile.studyYear}
+      />
+      <LoginAccountsSettings accounts={loginAccounts} />
+      <PortalAccessSettings
+        canLeavePortal={status === "Alumni" && !access.isPortalAdmin}
+        hasPersonalEmail={emailsResult.data.some(
+          (email) => email.email_type === "personal",
+        )}
       />
     </>
   );

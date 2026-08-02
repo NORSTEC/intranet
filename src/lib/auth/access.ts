@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PortalAccessState,
+  AdministeredOrganization,
   PortalMembership,
   PortalProfile,
-  PortalRole,
+  MembershipRole,
 } from "@/lib/auth/types";
 
 type ProfileRow = {
@@ -20,6 +21,7 @@ type ProfileRow = {
   study_year: number | null;
   phone_number: string | null;
   linkedin_url: string | null;
+  portal_access_status: "unclaimed" | "active" | "suspended" | "deactivated";
 };
 
 type PortalAccountRow = {
@@ -32,17 +34,16 @@ type PortalAccountRow = {
 type MembershipRow = {
   id: number;
   organization_id: number;
-  role: PortalRole;
+  role: MembershipRole;
   status: "active" | "ended";
   organizations:
     | { id: number; name: string; slug: string }
     | { id: number; name: string; slug: string }[];
 };
 
-const rolePriority: Record<PortalRole, number> = {
+const rolePriority: Record<MembershipRole, number> = {
   member: 1,
   organization_admin: 2,
-  norstec_admin: 3,
 };
 
 export async function getPortalAccess(): Promise<PortalAccessState> {
@@ -59,7 +60,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   const accountResult = await supabase
     .from("portal_accounts")
     .select(
-      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt)",
+      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, portal_access_status)",
     )
     .eq("auth_user_id", user.id)
     .maybeSingle();
@@ -69,15 +70,20 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   }
 
   const accountRow = accountResult.data as PortalAccountRow;
-  const [membershipsResult] = await Promise.all([
+  const [membershipsResult, portalAdministratorResult] = await Promise.all([
     supabase
       .from("memberships")
       .select("id, organization_id, role, status, organizations (id, name, slug)")
       .eq("person_id", accountRow.person_id)
       .in("status", ["active", "ended"]),
+    supabase
+      .from("portal_administrators")
+      .select("person_id")
+      .eq("person_id", accountRow.person_id)
+      .maybeSingle(),
   ]);
 
-  if (membershipsResult.error) {
+  if (membershipsResult.error || portalAdministratorResult.error) {
     return { status: "error" };
   }
 
@@ -86,6 +92,12 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     : accountRow.people;
   if (!profileRow) {
     return { status: "error" };
+  }
+  if (profileRow.portal_access_status !== "active") {
+    return {
+      status: "inactive",
+      reason: profileRow.portal_access_status,
+    };
   }
   const membershipRows = (membershipsResult.data ?? []) as MembershipRow[];
   const sortedMembershipRows = membershipRows.sort(
@@ -135,6 +147,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     profile,
     membership: memberships[0] ?? null,
     memberships,
+    isPortalAdmin: Boolean(portalAdministratorResult.data),
   };
 }
 
@@ -149,6 +162,10 @@ export async function requirePortalAccess() {
     redirect("/login?error=authorization");
   }
 
+  if (access.status === "inactive") {
+    redirect(`/login?error=${access.reason}`);
+  }
+
   if (!access.membership) {
     redirect("/access");
   }
@@ -156,10 +173,52 @@ export async function requirePortalAccess() {
   return { ...access, membership: access.membership };
 }
 
-export async function requirePortalRole(allowedRoles: PortalRole[]) {
+export async function requireOrganizationAdminAccess() {
+  const access = await requirePortalAccess();
+  let administeredOrganizations: AdministeredOrganization[];
+
+  if (access.isPortalAdmin) {
+    const supabase = await createClient();
+    const organizationsResult = await supabase
+      .from("organizations")
+      .select("id, name, slug")
+      .eq("status", "active")
+      .order("name");
+
+    if (organizationsResult.error) {
+      redirect("/?error=authorization");
+    }
+
+    administeredOrganizations = organizationsResult.data.map((organization) => ({
+      organizationId: organization.id,
+      organizationName: organization.name,
+      organizationSlug: organization.slug,
+    }));
+  } else {
+    administeredOrganizations = access.memberships
+      .filter(
+        (membership) =>
+          membership.status === "active" &&
+          membership.role === "organization_admin",
+      )
+      .map((membership) => ({
+        organizationId: membership.organizationId,
+        organizationName: membership.organizationName,
+        organizationSlug: membership.organizationSlug,
+      }));
+  }
+
+  if (administeredOrganizations.length === 0) {
+    redirect("/");
+  }
+
+  return { ...access, administeredOrganizations };
+}
+
+export async function requirePortalAdminAccess() {
   const access = await requirePortalAccess();
 
-  if (!allowedRoles.includes(access.membership.role)) {
+  if (!access.isPortalAdmin) {
     redirect("/");
   }
 

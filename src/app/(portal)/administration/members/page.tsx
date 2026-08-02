@@ -1,28 +1,59 @@
-import { PageHeader } from "@/components/portal/page-header";
-import { requirePortalRole } from "@/lib/auth/access";
-
-const members = [["Ada Fjell", "Orbit NTNU", "Active"], ["Jonas Strand", "Orbit NTNU", "Active"], ["Mina Isaksen", "Portal Space", "Alumni"], ["Lars Krogh", "Propulse NTNU", "Active"]];
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { OrganizationLogo } from "@/components/portal/organization-logo";
+import { requireOrganizationAdminAccess } from "@/lib/auth/access";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function MemberStatusPage() {
-  const access = await requirePortalRole(["organization_admin", "norstec_admin"]);
-  const globalScope = access.membership.role === "norstec_admin";
-  const administeredOrganizations = access.memberships.filter((membership) => membership.role === "organization_admin");
-  const scopeLabel = globalScope ? "All organizations" : administeredOrganizations.length > 1 ? `${administeredOrganizations.length} organizations` : access.membership.organizationName;
+  const access = await requireOrganizationAdminAccess();
+  const { administeredOrganizations } = access;
+
+  if (administeredOrganizations.length === 1) {
+    redirect(`/administration/members/${administeredOrganizations[0].organizationSlug}`);
+  }
+
+  const supabase = await createClient();
+  const organizationIds = administeredOrganizations.map(
+    (membership) => membership.organizationId,
+  );
+  const organizationResult = await supabase
+    .from("organizations")
+    .select("id, name, slug, logo_path")
+    .in("id", organizationIds)
+    .order("name");
+
+  if (organizationResult.error) {
+    throw new Error("Could not load administered organizations");
+  }
 
   return (
-    <>
-      <PageHeader description={scopeLabel} />
-      <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-2"><button className="portal-pill" type="button">Active</button><button className="portal-pill portal-pill-outline" type="button">Alumni</button>{(globalScope || administeredOrganizations.length > 1) && <button className="portal-pill portal-pill-outline" type="button">Organization</button>}</div>
-        <input className="portal-field w-full sm:w-72" placeholder="Search members" />
-      </div>
-      <section className="grid gap-3">
-        {members.map(([name, organization, status]) => (
-          <article key={`${name}-${organization}`} className="portal-surface grid items-center gap-4 p-5 sm:grid-cols-[1fr_1fr_auto_auto] sm:px-6">
-            <p className="font-medium">{name}</p><p className="text-sm opacity-55">{organization}</p><span className="portal-pill portal-pill-outline">{status}</span><button className="portal-pill" type="button">Change status</button>
-          </article>
+    <section>
+      <p className="mb-7 max-w-xl text-sm leading-relaxed opacity-60">
+        Choose the organization whose members you want to manage.
+      </p>
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {organizationResult.data.map((organization) => (
+          <Link
+            className="portal-surface portal-card-link group flex min-h-64 flex-col p-5"
+            href={`/administration/members/${organization.slug}`}
+            key={organization.id}
+          >
+            <OrganizationLogo
+              logoPath={organization.logo_path}
+              name={organization.name}
+            />
+            <span className="mt-7 flex items-center justify-between gap-4">
+              <span className="text-xl font-medium">{organization.name}</span>
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined shrink-0 transition-transform group-hover:translate-x-1"
+              >
+                trending_flat
+              </span>
+            </span>
+          </Link>
         ))}
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

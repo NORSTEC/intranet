@@ -33,6 +33,7 @@ demonstrated need arises.
 - [Product scope](docs/product-scope.md)
 - [Proposed architecture](docs/architecture.md)
 - [Security model](docs/security-model.md)
+- [Membership lifecycle and edge cases](docs/membership-lifecycle.md)
 
 ## Development
 
@@ -51,7 +52,7 @@ Open `http://localhost:3000`. The current prototype includes:
 - `/profile` — member profile
 - `/teams` — team directory
 - `/organization` — organization administration
-- `/admin` — Norstec administration
+- `/admin` — portal administration
 
 Run the local database migration and authorization tests with Docker running:
 

@@ -48,6 +48,13 @@ export default async function LoginPage({
             />
           </h1>
 
+          <div className="mt-8 rounded-2xl border border-current p-4 text-sm leading-relaxed">
+            <p className="font-medium">Already have a portal profile?</p>
+            <p className="mt-1 opacity-60">
+              Sign in with an account already connected to your profile. You can then link a new organization or personal Google account from your profile without creating a duplicate.
+            </p>
+          </div>
+
           <GoogleSignInButton />
           {error === "oauth_callback" && (
             <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
@@ -59,17 +66,27 @@ export default async function LoginPage({
               Portal access could not be checked. Please try again.
             </p>
           )}
+          {error === "deactivated" && (
+            <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
+              This portal account has been deactivated. Contact Norstec IT if you want to return.
+            </p>
+          )}
+          {error === "suspended" && (
+            <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
+              This portal account is suspended. Contact Norstec IT for help.
+            </p>
+          )}
 
           <div className="mt-12">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-50">Which account should I use?</p>
             <ol className="mt-5 space-y-5">
               <li className="flex gap-4">
                 <span className="material-symbols-outlined mt-0.5 text-[1.3rem]">domain</span>
-                <div><p className="text-sm font-medium">Organization account</p><p className="mt-1 text-sm leading-5 opacity-55">Use the Google account provided by a Norstec member organization. Approved organization accounts get direct access.</p></div>
+                <div><p className="text-sm font-medium">Organization account</p><p className="mt-1 text-sm leading-5 opacity-55">New users can sign in with the Google account provided by a member organization. Existing users should connect new organization accounts from their profile first.</p></div>
               </li>
               <li className="flex gap-4">
                 <span className="material-symbols-outlined mt-0.5 text-[1.3rem]">person</span>
-                <div><p className="text-sm font-medium">Personal account</p><p className="mt-1 text-sm leading-5 opacity-55">Use your personal Google account if your organization does not provide one, or if you are an alumnus. You can request access after signing in.</p></div>
+                <div><p className="text-sm font-medium">Personal account</p><p className="mt-1 text-sm leading-5 opacity-55">Use a personal Google account only when it has already been linked to your Norstec profile.</p></div>
               </li>
             </ol>
           </div>

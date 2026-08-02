@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/portal/page-header";
-import { requirePortalRole } from "@/lib/auth/access";
+import { requireOrganizationAdminAccess } from "@/lib/auth/access";
 
 const requests = [
   ["Emilie Moe", "emilie@orbitntnu.com"],
@@ -15,7 +15,7 @@ const members = [
 ];
 
 export default async function OrganizationPage() {
-  const access = await requirePortalRole(["organization_admin", "norstec_admin"]);
+  const access = await requireOrganizationAdminAccess();
 
   return (
     <>

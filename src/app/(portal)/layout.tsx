@@ -11,7 +11,14 @@ export default async function PortalLayout({ children }: { children: React.React
     <PortalShell
       displayName={access.profile.fullName ?? access.profile.email}
       organizationName={organizationLabel}
-      role={access.membership.role}
+      canAdministerOrganization={
+        access.isPortalAdmin ||
+        access.memberships.some(
+          (membership) =>
+            membership.status === "active" && membership.role === "organization_admin",
+        )
+      }
+      isPortalAdmin={access.isPortalAdmin}
     >
       {children}
     </PortalShell>

@@ -10,7 +10,10 @@ const teams = [
 
 export default async function TeamsPage() {
   const access = await requirePortalAccess();
-  const canAdminister = access.membership.role !== "member";
+  const canAdminister = access.memberships.some(
+    (membership) =>
+      membership.status === "active" && membership.role === "organization_admin",
+  );
 
   return (
     <>

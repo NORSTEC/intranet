@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { MemberAvatar } from "@/components/portal/member-avatar";
+import {
+  SortableTableHeader,
+  type TableSortDirection,
+} from "@/components/portal/sortable-table-header";
 import { TeamMemberCard } from "@/components/portal/team-member-card";
 
 type DirectoryOrganization = {
@@ -12,7 +17,6 @@ type DirectoryOrganization = {
 
 type DirectoryStatus = "active" | "alumni";
 type DirectoryView = "table" | "cards";
-type SortDirection = "ascending" | "descending";
 type SortKey = "name" | "organizations" | "status" | "email";
 
 export type DirectoryMember = {
@@ -31,7 +35,7 @@ function statusLabel(status: DirectoryStatus) {
   return status === "active" ? "Active" : "Alumni";
 }
 
-function CheckboxOption({
+export function CheckboxOption({
   checked,
   label,
   onChange,
@@ -61,7 +65,7 @@ function CheckboxOption({
   );
 }
 
-function FilterMenu({
+export function FilterMenu({
   children,
   icon,
   label,
@@ -103,7 +107,7 @@ export function MembersDirectory({
   const [selectedOrganizations, setSelectedOrganizations] = useState<number[]>([]);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] =
-    useState<SortDirection>("ascending");
+    useState<TableSortDirection>("ascending");
 
   const filteredMembers = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("en");
@@ -270,7 +274,7 @@ export function MembersDirectory({
             ] as const).map(([value, icon, label]) => (
               <button
                 aria-pressed={view === value}
-                className={`flex min-w-24 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-colors ${view === value ? "bg-egg text-moody" : "text-egg hover:text-copper"}`}
+                className={`flex min-w-24 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-colors hover:bg-copper hover:text-moody-static ${view === value ? "bg-egg text-moody" : "text-egg"}`}
                 key={value}
                 onClick={() => setView(value)}
                 type="button"
@@ -297,31 +301,14 @@ export function MembersDirectory({
                       ["email", "Email"],
                     ] as const
                   ).map(([key, heading]) => (
-                    <th
-                      aria-sort={sortKey === key ? sortDirection : "none"}
-                      className="pb-3 pr-5 text-left font-semibold italic first:pl-4 last:pr-4"
+                    <SortableTableHeader
+                      active={sortKey === key}
+                      direction={sortDirection}
                       key={key}
-                      scope="col"
+                      onSort={() => changeSort(key)}
                     >
-                      <button
-                        className="inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-copper"
-                        onClick={() => changeSort(key)}
-                        type="button"
-                      >
-                        {heading}
-                        <span
-                          className={`material-symbols-outlined text-[1rem] not-italic transition-transform ${
-                            sortKey === key
-                              ? sortDirection === "descending"
-                                ? "rotate-180 opacity-100"
-                                : "opacity-100"
-                              : "opacity-30"
-                          }`}
-                        >
-                          {sortKey === key ? "arrow_upward" : "unfold_more"}
-                        </span>
-                      </button>
-                    </th>
+                      {heading}
+                    </SortableTableHeader>
                   ))}
                 </tr>
               </thead>
@@ -341,8 +328,11 @@ export function MembersDirectory({
                     role="link"
                     tabIndex={0}
                   >
-                    <td className="py-3 pl-4 pr-5 font-medium">
-                      {member.name}
+                    <td className="py-3 pl-4 pr-5">
+                      <div className="flex min-w-0 items-center gap-3 font-medium">
+                        <MemberAvatar name={member.name} src={member.avatarUrl} />
+                        <span className="truncate">{member.name}</span>
+                      </div>
                     </td>
                     <td className="py-3 pr-5">
                       {member.organizations

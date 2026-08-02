@@ -12,21 +12,31 @@ These are separate concepts:
 3. An active membership connects the user to an organization.
 4. Membership and system roles determine what the user may access.
 
-A verified Google account from an approved Workspace domain receives an active
-`member` membership automatically. A personal Google account receives only a
-profile and onboarding access until its request is approved.
+A verified Google account from an approved Workspace domain can receive its
+first active `member` membership automatically. If a membership already exists,
+later sign-ins never change its lifecycle state. A linked personal Google
+account can authenticate the same person, but does not create or reactivate an
+organization membership.
 
-Domain matching must never grant an administrative role. `organization_admin`
-and `norstec_admin` are assigned through authorized, audited operations.
+Additional Google accounts are linked only while authenticated to the existing
+profile and after Google verifies the added identity. Accounts are never joined
+by name or email similarity. If a verified identity email is already assigned
+to another portal person, linking stops for portal-admin duplicate review.
+
+Domain matching must never grant an administrative permission.
+`organization_admin` and `portal_admin` are assigned through separate,
+authorized, audited operations.
 
 ## Proposed roles
 
 - `member`
 - `organization_admin`
-- `norstec_admin`
+- `portal_admin`
 
-Roles are attached to memberships. An active `norstec_admin` membership grants
-global portal administration.
+`organization_admin` is attached to an active membership and applies only to
+that organization. `portal_admin` is a separate system permission for the small
+Norstec IT group. It grants Portal management and Audit log access and inherits
+organization administration for every active organization.
 
 ## Role scope
 
@@ -35,13 +45,13 @@ global portal administration.
 The arrows represent additional permissions, not automatic role assignment.
 Roles must always be assigned through an authorized and audited operation.
 
-| Capability | `member` | `organization_admin` | `norstec_admin` |
+| Capability | `member` | `organization_admin` | `portal_admin` |
 | --- | ---: | ---: | ---: |
 | View and edit own profile | Yes | Yes | Yes |
 | View permitted member content | Yes | Yes | Yes |
-| Manage members in own organization | No | Yes | Yes |
-| Manage teams in own organization | No | Yes | Yes |
-| Manage other organizations | No | No | Yes |
+| Manage members in assigned organization | No | Yes | All organizations |
+| Manage teams in assigned organization | No | Yes | All organizations |
+| Manage organization settings | No | Yes | All organizations |
 | Assign administrator roles | No | No | Yes |
 | Access system-wide audit information | No | No | Yes |
 
@@ -56,6 +66,12 @@ Roles must always be assigned through an authorized and audited operation.
   permission functions.
 - Privileged service credentials are never included in browser bundles.
 - Global administrator roles are assigned manually and audited.
+- Linked Google identities are synchronized from Supabase Auth, not from
+  user-editable metadata supplied by the browser.
+- Ending a membership is organization-scoped and preserves its periods and
+  audit history. Reactivation starts a new period with the safe `member` role.
+- Portal access is independent of organization membership. Self-deactivation is
+  allowed only after every active membership has ended and is not data erasure.
 - Administrative access requires an additional authentication factor before
   production launch.
 
@@ -88,3 +104,6 @@ Before implementation is considered production-ready, the project needs:
 - An incident-response procedure
 - Backup and restore procedures
 - Administrator and project handover procedures
+
+See [Membership lifecycle](membership-lifecycle.md) for the implemented state
+transitions and edge-case flow diagrams.

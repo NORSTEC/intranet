@@ -1,6 +1,6 @@
 import { reviewAccessRequest } from "@/app/(portal)/administration/access-requests/actions";
 import { PageHeader } from "@/components/portal/page-header";
-import { requirePortalRole } from "@/lib/auth/access";
+import { requireOrganizationAdminAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
 type RelatedName = { name: string } | Array<{ name: string }>;
@@ -55,7 +55,7 @@ export default async function AccessRequestsPage({
 }: {
   searchParams: Promise<{ error?: string; reviewed?: string }>;
 }) {
-  const access = await requirePortalRole(["organization_admin", "norstec_admin"]);
+  const access = await requireOrganizationAdminAccess();
   const { error, reviewed } = await searchParams;
   const supabase = await createClient();
   const accessResult = await supabase
@@ -70,13 +70,16 @@ export default async function AccessRequestsPage({
 
   const accessRequests = accessResult.data as AccessRequest[];
   const pendingCount = accessRequests.length;
-  const globalScope = access.memberships.some(
-    (membership) => membership.status === "active" && membership.role === "norstec_admin",
-  );
 
   return (
     <>
-      <PageHeader description={globalScope ? "All organizations" : "Your organizations"} />
+      <PageHeader
+        description={
+          access.administeredOrganizations.length === 1
+            ? access.administeredOrganizations[0].organizationName
+            : `${access.administeredOrganizations.length} organizations`
+        }
+      />
       {error && <p className="mb-6 font-medium text-copper" role="alert">The request could not be reviewed.</p>}
       {reviewed && <p className="mb-6 font-medium" role="status">Request {reviewed}.</p>}
       <p className="mb-10 text-sm opacity-55">

@@ -1,9 +1,9 @@
-import { requirePortalRole } from "@/lib/auth/access";
+import { requirePortalAdminAccess } from "@/lib/auth/access";
 
 const events = [["Access request approved", "Emilie Moe · Orbit NTNU", "Today, 10:42"], ["Member changed to alumni", "Mina Isaksen · Portal Space", "Yesterday, 15:18"], ["Organization settings updated", "Interstellar NTNU", "30 July, 12:03"], ["Administrator role assigned", "Jonas Strand · Orbit NTNU", "28 July, 09:21"]];
 
 export default async function AuditLogPage() {
-  await requirePortalRole(["norstec_admin"]);
+  await requirePortalAdminAccess();
 
   return (
     <>

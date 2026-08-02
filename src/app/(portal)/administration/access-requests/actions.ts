@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requirePortalRole } from "@/lib/auth/access";
+import { requireOrganizationAdminAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
 function requestId(formData: FormData) {
@@ -16,7 +16,7 @@ function decision(formData: FormData) {
 }
 
 async function review(formData: FormData) {
-  await requirePortalRole(["organization_admin", "norstec_admin"]);
+  await requireOrganizationAdminAccess();
   const id = requestId(formData);
   const nextStatus = decision(formData);
   if (!id || !nextStatus) redirect("/administration/access-requests?error=invalid_request");

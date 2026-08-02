@@ -1,4 +1,4 @@
-import { requirePortalRole } from "@/lib/auth/access";
+import { requirePortalAdminAccess } from "@/lib/auth/access";
 
 const organizations = [
   ["Orbit NTNU", "orbitntnu.com", "128", "Active"],
@@ -8,7 +8,7 @@ const organizations = [
 ];
 
 export default async function AdminPage() {
-  await requirePortalRole(["norstec_admin"]);
+  await requirePortalAdminAccess();
 
   return (
     <>

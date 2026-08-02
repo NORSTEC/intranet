@@ -1,12 +1,18 @@
-export type PortalRole = "member" | "organization_admin" | "norstec_admin";
+export type MembershipRole = "member" | "organization_admin";
 
 export type PortalMembership = {
   id: number;
   organizationId: number;
   organizationName: string;
   organizationSlug: string;
-  role: PortalRole;
+  role: MembershipRole;
   status: "active" | "ended";
+};
+
+export type AdministeredOrganization = {
+  organizationId: number;
+  organizationName: string;
+  organizationSlug: string;
 };
 
 export type PortalProfile = {
@@ -28,8 +34,13 @@ export type PortalAccessState =
   | { status: "unauthenticated" }
   | { status: "error" }
   | {
+      status: "inactive";
+      reason: "unclaimed" | "suspended" | "deactivated";
+    }
+  | {
       status: "authenticated";
       profile: PortalProfile;
       membership: PortalMembership | null;
       memberships: PortalMembership[];
+      isPortalAdmin: boolean;
     };

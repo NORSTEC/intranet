@@ -12,14 +12,13 @@ import {
 } from "@/components/portal/portal-breadcrumb-data";
 import { PortalLogoToggle } from "@/components/portal/portal-logo-toggle";
 import { useTheme } from "@/hooks/use-theme";
-import type { PortalRole } from "@/lib/auth/types";
 
 type NavigationItem = {
   label: string;
   href: string;
   icon: string;
   nested?: boolean;
-  admin?: "organization" | "norstec";
+  admin?: "organization" | "portal";
 };
 
 const generalNavigation: NavigationItem[] = [
@@ -46,6 +45,7 @@ const administrationNavigation: NavigationItem[] = [
     label: "Member status",
     href: "/administration/members",
     icon: "manage_accounts",
+    nested: true,
     admin: "organization",
   },
   {
@@ -64,13 +64,13 @@ const administrationNavigation: NavigationItem[] = [
     label: "Portal management",
     href: "/admin",
     icon: "admin_panel_settings",
-    admin: "norstec",
+    admin: "portal",
   },
   {
     label: "Audit log",
     href: "/admin/audit-log",
     icon: "history",
-    admin: "norstec",
+    admin: "portal",
   },
 ];
 
@@ -93,25 +93,25 @@ function isActiveNavigationItem(pathname: string, href: string, nested?: boolean
 }
 
 function Navigation({
-  role,
+  canAdministerOrganization,
+  isPortalAdmin,
   onNavigate,
   collapsed = false,
   desktop = false,
 }: {
-  role: PortalRole;
+  canAdministerOrganization: boolean;
+  isPortalAdmin: boolean;
   onNavigate?: () => void;
   collapsed?: boolean;
   desktop?: boolean;
 }) {
   const pathname = usePathname();
-  const isNorstecAdmin = role === "norstec_admin";
-  const canAdministerOrganization = role === "organization_admin" || isNorstecAdmin;
   const administrationItems = administrationNavigation.filter(({ admin }) => {
-    if (admin === "norstec") return isNorstecAdmin;
+    if (admin === "portal") return isPortalAdmin;
     return canAdministerOrganization;
   });
   const groups: Array<{ label: string | null; items: NavigationItem[] }> =
-    canAdministerOrganization
+    canAdministerOrganization || isPortalAdmin
       ? [
           { label: "General", items: generalNavigation },
           { label: "Administration", items: administrationItems },
@@ -315,6 +315,7 @@ function Breadcrumbs() {
     const decoded = decodeURIComponent(segment).replaceAll("-", " ");
     const label =
       dynamicLabels[href] ??
+      (href === "/administration/members" ? "Member status" : undefined) ??
       breadcrumbLabels[segment] ??
       decoded.replace(/\b\w/g, (letter) => letter.toUpperCase());
     return [{ href, label }];
@@ -348,13 +349,15 @@ function Breadcrumbs() {
 function DesktopSidebar({
   displayName,
   organizationName,
-  role,
+  canAdministerOrganization,
+  isPortalAdmin,
   collapsed,
   onToggle,
 }: {
   displayName: string;
   organizationName: string;
-  role: PortalRole;
+  canAdministerOrganization: boolean;
+  isPortalAdmin: boolean;
   collapsed: boolean;
   onToggle: () => void;
 }) {
@@ -389,7 +392,12 @@ function DesktopSidebar({
         </div>
 
         <div className="portal-sidebar-navigation mt-10 min-h-0 flex-1 overflow-y-auto">
-          <Navigation role={role} collapsed={collapsed} desktop />
+          <Navigation
+            canAdministerOrganization={canAdministerOrganization}
+            isPortalAdmin={isPortalAdmin}
+            collapsed={collapsed}
+            desktop
+          />
         </div>
 
         <div className="mt-auto pb-1">
@@ -420,12 +428,14 @@ export function PortalShell({
   children,
   displayName,
   organizationName,
-  role,
+  canAdministerOrganization,
+  isPortalAdmin,
 }: {
   children: React.ReactNode;
   displayName: string;
   organizationName: string;
-  role: PortalRole;
+  canAdministerOrganization: boolean;
+  isPortalAdmin: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -465,7 +475,8 @@ export function PortalShell({
       <DesktopSidebar
         displayName={displayName}
         organizationName={organizationName}
-        role={role}
+        canAdministerOrganization={canAdministerOrganization}
+        isPortalAdmin={isPortalAdmin}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((collapsed) => !collapsed)}
       />
@@ -531,7 +542,11 @@ export function PortalShell({
           transition={mobilePanelTransition}
         >
           <div className="flex min-h-dvh flex-col pb-7 pt-24">
-            <Navigation role={role} onNavigate={() => setMenuOpen(false)} />
+          <Navigation
+            canAdministerOrganization={canAdministerOrganization}
+            isPortalAdmin={isPortalAdmin}
+            onNavigate={() => setMenuOpen(false)}
+          />
             <div className="mt-auto pt-12">
               <AccountSummary displayName={displayName} organizationName={organizationName} />
             </div>
