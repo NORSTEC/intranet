@@ -11,11 +11,11 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function LinkedInGlyph() {
+function LinkedInGlyph({ compact = false }: { compact?: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-7 w-7 md:h-8 md:w-8"
+      className={compact ? "h-5 w-5" : "h-7 w-7 md:h-8 md:w-8"}
       fill="none"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
@@ -34,6 +34,8 @@ function LinkedInGlyph() {
 
 export function TeamMemberCard({
   avatarUrl,
+  badges,
+  compact = false,
   email,
   href,
   linkedinUrl,
@@ -42,6 +44,8 @@ export function TeamMemberCard({
   roleTitle,
 }: {
   avatarUrl?: string;
+  badges?: string[];
+  compact?: boolean;
   email?: string;
   href: string;
   linkedinUrl: string | null;
@@ -49,6 +53,7 @@ export function TeamMemberCard({
   phoneNumber: string | null;
   roleTitle: string | null;
 }) {
+  const imageBadges = badges ?? (roleTitle ? [roleTitle] : []);
   const contacts = [
     email
       ? { href: `mailto:${email}`, icon: "mail", label: `Email ${name}` }
@@ -70,9 +75,13 @@ export function TeamMemberCard({
   ].filter(Boolean) as Array<{ href: string; icon: string; label: string }>;
 
   return (
-    <article className="portal-surface portal-card-link flex w-full flex-col p-5">
+    <article
+      className={`portal-surface portal-card-link flex w-full flex-col ${compact ? "rounded-[1.5rem] p-3" : "p-5"}`}
+    >
       <Link aria-label={`View ${name}`} className="group block" href={href}>
-        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-moody-static">
+        <div
+          className={`relative aspect-[4/5] w-full overflow-hidden bg-moody-static ${compact ? "rounded-xl" : "rounded-2xl"}`}
+        >
           {avatarUrl ? (
             <Image
               alt={name}
@@ -87,36 +96,58 @@ export function TeamMemberCard({
               {initials(name)}
             </span>
           )}
-          {roleTitle && (
-            <span className="portal-pill portal-pill-filled absolute left-3 top-3">
-              {roleTitle}
+          {imageBadges.length > 0 && (
+            <span
+              className={`absolute flex flex-wrap gap-1.5 ${compact ? "left-2 right-2 top-2" : "left-3 right-3 top-3"}`}
+            >
+              {imageBadges.map((badge) => (
+                <span
+                  className={`portal-pill portal-pill-filled max-w-full truncate ${compact ? "min-h-6 px-2 py-1 text-[0.58rem]" : ""}`}
+                  key={badge}
+                >
+                  {badge}
+                </span>
+              ))}
             </span>
           )}
         </div>
 
-        <span className="mt-5 flex items-center justify-between gap-4">
-          <span className="text-xl font-medium leading-tight">{name}</span>
-          <span className="material-symbols-outlined shrink-0 transition-transform group-hover:translate-x-1">
+        <span
+          className={`flex items-center justify-between ${compact ? "mt-3 gap-2" : "mt-5 gap-4"}`}
+        >
+          <span
+            className={`${compact ? "truncate text-base" : "text-xl"} min-w-0 font-medium leading-tight`}
+            title={compact ? name : undefined}
+          >
+            {name}
+          </span>
+          <span
+            className={`material-symbols-outlined shrink-0 transition-transform group-hover:translate-x-1 ${compact ? "text-[1.1rem]" : ""}`}
+          >
             trending_flat
           </span>
         </span>
       </Link>
 
       {contacts.length > 0 && (
-        <div className="mt-auto flex flex-wrap gap-2 pt-5">
+        <div
+          className={`mt-auto flex flex-wrap ${compact ? "gap-1.5 pt-3" : "gap-2 pt-5"}`}
+        >
           {contacts.map((contact) => (
             <a
               aria-label={contact.label}
-              className="portal-contact-button"
+              className={`portal-contact-button ${compact ? "size-8" : ""}`}
               href={contact.href}
               key={contact.icon}
               rel={contact.icon === "linkedin" ? "noreferrer" : undefined}
               target={contact.icon === "linkedin" ? "_blank" : undefined}
             >
               {contact.icon === "linkedin" ? (
-                <LinkedInGlyph />
+                <LinkedInGlyph compact={compact} />
               ) : (
-                <span className="icon icon-20 icon-400 icon-filled">
+                <span
+                  className={`icon icon-400 icon-filled ${compact ? "text-[1.1rem]" : "icon-20"}`}
+                >
                   {contact.icon}
                 </span>
               )}

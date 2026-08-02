@@ -1,63 +1,64 @@
-import Link from "next/link";
-import { MemberAvatar } from "@/components/portal/member-avatar";
+import { MembersDirectory } from "@/components/portal/members-directory";
+import type { DirectoryMember } from "@/components/portal/members-directory";
 import { requirePortalAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 
 type MembershipRow = {
-  id: number;
   status: string;
   people:
-    | { id: number; full_name: string | null; avatar_path: string | null }
-    | Array<{ id: number; full_name: string | null; avatar_path: string | null }>;
+    | {
+        id: number;
+        full_name: string | null;
+        avatar_path: string | null;
+        linkedin_url: string | null;
+        phone_number: string | null;
+      }
+    | Array<{
+        id: number;
+        full_name: string | null;
+        avatar_path: string | null;
+        linkedin_url: string | null;
+        phone_number: string | null;
+      }>;
   organizations:
     | { id: number; name: string; slug: string }
     | Array<{ id: number; name: string; slug: string }>;
 };
 
-type TeamMembershipRow = {
+type PersonEmailRow = {
   person_id: number;
-  teams:
-    | { name: string; slug: string; organizations: { slug: string } | Array<{ slug: string }> }
-    | Array<{ name: string; slug: string; organizations: { slug: string } | Array<{ slug: string }> }>;
+  email: string;
+  email_type: string;
+  is_primary: boolean;
 };
 
-type DirectoryMember = {
+type MemberAccumulator = {
   id: number;
   name: string;
   avatarPath: string | null;
+  linkedinUrl: string | null;
+  phoneNumber: string | null;
   statuses: Set<string>;
-  organizations: Map<number, { name: string; slug: string }>;
-  teams: Array<{ name: string; href: string }>;
+  organizations: Map<number, { id: number; name: string; slug: string }>;
 };
 
-export default async function MembersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; q?: string }>;
-}) {
+export default async function MembersPage() {
   await requirePortalAccess();
-  const { status = "all", q = "" } = await searchParams;
   const supabase = await createClient();
 
-  const [membershipsResult, teamMembershipsResult] = await Promise.all([
-    supabase
-      .from("memberships")
-      .select(
-        "id, status, people (id, full_name, avatar_path), organizations (id, name, slug)",
-      )
-      .in("status", ["active", "ended"]),
-    supabase
-      .from("team_memberships")
-      .select("person_id, teams (name, slug, organizations (slug))")
-      .is("archived_at", null),
-  ]);
+  const membershipsResult = await supabase
+    .from("memberships")
+    .select(
+      "status, people (id, full_name, avatar_path, linkedin_url, phone_number), organizations (id, name, slug)",
+    )
+    .in("status", ["active", "ended"]);
 
-  if (membershipsResult.error || teamMembershipsResult.error) {
+  if (membershipsResult.error) {
     throw new Error("Could not load member directory");
   }
 
-  const membersById = new Map<number, DirectoryMember>();
+  const membersById = new Map<number, MemberAccumulator>();
   for (const row of membershipsResult.data as MembershipRow[]) {
     const person = Array.isArray(row.people) ? row.people[0] : row.people;
     const organization = Array.isArray(row.organizations)
@@ -69,132 +70,69 @@ export default async function MembersPage({
       id: person.id,
       name: person.full_name ?? "Unnamed member",
       avatarPath: person.avatar_path,
+      linkedinUrl: person.linkedin_url,
+      phoneNumber: person.phone_number,
       statuses: new Set<string>(),
-      organizations: new Map<number, { name: string; slug: string }>(),
-      teams: [],
+      organizations: new Map(),
     };
     member.statuses.add(row.status);
     member.organizations.set(organization.id, organization);
     membersById.set(person.id, member);
   }
 
-  for (const row of teamMembershipsResult.data as TeamMembershipRow[]) {
-    const member = membersById.get(row.person_id);
-    if (!member) continue;
-    const team = Array.isArray(row.teams) ? row.teams[0] : row.teams;
-    if (!team) continue;
-    const organization = Array.isArray(team.organizations)
-      ? team.organizations[0]
-      : team.organizations;
-    if (!organization) continue;
-    member.teams.push({
-      name: team.name,
-      href: `/organizations/${organization.slug}/teams/${team.slug}`,
-    });
+  const [emailsResult, avatarUrls] = await Promise.all([
+    supabase
+      .from("person_emails")
+      .select("person_id, email, email_type, is_primary"),
+    getMemberAvatarUrls(
+      [...membersById.values()].map((member) => member.avatarPath),
+    ),
+  ]);
+
+  if (emailsResult.error) throw new Error("Could not load member email addresses");
+
+  const emailsByPerson = new Map<number, PersonEmailRow[]>();
+  for (const personEmail of emailsResult.data as PersonEmailRow[]) {
+    const emails = emailsByPerson.get(personEmail.person_id) ?? [];
+    emails.push(personEmail);
+    emailsByPerson.set(personEmail.person_id, emails);
   }
 
-  const normalizedQuery = q.trim().toLocaleLowerCase("en");
-  const members = [...membersById.values()]
-    .filter((member) => {
-      const derivedStatus = member.statuses.has("active") ? "active" : "alumni";
-      return status === "all" || derivedStatus === status;
-    })
-    .filter((member) => {
-      if (!normalizedQuery) return true;
-      const searchable = [
-        member.name,
-        ...[...member.organizations.values()].map((organization) => organization.name),
-        ...member.teams.map((team) => team.name),
-      ]
-        .join(" ")
-        .toLocaleLowerCase("en");
-      return searchable.includes(normalizedQuery);
+  const members: DirectoryMember[] = [...membersById.values()]
+    .map((member) => {
+      const personEmails = emailsByPerson.get(member.id) ?? [];
+      const preferredEmail =
+        personEmails.find((email) => email.email_type === "organization") ??
+        personEmails.find((email) => email.is_primary) ??
+        personEmails[0];
+
+      return {
+        id: member.id,
+        name: member.name,
+        avatarUrl: member.avatarPath
+          ? avatarUrls.get(member.avatarPath)
+          : undefined,
+        email: preferredEmail?.email ?? null,
+        linkedinUrl: member.linkedinUrl,
+        organizations: [...member.organizations.values()].sort((left, right) =>
+          left.name.localeCompare(right.name),
+        ),
+        phoneNumber: member.phoneNumber,
+        profileHref: `/members/${member.id}`,
+        status: member.statuses.has("active")
+          ? ("active" as const)
+          : ("alumni" as const),
+      };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
 
-  const avatarUrls = await getMemberAvatarUrls(members.map((member) => member.avatarPath));
+  const organizations = [...membersById.values()]
+    .flatMap((member) => [...member.organizations.values()])
+    .filter(
+      (organization, index, all) =>
+        all.findIndex((candidate) => candidate.id === organization.id) === index,
+    )
+    .sort((left, right) => left.name.localeCompare(right.name));
 
-  function filterHref(nextStatus: string) {
-    const params = new URLSearchParams();
-    if (nextStatus !== "all") params.set("status", nextStatus);
-    if (q.trim()) params.set("q", q.trim());
-    const query = params.toString();
-    return query ? `/members?${query}` : "/members";
-  }
-
-  return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-2">
-          {[
-            ["all", "All"],
-            ["active", "Active"],
-            ["alumni", "Alumni"],
-          ].map(([value, label]) => (
-            <Link
-              className={`portal-pill ${status === value ? "portal-pill-filled" : "portal-pill-outline"}`}
-              href={filterHref(value)}
-              key={value}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
-        <form className="relative w-full sm:w-auto" method="get">
-          {status !== "all" && <input name="status" type="hidden" value={status} />}
-          <label>
-            <span className="sr-only">Search members</span>
-            <input
-              className="portal-field w-full pr-10 sm:w-72"
-              defaultValue={q}
-              name="q"
-              placeholder="Search members"
-            />
-            <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
-              search
-            </span>
-          </label>
-        </form>
-      </div>
-
-      <section className="mt-7 grid gap-3">
-        {members.map((member) => (
-          <article
-            key={member.id}
-            className="portal-surface flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:px-6"
-          >
-            <div className="flex min-w-0 items-center gap-4 sm:w-64">
-              <MemberAvatar
-                name={member.name}
-                src={member.avatarPath ? avatarUrls.get(member.avatarPath) : undefined}
-              />
-              <p className="truncate font-medium">{member.name}</p>
-            </div>
-            <div className="flex flex-1 flex-wrap gap-2">
-              {[...member.organizations.values()].map((organization) => (
-                <Link
-                  className="portal-pill portal-pill-outline"
-                  href={`/organizations/${organization.slug}`}
-                  key={organization.slug}
-                >
-                  {organization.name}
-                </Link>
-              ))}
-              {member.teams.map((team) => (
-                <Link className="portal-pill portal-pill-outline" href={team.href} key={team.href}>
-                  {team.name}
-                </Link>
-              ))}
-            </div>
-            <span className="portal-pill portal-pill-outline">
-              {member.statuses.has("active") ? "Active" : "Alumni"}
-            </span>
-          </article>
-        ))}
-        {members.length === 0 && (
-          <p className="text-sm opacity-55">No members match this view.</p>
-        )}
-      </section>
-    </>
-  );
+  return <MembersDirectory members={members} organizations={organizations} />;
 }

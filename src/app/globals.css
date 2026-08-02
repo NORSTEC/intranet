@@ -40,6 +40,7 @@ html.theme-switching *::after {
 @layer base {
   html {
     background: var(--color-egg);
+    scrollbar-gutter: stable;
   }
 
   body {
