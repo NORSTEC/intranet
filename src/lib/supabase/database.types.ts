@@ -865,7 +865,19 @@ export type Database = {
         }
         Returns: number
       }
+      create_team: {
+        Args: {
+          p_description: string | null
+          p_name: string
+          p_organization_id: number
+        }
+        Returns: Json
+      }
       deactivate_own_portal_access: { Args: never; Returns: undefined }
+      delete_team: {
+        Args: { p_team_id: number }
+        Returns: undefined
+      }
       restore_own_team_experience: {
         Args: { p_expected_updated_at: string; p_team_membership_id: number }
         Returns: string
@@ -963,6 +975,16 @@ export type Database = {
           p_phone_number: string | null
           p_roles: Json
           p_study_year: number | null
+        }
+        Returns: string
+      }
+      save_team_settings: {
+        Args: {
+          p_description: string | null
+          p_expected_updated_at: string
+          p_name: string
+          p_person_ids: number[] | null
+          p_team_id: number
         }
         Returns: string
       }

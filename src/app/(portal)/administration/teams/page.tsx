@@ -1,22 +1,59 @@
-import { PageHeader } from "@/components/portal/page-header";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { OrganizationLogo } from "@/components/portal/organization-logo";
 import { requireOrganizationAdminAccess } from "@/lib/auth/access";
+import { createClient } from "@/lib/supabase/server";
 
-const teams = [["Propulsion", "16"], ["Avionics", "12"], ["Structures", "21"], ["Business", "9"]];
-
-export default async function TeamManagementPage() {
+export default async function TeamManagementIndexPage() {
   const access = await requireOrganizationAdminAccess();
   const { administeredOrganizations } = access;
-  const scopeLabel = administeredOrganizations.length > 1 ? `${administeredOrganizations.length} organizations` : administeredOrganizations[0].organizationName;
+
+  if (administeredOrganizations.length === 1) {
+    redirect(`/administration/teams/${administeredOrganizations[0].organizationSlug}`);
+  }
+
+  const supabase = await createClient();
+  const organizationIds = administeredOrganizations.map(
+    (membership) => membership.organizationId,
+  );
+  const organizationResult = await supabase
+    .from("organizations")
+    .select("id, name, slug, logo_path")
+    .in("id", organizationIds)
+    .order("name");
+
+  if (organizationResult.error) {
+    throw new Error("Could not load administered organizations");
+  }
 
   return (
-    <>
-      <PageHeader description={scopeLabel} />
-      <div className="mb-7 flex flex-wrap items-center justify-between gap-4">{administeredOrganizations.length > 1 ? <button className="portal-pill" type="button">Filter organization</button> : <span /> }<button className="portal-button" type="button"><span className="material-symbols-outlined">add</span>New team</button></div>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {teams.map(([name, memberCount]) => (
-          <article key={name} className="portal-surface flex min-h-48 flex-col p-6"><span className="portal-pill portal-pill-outline">{memberCount} members</span><h2 className="mt-7 text-xl font-medium">{name}</h2><div className="mt-auto flex gap-2 pt-6"><button className="portal-pill" type="button">Edit</button><button className="portal-pill" type="button">Members</button></div></article>
+    <section>
+      <p className="mb-7 max-w-xl text-sm leading-relaxed opacity-60">
+        Choose the organization whose teams you want to manage.
+      </p>
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {organizationResult.data.map((organization) => (
+          <Link
+            className="portal-surface portal-card-link group flex min-h-64 flex-col p-5"
+            href={`/administration/teams/${organization.slug}`}
+            key={organization.id}
+          >
+            <OrganizationLogo
+              logoPath={organization.logo_path}
+              name={organization.name}
+            />
+            <span className="mt-auto flex items-center justify-between gap-4 pt-7">
+              <span className="text-xl font-medium">{organization.name}</span>
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined shrink-0 transition-transform group-hover:translate-x-1"
+              >
+                trending_flat
+              </span>
+            </span>
+          </Link>
         ))}
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

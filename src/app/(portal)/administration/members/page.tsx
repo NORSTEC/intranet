@@ -42,7 +42,7 @@ export default async function MemberStatusPage() {
               logoPath={organization.logo_path}
               name={organization.name}
             />
-            <span className="mt-7 flex items-center justify-between gap-4">
+            <span className="mt-auto flex items-center justify-between gap-4 pt-7">
               <span className="text-xl font-medium">{organization.name}</span>
               <span
                 aria-hidden="true"

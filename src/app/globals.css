@@ -151,6 +151,17 @@ html.theme-switching *::after {
     color: var(--color-moody);
   }
 
+  .portal-button-danger {
+    border-color: var(--color-copper);
+    background: var(--color-copper);
+    color: #0f1118;
+  }
+
+  .portal-button-danger:hover {
+    background: transparent;
+    color: var(--color-copper);
+  }
+
   .portal-field {
     width: 100%;
     border: 2px solid color-mix(in srgb, var(--color-moody) 20%, transparent);

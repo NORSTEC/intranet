@@ -59,6 +59,7 @@ const administrationNavigation: NavigationItem[] = [
     label: "Team management",
     href: "/administration/teams",
     icon: "group_work",
+    nested: true,
     admin: "organization",
   },
   {
@@ -323,6 +324,7 @@ function Breadcrumbs() {
       dynamicLabels[href] ??
       (href === "/administration/members" ? "Member status" : undefined) ??
       (href === "/administration/organization" ? "Organization settings" : undefined) ??
+      (href === "/administration/teams" ? "Team management" : undefined) ??
       breadcrumbLabels[segment] ??
       decoded.replace(/\b\w/g, (letter) => letter.toUpperCase());
     return [{ href, label }];
