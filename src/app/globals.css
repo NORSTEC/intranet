@@ -715,6 +715,27 @@ html.theme-switching *::after {
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
+
+  /* Overflowing chart lists: just a recessive scrollbar, no fade overlay. */
+  .statistics-scroll {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-moody) 22%, transparent) transparent;
+  }
+
+  .statistics-scroll::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .statistics-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .statistics-scroll::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--color-moody) 22%, transparent);
+  }
 }
 
 @keyframes portal-toast-in {
