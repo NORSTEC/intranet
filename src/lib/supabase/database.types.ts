@@ -41,8 +41,9 @@ export type Database = {
           field_of_study: string | null
           id: number
           message: string | null
-          organization_id: number
+          organization_id: number | null
           person_id: number
+          request_type: string
           reviewed_at: string | null
           reviewed_by_person_id: number | null
           status: string
@@ -55,8 +56,9 @@ export type Database = {
           field_of_study?: string | null
           id?: never
           message?: string | null
-          organization_id: number
+          organization_id?: number | null
           person_id: number
+          request_type?: string
           reviewed_at?: string | null
           reviewed_by_person_id?: number | null
           status?: string
@@ -69,8 +71,9 @@ export type Database = {
           field_of_study?: string | null
           id?: never
           message?: string | null
-          organization_id?: number
+          organization_id?: number | null
           person_id?: number
+          request_type?: string
           reviewed_at?: string | null
           reviewed_by_person_id?: number | null
           status?: string
@@ -435,6 +438,7 @@ export type Database = {
       }
       people: {
         Row: {
+          alumni_access_granted_at: string | null
           avatar_alt: string | null
           avatar_path: string | null
           created_at: string
@@ -452,6 +456,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          alumni_access_granted_at?: string | null
           avatar_alt?: string | null
           avatar_path?: string | null
           created_at?: string
@@ -469,6 +474,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          alumni_access_granted_at?: string | null
           avatar_alt?: string | null
           avatar_path?: string | null
           created_at?: string
@@ -1002,8 +1008,9 @@ export type Database = {
           requested_first_name: string
           requested_last_name: string
           requested_message: string
-          requested_study_year: number
-          target_organization_id: number
+          requested_request_type: string
+          requested_study_year: number | null
+          target_organization_id: number | null
         }
         Returns: number
       }
@@ -1019,6 +1026,10 @@ export type Database = {
         Returns: number
       }
       sync_linked_google_identities: { Args: never; Returns: Json }
+      unlink_own_portal_account: {
+        Args: { p_auth_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

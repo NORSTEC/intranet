@@ -3,9 +3,11 @@ import { requirePortalAccess } from "@/lib/auth/access";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const access = await requirePortalAccess();
-  const organizationLabel = access.memberships.length === 1
-    ? access.membership.organizationName
-    : `${access.memberships.length} organizations`;
+  const organizationLabel = access.memberships.length === 0
+    ? "Alumni"
+    : access.memberships.length === 1
+      ? access.memberships[0].organizationName
+      : `${access.memberships.length} organizations`;
 
   return (
     <PortalShell

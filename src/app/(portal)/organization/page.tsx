@@ -19,7 +19,13 @@ export default async function OrganizationPage() {
 
   return (
     <>
-      <PageHeader description={access.membership.organizationName} />
+      <PageHeader
+        description={
+          access.administeredOrganizations.length === 1
+            ? access.administeredOrganizations[0].organizationName
+            : `${access.administeredOrganizations.length} organizations`
+        }
+      />
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-4">

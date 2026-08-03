@@ -12,6 +12,7 @@ import type {
 
 type ProfileRow = {
   id: number;
+  alumni_access_granted_at: string | null;
   avatar_path: string | null;
   avatar_alt: string | null;
   full_name: string | null;
@@ -61,7 +62,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   const accountResult = await supabase
     .from("portal_accounts")
     .select(
-      "auth_user_id, person_id, account_email, onboarding_status, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, portal_access_status)",
+      "auth_user_id, person_id, account_email, onboarding_status, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, portal_access_status, alumni_access_granted_at)",
     )
     .eq("auth_user_id", user.id)
     .maybeSingle();
@@ -150,6 +151,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     membership: memberships[0] ?? null,
     memberships,
     isPortalAdmin: Boolean(portalAdministratorResult.data),
+    hasAlumniAccess: Boolean(profileRow.alumni_access_granted_at),
   };
 }
 
@@ -172,11 +174,13 @@ export async function requirePortalAccess() {
     redirect("/onboarding/account");
   }
 
-  if (!access.membership) {
+  // Alumni approved by a portal administrator hold portal access without
+  // belonging to any organization.
+  if (!access.membership && !access.hasAlumniAccess) {
     redirect("/access");
   }
 
-  return { ...access, membership: access.membership };
+  return access;
 }
 
 export async function requireOrganizationAdminAccess() {

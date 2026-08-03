@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { submitAccessRequest } from "@/app/access/actions";
+import { AccessRequestForm } from "@/components/portal/access-request-form";
 import { PortalEntryShell } from "@/components/portal/portal-entry-shell";
-import { STUDY_FIELDS } from "@/lib/profile/study-fields";
 import { getPortalAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,12 +8,13 @@ type Organization = { id: number; name: string };
 type AccessRequest = {
   id: number;
   status: "pending" | "approved" | "rejected" | "cancelled";
-  organizations: { name: string } | { name: string }[];
+  request_type: "organization" | "alumni";
+  organizations: { name: string } | { name: string }[] | null;
 };
 
 const errorMessages: Record<string, string> = {
   invalid_request: "Check the information and try again.",
-  already_pending: "You already have a pending request for this organization.",
+  already_pending: "You already have a pending request.",
   request_failed: "The request could not be submitted. Please try again.",
 };
 
@@ -42,7 +42,7 @@ export default async function AccessPage({
     redirect("/onboarding/account");
   }
 
-  if (access.membership) {
+  if (access.membership || access.hasAlumniAccess) {
     redirect("/");
   }
 
@@ -55,7 +55,7 @@ export default async function AccessPage({
       .order("name"),
     supabase
       .from("access_requests")
-      .select("id, status, organizations (name)")
+      .select("id, status, request_type, organizations (name)")
       .eq("person_id", access.profile.personId)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
@@ -69,11 +69,13 @@ export default async function AccessPage({
 
   const organizations = (organizationsResult.data ?? []) as Organization[];
   const pendingRequest = requestsResult.data as AccessRequest | null;
-  const pendingOrganization = pendingRequest
-    ? Array.isArray(pendingRequest.organizations)
-      ? pendingRequest.organizations[0]?.name
-      : pendingRequest.organizations.name
-    : null;
+  const pendingScope = !pendingRequest
+    ? null
+    : pendingRequest.request_type === "alumni"
+      ? "Alumni access"
+      : Array.isArray(pendingRequest.organizations)
+        ? pendingRequest.organizations[0]?.name
+        : pendingRequest.organizations?.name;
 
   return (
     <PortalEntryShell>
@@ -87,49 +89,18 @@ export default async function AccessPage({
           <section className="portal-surface mt-8 max-w-4xl p-6 sm:p-8">
             <span className="portal-pill">Request received</span>
             <h2 className="mt-6 text-h3 font-medium">Pending approval</h2>
-            {pendingOrganization && (
-              <p className="mt-2 text-sm opacity-55">{pendingOrganization}</p>
+            {pendingScope && (
+              <p className="mt-2 text-sm opacity-55">{pendingScope}</p>
             )}
           </section>
         ) : (
-          <form action={submitAccessRequest} className="mt-8 grid max-w-4xl gap-6 sm:grid-cols-2">
-            {error && errorMessages[error] && (
-              <p className="text-sm text-[#a33b2b] sm:col-span-2" role="alert">{errorMessages[error]}</p>
-            )}
-            <label className="grid gap-2"><span className="section-label opacity-45">First name <span className="text-copper" aria-hidden="true">*</span></span><input name="firstName" className="portal-field" defaultValue={access.profile.firstName ?? ""} maxLength={80} autoComplete="given-name" required /></label>
-            <label className="grid gap-2"><span className="section-label opacity-45">Last name <span className="text-copper" aria-hidden="true">*</span></span><input name="lastName" className="portal-field" defaultValue={access.profile.lastName ?? ""} maxLength={80} autoComplete="family-name" required /></label>
-            <label className="grid gap-2 sm:col-span-2">
-              <span className="section-label opacity-45">Organization <span className="text-copper" aria-hidden="true">*</span></span>
-              <select name="organizationId" className="portal-field" defaultValue="" required>
-                <option value="" disabled>Select organization</option>
-                {organizations.map((organization) => (
-                  <option key={organization.id} value={organization.id}>{organization.name}</option>
-                ))}
-              </select>
-            </label>
-              <label className="grid gap-2">
-                <span className="section-label opacity-45">Field of study</span>
-                <select name="fieldOfStudy" className="portal-field" defaultValue="">
-                  <option value="">Not provided</option>
-                  {STUDY_FIELDS.map((field) => (
-                    <option key={field} value={field}>{field}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-2">
-                <span className="section-label opacity-45">Study year <span className="text-copper" aria-hidden="true">*</span></span>
-                <select name="studyYear" className="portal-field" defaultValue={access.profile.studyYear ?? ""} required>
-                  <option value="" disabled>Select year</option>
-                  {[1, 2, 3, 4, 5, 6].map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </label>
-            <label className="grid gap-2 sm:col-span-2"><span className="section-label opacity-45">Message</span><textarea name="message" className="portal-field min-h-32 resize-y" maxLength={2000} /></label>
-            <div className="sm:col-span-2">
-              <button className="portal-button" type="submit">Send request<span className="material-symbols-outlined">arrow_right_alt</span></button>
-            </div>
-          </form>
+          <AccessRequestForm
+            errorMessage={error ? errorMessages[error] : undefined}
+            firstName={access.profile.firstName ?? ""}
+            lastName={access.profile.lastName ?? ""}
+            organizations={organizations}
+            studyYear={access.profile.studyYear}
+          />
         )}
       </section>
     </PortalEntryShell>

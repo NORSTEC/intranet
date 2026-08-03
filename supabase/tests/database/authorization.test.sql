@@ -616,7 +616,8 @@ select lives_ok(
       'User',
       'Computer Science',
       3::smallint,
-      'Please review my request'
+      'Please review my request',
+      'organization'
     )
   $$,
   'a personal Google user can submit an access request'

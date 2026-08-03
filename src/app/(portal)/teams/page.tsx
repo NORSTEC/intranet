@@ -17,7 +17,7 @@ export default async function TeamsPage() {
 
   return (
     <>
-      <PageHeader description={access.membership.organizationName} />
+      <PageHeader description={access.membership?.organizationName ?? "Alumni"} />
 
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2" aria-label="Team filters">

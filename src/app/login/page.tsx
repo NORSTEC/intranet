@@ -69,6 +69,11 @@ export default async function LoginPage({
               This portal account is suspended. Contact Norstec IT for help.
             </p>
           )}
+          {error === "account_unlinked" && (
+            <p className="mt-3 text-sm" role="status">
+              That Google account was removed from your profile, so you were signed out. Sign in with your other account to continue.
+            </p>
+          )}
           {error === "account_link" && (
             <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
               The Google accounts could not be connected. You were signed out to prevent switching to the wrong profile. Sign in with your original account and try again.

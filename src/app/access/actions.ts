@@ -10,26 +10,41 @@ function optionalText(formData: FormData, key: string) {
 }
 
 export async function submitAccessRequest(formData: FormData) {
-  const organizationId = Number(formData.get("organizationId"));
+  const requestTypeValue = optionalText(formData, "requestType");
+  const requestType =
+    requestTypeValue === "organization" ? "organization" : "alumni";
+  const isOrganizationRequest = requestType === "organization";
+  const organizationIdValue = optionalText(formData, "organizationId");
+  const organizationId = isOrganizationRequest
+    ? Number(organizationIdValue)
+    : null;
   const firstName = optionalText(formData, "firstName");
   const lastName = optionalText(formData, "lastName");
   const fieldOfStudy = optionalText(formData, "fieldOfStudy");
   const message = optionalText(formData, "message");
   const studyYearValue = optionalText(formData, "studyYear");
-  const studyYear = Number(studyYearValue);
+  // Alumni are no longer studying, so a study year is optional for them.
+  const studyYear = studyYearValue ? Number(studyYearValue) : null;
 
   if (
-    !Number.isSafeInteger(organizationId) ||
-    organizationId <= 0 ||
+    requestTypeValue !== "organization" &&
+    requestTypeValue !== "alumni"
+  ) {
+    redirect("/access?error=invalid_request");
+  }
+
+  if (
+    (organizationId !== null &&
+      (!Number.isSafeInteger(organizationId) || organizationId <= 0)) ||
     firstName.length < 1 ||
     firstName.length > 80 ||
     lastName.length < 1 ||
     lastName.length > 80 ||
     (fieldOfStudy && !isStudyField(fieldOfStudy)) ||
     message.length > 2000 ||
-    !Number.isInteger(studyYear) ||
-    studyYear < 1 ||
-    studyYear > 6
+    (studyYear !== null &&
+      (!Number.isInteger(studyYear) || studyYear < 1 || studyYear > 6)) ||
+    (isOrganizationRequest && studyYear === null)
   ) {
     redirect("/access?error=invalid_request");
   }
@@ -51,6 +66,7 @@ export async function submitAccessRequest(formData: FormData) {
     requested_field_of_study: fieldOfStudy,
     requested_study_year: studyYear,
     requested_message: message,
+    requested_request_type: requestType,
   });
 
   if (error) {

@@ -84,14 +84,19 @@ export default async function ProfilePage({
             ? emailRecord.email_type
             : "unknown",
         id: account.auth_user_id,
+        isCurrentSession: account.auth_user_id === access.profile.userId,
         isPrimary: emailRecord?.is_primary ?? false,
       } satisfies LinkedLoginAccount;
     })
     .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
+  const primaryEmail =
+    emailsResult.data.find((personEmail) => personEmail.is_primary)?.email ??
+    null;
 
   const status = access.memberships.some((membership) => membership.status === "active")
     ? "Active"
-    : access.memberships.some((membership) => membership.status === "ended")
+    : access.memberships.some((membership) => membership.status === "ended") ||
+        access.hasAlumniAccess
       ? "Alumni"
       : "Pending";
   const experience = (experiencesResult.data as ProfileExperience[]).map((entry) => {
@@ -163,7 +168,7 @@ export default async function ProfilePage({
         }
         avatarAlt={access.profile.avatarAlt}
         avatarUrl={avatarUrl}
-        emails={emailsResult.data}
+        email={primaryEmail}
         experience={experience}
         fieldOfStudy={access.profile.fieldOfStudy}
         linkedinUrl={access.profile.linkedinUrl}

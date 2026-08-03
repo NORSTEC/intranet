@@ -7,6 +7,48 @@ import { requirePortalAccess } from "@/lib/auth/access";
 import { isStudyField } from "@/lib/profile/study-fields";
 import { createClient } from "@/lib/supabase/server";
 
+export type UnlinkLoginAccountResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function unlinkLoginAccount(
+  authUserId: string,
+): Promise<UnlinkLoginAccountResult> {
+  const access = await requirePortalAccess();
+
+  if (!uuidPattern.test(authUserId)) {
+    return { ok: false, message: "That sign-in account could not be removed." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("unlink_own_portal_account", {
+    p_auth_user_id: authUserId,
+  });
+
+  if (error) {
+    const message = error.message.includes("cannot_unlink_primary_account")
+      ? "The primary sign-in account cannot be removed."
+      : error.message.includes("last_portal_account")
+        ? "You must keep at least one sign-in account."
+        : "That sign-in account could not be removed.";
+    return { ok: false, message };
+  }
+
+  // The removed account no longer reaches this profile, so a session held by
+  // it has to end. Linking leaves you signed in as the account you just
+  // added, which makes this the common case rather than the edge case.
+  if (authUserId === access.profile.userId) {
+    await supabase.auth.signOut();
+    redirect("/login?error=account_unlinked");
+  }
+
+  revalidatePath("/profile");
+  return { ok: true };
+}
+
 export type DeactivatePortalAccessResult =
   | { ok: false; message: string }
   | never;

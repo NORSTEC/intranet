@@ -13,8 +13,9 @@ type AccessRequest = {
   created_at: string;
   field_of_study: string | null;
   message: string | null;
+  request_type: "organization" | "alumni";
   study_year: number | null;
-  organizations: RelatedName;
+  organizations: RelatedName | null;
   people: RelatedPerson;
 };
 
@@ -60,7 +61,7 @@ export default async function AccessRequestsPage({
   const supabase = await createClient();
   const accessResult = await supabase
     .from("access_requests")
-    .select("id, created_at, field_of_study, study_year, message, organizations (name), people!access_requests_person_id_fkey (full_name)")
+    .select("id, created_at, field_of_study, study_year, message, request_type, organizations (name), people!access_requests_person_id_fkey (full_name)")
     .eq("status", "pending")
     .order("created_at");
 
@@ -91,7 +92,11 @@ export default async function AccessRequestsPage({
         <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {accessRequests.map((request) => (
             <article className="portal-surface flex flex-col p-6" key={request.id}>
-              <span className="portal-pill portal-pill-outline w-fit">{relatedName(request.organizations)}</span>
+              <span className="portal-pill portal-pill-outline w-fit">
+                {request.request_type === "alumni"
+                  ? "Alumni"
+                  : relatedName(request.organizations)}
+              </span>
               <h3 className="mt-6 text-xl font-medium">{personName(request.people)}</h3>
               {(request.field_of_study || request.study_year) && (
                 <p className="mt-2 text-sm opacity-55">

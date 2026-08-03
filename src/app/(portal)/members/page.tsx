@@ -26,6 +26,14 @@ type MembershipRow = {
     | Array<{ id: number; name: string; slug: string }>;
 };
 
+type AlumniPersonRow = {
+  id: number;
+  full_name: string | null;
+  avatar_path: string | null;
+  linkedin_url: string | null;
+  phone_number: string | null;
+};
+
 type PersonEmailRow = {
   person_id: number;
   email: string;
@@ -47,14 +55,23 @@ export default async function MembersPage() {
   await requirePortalAccess();
   const supabase = await createClient();
 
-  const membershipsResult = await supabase
-    .from("memberships")
-    .select(
-      "status, people (id, full_name, avatar_path, linkedin_url, phone_number), organizations (id, name, slug)",
-    )
-    .in("status", ["active", "ended"]);
+  const [membershipsResult, alumniResult] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select(
+        "status, people (id, full_name, avatar_path, linkedin_url, phone_number), organizations (id, name, slug)",
+      )
+      .in("status", ["active", "ended"]),
+    // Alumni granted portal access directly belong to no organization, so
+    // they have no membership row to reach them through.
+    supabase
+      .from("people")
+      .select("id, full_name, avatar_path, linkedin_url, phone_number")
+      .not("alumni_access_granted_at", "is", null)
+      .eq("portal_access_status", "active"),
+  ]);
 
-  if (membershipsResult.error) {
+  if (membershipsResult.error || alumniResult.error) {
     throw new Error("Could not load member directory");
   }
 
@@ -77,6 +94,20 @@ export default async function MembersPage() {
     };
     member.statuses.add(row.status);
     member.organizations.set(organization.id, organization);
+    membersById.set(person.id, member);
+  }
+
+  for (const person of alumniResult.data as AlumniPersonRow[]) {
+    const member = membersById.get(person.id) ?? {
+      id: person.id,
+      name: person.full_name ?? "Unnamed member",
+      avatarPath: person.avatar_path,
+      linkedinUrl: person.linkedin_url,
+      phoneNumber: person.phone_number,
+      statuses: new Set<string>(),
+      organizations: new Map(),
+    };
+    member.statuses.add("ended");
     membersById.set(person.id, member);
   }
 

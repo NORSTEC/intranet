@@ -178,7 +178,10 @@ export default async function TeamMemberDetailsPage({
       <MemberProfileView
         avatarAlt={person.avatar_alt}
         avatarUrl={avatarUrl}
-        emails={personEmailsResult.data}
+        email={
+          personEmailsResult.data.find((personEmail) => personEmail.is_primary)
+            ?.email ?? null
+        }
         experience={experience}
         fieldOfStudy={person.field_of_study}
         linkedinUrl={person.linkedin_url}

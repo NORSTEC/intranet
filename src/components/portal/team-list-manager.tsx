@@ -154,6 +154,9 @@ function DeleteTeamDialog({
             onClick={onCancel}
             type="button"
           >
+            <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">
+              close
+            </span>
             Cancel
           </button>
           <button
@@ -229,7 +232,7 @@ export function TeamListManager({
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {teams.map((team) => (
             <article className="portal-surface flex min-h-48 flex-col p-6" key={team.id}>
-              <span className="portal-pill portal-pill-filled w-fit">
+              <span className="text-sm opacity-55">
                 {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
               </span>
               <h2 className="mt-7 text-xl font-medium">{team.name}</h2>

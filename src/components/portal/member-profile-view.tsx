@@ -61,7 +61,7 @@ export function MemberProfileView({
   action,
   avatarAlt,
   avatarUrl,
-  emails,
+  email,
   experience,
   fieldOfStudy,
   linkedinUrl,
@@ -74,7 +74,7 @@ export function MemberProfileView({
   action?: ReactNode;
   avatarAlt?: string | null;
   avatarUrl?: string;
-  emails: Array<{ id: number | string; email: string }>;
+  email: string | null;
   experience: MemberProfileExperience[];
   fieldOfStudy: string | null;
   linkedinUrl: string | null;
@@ -144,22 +144,21 @@ export function MemberProfileView({
                 {studyYear ?? "Not provided"}
               </dd>
             </div>
-            {emails.length > 0 && (
-              <div>
-                <dt className="section-label opacity-45">Email</dt>
-                <dd className="profile-value mt-2 flex flex-wrap gap-x-5 gap-y-2 font-medium">
-                  {emails.map((personEmail) => (
-                    <a
-                      className="transition-colors hover:text-copper"
-                      href={`mailto:${personEmail.email}`}
-                      key={personEmail.id}
-                    >
-                      {personEmail.email}
-                    </a>
-                  ))}
-                </dd>
-              </div>
-            )}
+            <div>
+              <dt className="section-label opacity-45">Email</dt>
+              <dd className="profile-value mt-2 font-medium break-words">
+                {email ? (
+                  <a
+                    className="transition-colors hover:text-copper"
+                    href={`mailto:${email}`}
+                  >
+                    {email}
+                  </a>
+                ) : (
+                  "Not provided"
+                )}
+              </dd>
+            </div>
           </dl>
 
           <div className="mt-8 h-11">

@@ -44,4 +44,6 @@ export type PortalAccessState =
       membership: PortalMembership | null;
       memberships: PortalMembership[];
       isPortalAdmin: boolean;
+      // Portal access granted to an alumnus who belongs to no organization.
+      hasAlumniAccess: boolean;
     };

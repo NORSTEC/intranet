@@ -6,6 +6,7 @@ import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 
 type Person = {
   id: number;
+  alumni_access_granted_at: string | null;
   full_name: string | null;
   avatar_path: string | null;
   avatar_alt: string | null;
@@ -41,7 +42,7 @@ type ProfileExperience = {
 export type MemberProfileData = {
   avatarAlt: string | null;
   avatarUrl?: string;
-  emails: Array<{ id: number; email: string }>;
+  email: string | null;
   experience: MemberProfileExperience[];
   fieldOfStudy: string | null;
   linkedinUrl: string | null;
@@ -58,7 +59,7 @@ export async function getMemberProfile(
   const personResult = await supabase
     .from("people")
     .select(
-      "id, full_name, avatar_path, avatar_alt, field_of_study, study_year, linkedin_url, phone_number",
+      "id, full_name, avatar_path, avatar_alt, field_of_study, study_year, linkedin_url, phone_number, alumni_access_granted_at",
     )
     .eq("id", personId)
     .maybeSingle();
@@ -105,7 +106,8 @@ export async function getMemberProfile(
     organizationMembershipsResult.data as OrganizationMembership[];
   const status = memberships.some((membership) => membership.status === "active")
     ? "Active"
-    : memberships.some((membership) => membership.status === "ended")
+    : memberships.some((membership) => membership.status === "ended") ||
+        person.alumni_access_granted_at
       ? "Alumni"
       : "Pending";
   const experience: MemberProfileExperience[] = (
@@ -138,7 +140,9 @@ export async function getMemberProfile(
     avatarUrl: person.avatar_path
       ? avatarUrls.get(person.avatar_path)
       : undefined,
-    emails: personEmailsResult.data,
+    email:
+      personEmailsResult.data.find((personEmail) => personEmail.is_primary)
+        ?.email ?? null,
     experience,
     fieldOfStudy: person.field_of_study,
     linkedinUrl: person.linkedin_url,
