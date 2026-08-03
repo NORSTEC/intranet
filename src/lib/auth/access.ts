@@ -28,6 +28,7 @@ type PortalAccountRow = {
   auth_user_id: string;
   person_id: number;
   account_email: string;
+  onboarding_status: "pending" | "complete";
   people: ProfileRow | ProfileRow[];
 };
 
@@ -60,7 +61,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   const accountResult = await supabase
     .from("portal_accounts")
     .select(
-      "auth_user_id, person_id, account_email, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, portal_access_status)",
+      "auth_user_id, person_id, account_email, onboarding_status, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, portal_access_status)",
     )
     .eq("auth_user_id", user.id)
     .maybeSingle();
@@ -119,6 +120,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     studyYear: profileRow.study_year,
     phoneNumber: profileRow.phone_number,
     linkedinUrl: profileRow.linkedin_url,
+    onboardingStatus: accountRow.onboarding_status,
   };
 
   const memberships: PortalMembership[] = [];
@@ -164,6 +166,10 @@ export async function requirePortalAccess() {
 
   if (access.status === "inactive") {
     redirect(`/login?error=${access.reason}`);
+  }
+
+  if (access.profile.onboardingStatus === "pending") {
+    redirect("/onboarding/account");
   }
 
   if (!access.membership) {

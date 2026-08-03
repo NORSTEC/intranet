@@ -52,6 +52,7 @@ const administrationNavigation: NavigationItem[] = [
     label: "Organization settings",
     href: "/administration/organization",
     icon: "settings",
+    nested: true,
     admin: "organization",
   },
   {
@@ -305,17 +306,23 @@ function Breadcrumbs() {
   const dynamicLabels = usePortalBreadcrumbLabels();
   const segments = pathname.split("/").filter(Boolean);
   const crumbs = segments.flatMap((segment, index) => {
+    const isAdministrationSegment = segment === "administration" && index === 0;
     const isTeamCollectionSegment =
       segment === "teams" && segments[0] === "organizations" && index === 2;
     const isMemberCollectionSegment =
       segment === "members" && segments[0] === "organizations" && index === 4;
-    if (isTeamCollectionSegment || isMemberCollectionSegment) return [];
+    if (isAdministrationSegment || isTeamCollectionSegment || isMemberCollectionSegment) {
+      return [];
+    }
 
     const href = `/${segments.slice(0, index + 1).join("/")}`;
+    if (href in dynamicLabels && dynamicLabels[href] === null) return [];
+
     const decoded = decodeURIComponent(segment).replaceAll("-", " ");
     const label =
       dynamicLabels[href] ??
       (href === "/administration/members" ? "Member status" : undefined) ??
+      (href === "/administration/organization" ? "Organization settings" : undefined) ??
       breadcrumbLabels[segment] ??
       decoded.replace(/\b\w/g, (letter) => letter.toUpperCase());
     return [{ href, label }];

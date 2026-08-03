@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-type BreadcrumbLabels = Record<string, string>;
+type BreadcrumbLabels = Record<string, string | null>;
 
 const PortalBreadcrumbContext = createContext<{
   labels: BreadcrumbLabels;

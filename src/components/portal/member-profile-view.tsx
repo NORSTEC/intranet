@@ -57,6 +57,7 @@ function groupTeamRoles(teams: MemberProfileExperience["teams"]) {
 }
 
 export function MemberProfileView({
+  accountSettings,
   action,
   avatarAlt,
   avatarUrl,
@@ -69,6 +70,7 @@ export function MemberProfileView({
   status,
   studyYear,
 }: {
+  accountSettings?: ReactNode;
   action?: ReactNode;
   avatarAlt?: string | null;
   avatarUrl?: string;
@@ -177,6 +179,8 @@ export function MemberProfileView({
           </div>
         </div>
       </section>
+
+      {accountSettings}
 
       <section className="mt-20">
         <h2 className="text-h2">Experience</h2>

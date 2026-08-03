@@ -28,6 +28,7 @@ export type PortalProfile = {
   studyYear: number | null;
   phoneNumber: string | null;
   linkedinUrl: string | null;
+  onboardingStatus: "pending" | "complete";
 };
 
 export type PortalAccessState =

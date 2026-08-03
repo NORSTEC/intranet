@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(113);
+select plan(127);
 
 insert into public.people (
   full_name,
@@ -297,14 +297,6 @@ values
     now()
   ),
   (
-    'google-member-personal',
-    '11111111-1111-4111-8111-111111111111',
-    '{"email":"member.private@example.com","email_verified":true}'::jsonb,
-    'google',
-    now(),
-    now()
-  ),
-  (
     'google-member-orbit',
     '11111111-1111-4111-8111-111111111111',
     '{"email":"eirikkvam@orbitntnu.no","email_verified":true}'::jsonb,
@@ -320,6 +312,78 @@ select ok(
     where auth_user_id = '11111111-1111-4111-8111-111111111111'
   ),
   'a verified Norstec Google user receives a portal account'
+);
+
+select is(
+  (
+    select onboarding_status
+    from public.portal_accounts
+    where auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  'pending',
+  'a new organization account waits for the user to choose a profile'
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.portal_accounts as account
+      on account.person_id = membership.person_id
+    where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  0::bigint,
+  'pending organization onboarding does not create membership prematurely'
+);
+
+update auth.users
+set updated_at = now()
+where id = '11111111-1111-4111-8111-111111111111';
+
+select is(
+  (
+    select onboarding_status
+    from public.portal_accounts
+    where auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  'pending',
+  'a later Auth user update preserves pending organization onboarding'
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.portal_accounts as account
+      on account.person_id = membership.person_id
+    where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  0::bigint,
+  'a later Auth user update cannot bypass the organization account choice'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.complete_own_organization_onboarding() $$,
+  'a first-time organization user can choose to create a new profile'
+);
+
+reset role;
+
+select is(
+  (
+    select onboarding_status
+    from public.portal_accounts
+    where auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  'complete',
+  'creating a new profile completes organization onboarding'
 );
 
 select ok(
@@ -427,16 +491,6 @@ select is(
   (
     select email_type
     from public.person_emails
-    where email = 'member.private@example.com'
-  ),
-  'personal',
-  'a linked private Google identity becomes a personal sign-in email'
-);
-
-select is(
-  (
-    select email_type
-    from public.person_emails
     where email = 'eirikkvam@orbitntnu.no'
   ),
   'organization',
@@ -476,8 +530,8 @@ select is(
     from public.audit_events
     where action = 'auth.identity_linked'
   ),
-  2::bigint,
-  'new linked sign-in emails are audited without duplicating the primary email'
+  1::bigint,
+  'the alternative sign-in email is audited without duplicating the primary email'
 );
 
 set local role authenticated;
@@ -500,8 +554,51 @@ select is(
     from public.audit_events
     where action = 'auth.identity_linked'
   ),
-  2::bigint,
+  1::bigint,
   'repeated synchronization creates no duplicate audit events'
+);
+
+insert into auth.identities (
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  created_at,
+  updated_at
+)
+values (
+  'google-member-personal',
+  '11111111-1111-4111-8111-111111111111',
+  '{"email":"member.private@example.com","email_verified":true}'::jsonb,
+  'google',
+  now(),
+  now()
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$ select public.sync_linked_google_identities() $$,
+  'P0001',
+  'too_many_linked_google_identities',
+  'a profile cannot synchronize more than one alternative Google account'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where email = 'member.private@example.com'
+  ),
+  0::bigint,
+  'a third Google identity is not copied into the portal profile'
 );
 
 set local role authenticated;
@@ -1802,6 +1899,119 @@ select is(
   ),
   1::bigint,
   'claiming a record preserves its manually created membership'
+);
+
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  is_sso_user,
+  is_anonymous
+)
+values (
+  '66666666-6666-4666-8666-666666666666',
+  'authenticated',
+  'authenticated',
+  'alternative@example.com',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Alternative Login"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.start_portal_account_link(repeat('a', 64), 'add_account') $$,
+  'an existing profile can start linking one alternative Google account'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"66666666-6666-4666-8666-666666666666","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.complete_portal_account_link(repeat('a', 64)) $$,
+  'an empty account shell can be linked to the existing portal profile'
+);
+
+select is(
+  (
+    select person_id
+    from public.portal_accounts
+    where auth_user_id = '66666666-6666-4666-8666-666666666666'
+  ),
+  (
+    select person_id
+    from public.portal_accounts
+    where auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  'both Google sign-ins point to the same portal person'
+);
+
+reset role;
+
+select is(
+  (select count(*) from public.people where full_name = 'Alternative Login'),
+  0::bigint,
+  'the unused duplicate person shell is removed after linking'
+);
+
+select is(
+  (
+    select count(*)
+    from public.portal_accounts
+    where person_id = (
+      select person_id
+      from public.portal_accounts
+      where auth_user_id = '11111111-1111-4111-8111-111111111111'
+    )
+  ),
+  2::bigint,
+  'a portal profile has at most one primary and one alternative sign-in account'
+);
+
+select is(
+  (
+    select person_id
+    from public.person_emails
+    where email = 'alternative@example.com'
+  ),
+  (
+    select person_id
+    from public.portal_accounts
+    where auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  'the alternative email belongs to the existing profile'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'auth.portal_account_linked'
+      and details ->> 'account_email' = 'alternative@example.com'
+  ),
+  1::bigint,
+  'linking an alternative account is audited'
 );
 
 select * from finish();

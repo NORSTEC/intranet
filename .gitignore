@@ -46,6 +46,9 @@ secrets/
 crash.log
 crash.*.log
 
+# Claude Code local config (not shared with the team)
+.claude/
+
 # Editors and operating systems
 .DS_Store
 Thumbs.db

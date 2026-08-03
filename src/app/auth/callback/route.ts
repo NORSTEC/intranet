@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 type LinkedAccount = {
+  onboarding_status: "pending" | "complete";
   person_id: number;
   people:
     | { portal_access_status: string }
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
 
   const { data: account, error: accountError } = await supabase
     .from("portal_accounts")
-    .select("person_id, people (portal_access_status)")
+    .select("person_id, onboarding_status, people (portal_access_status)")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -54,6 +55,10 @@ export async function GET(request: Request) {
         ? "suspended"
         : "authorization";
     return NextResponse.redirect(new URL(`/login?error=${reason}`, requestUrl.origin));
+  }
+
+  if (linkedAccount.onboarding_status === "pending") {
+    return NextResponse.redirect(new URL("/onboarding/account", requestUrl.origin));
   }
 
   const { data: membership, error: membershipError } = await supabase

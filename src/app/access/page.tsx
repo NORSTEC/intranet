@@ -1,8 +1,6 @@
-import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ThemeToggle } from "@/components/portal/portal-shell";
 import { submitAccessRequest } from "@/app/access/actions";
+import { PortalEntryShell } from "@/components/portal/portal-entry-shell";
 import { STUDY_FIELDS } from "@/lib/profile/study-fields";
 import { getPortalAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
@@ -40,6 +38,10 @@ export default async function AccessPage({
     redirect(`/login?error=${access.reason}`);
   }
 
+  if (access.profile.onboardingStatus === "pending") {
+    redirect("/onboarding/account");
+  }
+
   if (access.membership) {
     redirect("/");
   }
@@ -74,42 +76,30 @@ export default async function AccessPage({
     : null;
 
   return (
-    <main className="min-h-screen bg-egg px-5 py-6 text-moody sm:px-8 lg:px-12">
-      <header className="mx-auto flex max-w-5xl items-center justify-between">
-        <Link href="/login" className="flex items-center gap-3"><Image src="/images/logo.png" alt="Norstec" width={36} height={36} className="portal-logo" /><span className="font-display text-xl tracking-wide">NORSTEC</span></Link>
-        <ThemeToggle compact />
-      </header>
-      <div className="mx-auto max-w-2xl py-12 lg:py-20">
-        <form action="/auth/signout" method="post">
-          <button type="submit" className="mb-8 inline-flex cursor-pointer items-center gap-2 text-sm">
-            <span className="material-symbols-outlined rotate-180 text-[1.15rem]">arrow_right_alt</span>
-            Use another account
-          </button>
-        </form>
-        <h1 className="text-h1">Request access<span aria-hidden className="page-star" /></h1>
-        <p className="mt-4 text-sm opacity-55">
+    <PortalEntryShell>
+      <section>
+        <h1 className="text-h2">Request access</h1>
+        <p className="mt-4 max-w-3xl text-sm opacity-60">
           Signed in as {access.profile.email}. Your request must be approved before you can enter the portal.
         </p>
 
         {(submitted === "true" || pendingRequest) ? (
-          <section className="portal-surface mt-12 p-7 sm:p-9">
+          <section className="portal-surface mt-8 max-w-4xl p-6 sm:p-8">
             <span className="portal-pill">Request received</span>
-            <p className="mt-5 text-xl">Pending approval</p>
+            <h2 className="mt-6 text-h3 font-medium">Pending approval</h2>
             {pendingOrganization && (
               <p className="mt-2 text-sm opacity-55">{pendingOrganization}</p>
             )}
           </section>
         ) : (
-          <form action={submitAccessRequest} className="mt-12 space-y-6">
+          <form action={submitAccessRequest} className="mt-8 grid max-w-4xl gap-6 sm:grid-cols-2">
             {error && errorMessages[error] && (
-              <p className="text-sm text-[#a33b2b]" role="alert">{errorMessages[error]}</p>
+              <p className="text-sm text-[#a33b2b] sm:col-span-2" role="alert">{errorMessages[error]}</p>
             )}
-            <div className="grid gap-6 sm:grid-cols-2">
-              <label className="flex flex-col gap-2"><span className="section-label">First name</span><input name="firstName" className="portal-field" defaultValue={access.profile.firstName ?? ""} maxLength={80} autoComplete="given-name" required /></label>
-              <label className="flex flex-col gap-2"><span className="section-label">Last name</span><input name="lastName" className="portal-field" defaultValue={access.profile.lastName ?? ""} maxLength={80} autoComplete="family-name" required /></label>
-            </div>
-            <label className="flex flex-col gap-2">
-              <span className="section-label">Organization</span>
+            <label className="grid gap-2"><span className="section-label opacity-45">First name <span className="text-copper" aria-hidden="true">*</span></span><input name="firstName" className="portal-field" defaultValue={access.profile.firstName ?? ""} maxLength={80} autoComplete="given-name" required /></label>
+            <label className="grid gap-2"><span className="section-label opacity-45">Last name <span className="text-copper" aria-hidden="true">*</span></span><input name="lastName" className="portal-field" defaultValue={access.profile.lastName ?? ""} maxLength={80} autoComplete="family-name" required /></label>
+            <label className="grid gap-2 sm:col-span-2">
+              <span className="section-label opacity-45">Organization <span className="text-copper" aria-hidden="true">*</span></span>
               <select name="organizationId" className="portal-field" defaultValue="" required>
                 <option value="" disabled>Select organization</option>
                 {organizations.map((organization) => (
@@ -117,9 +107,8 @@ export default async function AccessPage({
                 ))}
               </select>
             </label>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <label className="flex flex-col gap-2">
-                <span className="section-label">Field of study</span>
+              <label className="grid gap-2">
+                <span className="section-label opacity-45">Field of study</span>
                 <select name="fieldOfStudy" className="portal-field" defaultValue="">
                   <option value="">Not provided</option>
                   {STUDY_FIELDS.map((field) => (
@@ -127,8 +116,8 @@ export default async function AccessPage({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-2">
-                <span className="section-label">Study year</span>
+              <label className="grid gap-2">
+                <span className="section-label opacity-45">Study year <span className="text-copper" aria-hidden="true">*</span></span>
                 <select name="studyYear" className="portal-field" defaultValue={access.profile.studyYear ?? ""} required>
                   <option value="" disabled>Select year</option>
                   {[1, 2, 3, 4, 5, 6].map((year) => (
@@ -136,12 +125,13 @@ export default async function AccessPage({
                   ))}
                 </select>
               </label>
+            <label className="grid gap-2 sm:col-span-2"><span className="section-label opacity-45">Message</span><textarea name="message" className="portal-field min-h-32 resize-y" maxLength={2000} /></label>
+            <div className="sm:col-span-2">
+              <button className="portal-button" type="submit">Send request<span className="material-symbols-outlined">arrow_right_alt</span></button>
             </div>
-            <label className="flex flex-col gap-2"><span className="section-label">Message</span><textarea name="message" className="portal-field min-h-32 resize-y" maxLength={2000} /></label>
-            <button className="portal-button" type="submit">Send request<span className="material-symbols-outlined">arrow_right_alt</span></button>
           </form>
         )}
-      </div>
-    </main>
+      </section>
+    </PortalEntryShell>
   );
 }

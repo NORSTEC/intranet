@@ -4,7 +4,6 @@ import {
   type LinkedLoginAccount,
 } from "@/components/portal/login-accounts-settings";
 import { MemberProfileView } from "@/components/portal/member-profile-view";
-import { PortalAccessSettings } from "@/components/portal/portal-access-settings";
 import { Toast } from "@/components/portal/toast";
 import { requirePortalAccess } from "@/lib/auth/access";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
@@ -41,7 +40,7 @@ export default async function ProfilePage({
   const access = await requirePortalAccess();
   const { accountLinked, accountLinkError, saved } = await searchParams;
   const supabase = await createClient();
-  const [experiencesResult, emailsResult, identitiesResult, avatarUrls] =
+  const [experiencesResult, emailsResult, accountsResult, avatarUrls] =
     await Promise.all([
       supabase
         .from("profile_experiences")
@@ -52,41 +51,41 @@ export default async function ProfilePage({
         .order("starts_on", { ascending: false, nullsFirst: false }),
       supabase
         .from("person_emails")
-        .select("id, email, email_type")
+        .select("id, email, email_type, is_primary")
         .eq("person_id", access.profile.personId)
         .order("is_primary", { ascending: false }),
-      supabase.auth.getUserIdentities(),
+      supabase
+        .from("portal_accounts")
+        .select("auth_user_id, account_email")
+        .eq("person_id", access.profile.personId),
       getMemberAvatarUrls([access.profile.avatarPath]),
     ]);
 
   if (
     experiencesResult.error ||
     emailsResult.error ||
-    identitiesResult.error
+    accountsResult.error
   ) {
     throw new Error("Could not load profile");
   }
 
-  const emailTypes = new Map(
-    emailsResult.data.map((email) => [email.email, email.email_type]),
+  const emailsByAddress = new Map(
+    emailsResult.data.map((email) => [email.email, email]),
   );
-  const loginAccounts: LinkedLoginAccount[] = identitiesResult.data.identities
-    .flatMap((identity) => {
-      const email = typeof identity.identity_data?.email === "string"
-        ? identity.identity_data.email.toLocaleLowerCase("en")
-        : null;
-      if (!email || identity.provider !== "google") return [];
-
-      const emailType = emailTypes.get(email);
-      return [{
+  const loginAccounts: LinkedLoginAccount[] = accountsResult.data
+    .map((account) => {
+      const email = account.account_email.toLocaleLowerCase("en");
+      const emailRecord = emailsByAddress.get(email);
+      return {
         email,
         emailType:
-          emailType === "organization" || emailType === "personal"
-            ? emailType
+          emailRecord?.email_type === "organization" ||
+          emailRecord?.email_type === "personal"
+            ? emailRecord.email_type
             : "unknown",
-        id: identity.id,
-        isPrimary: email === access.profile.email,
-      } satisfies LinkedLoginAccount];
+        id: account.auth_user_id,
+        isPrimary: emailRecord?.is_primary ?? false,
+      } satisfies LinkedLoginAccount;
     })
     .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
 
@@ -137,36 +136,41 @@ export default async function ProfilePage({
       {accountLinkError && (
         <Toast
           clearParams={["accountLinkError"]}
-          message={accountLinkError === "conflict"
-            ? "That email belongs to another portal profile. Contact Norstec IT."
+          message={accountLinkError === "limit"
+              ? "You can only connect one alternative Google account."
+            : accountLinkError === "same"
+              ? "Choose a different Google account."
+            : accountLinkError === "profile_has_data"
+              ? "That account belongs to a portal profile with existing data. Contact Norstec IT to merge the profiles."
+            : accountLinkError === "expired"
+              ? "The account-link request expired. Please try again."
             : "The Google account could not be linked. Please try again."}
           status="error"
         />
       )}
       <MemberProfileView
-      action={
-        <Link className="portal-button" href="/profile/edit">
-          <span className="material-symbols-outlined text-[1.1rem]">edit</span>
-          Edit profile
-        </Link>
-      }
-      avatarAlt={access.profile.avatarAlt}
-      avatarUrl={avatarUrl}
-      emails={emailsResult.data}
-      experience={experience}
-      fieldOfStudy={access.profile.fieldOfStudy}
-      linkedinUrl={access.profile.linkedinUrl}
-      name={name}
-      phoneNumber={access.profile.phoneNumber}
-      status={status}
-      studyYear={access.profile.studyYear}
-      />
-      <LoginAccountsSettings accounts={loginAccounts} />
-      <PortalAccessSettings
-        canLeavePortal={status === "Alumni" && !access.isPortalAdmin}
-        hasPersonalEmail={emailsResult.data.some(
-          (email) => email.email_type === "personal",
+        accountSettings={(
+          <LoginAccountsSettings
+            accounts={loginAccounts}
+            canLeavePortal={status === "Alumni" && !access.isPortalAdmin}
+          />
         )}
+        action={
+          <Link className="portal-button" href="/profile/edit">
+            <span className="material-symbols-outlined text-[1.1rem]">edit</span>
+            Edit profile
+          </Link>
+        }
+        avatarAlt={access.profile.avatarAlt}
+        avatarUrl={avatarUrl}
+        emails={emailsResult.data}
+        experience={experience}
+        fieldOfStudy={access.profile.fieldOfStudy}
+        linkedinUrl={access.profile.linkedinUrl}
+        name={name}
+        phoneNumber={access.profile.phoneNumber}
+        status={status}
+        studyYear={access.profile.studyYear}
       />
     </>
   );
