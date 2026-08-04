@@ -20,6 +20,17 @@ export type MergeCandidate = {
 
 type AccessStatus = "unclaimed" | "active" | "suspended";
 
+// A UI-only hint so the button doesn't invite a request the database will
+// refuse anyway. `set_portal_administrator` is the actual gate, checking
+// both primary emails and linked Google accounts against the same domain.
+const NORSTEC_EMAIL_DOMAIN = "norstec.no";
+
+function hasNorstecEmail(emails: string[]) {
+  return emails.some(
+    (email) => email.split("@")[1]?.toLocaleLowerCase("en") === NORSTEC_EMAIL_DOMAIN,
+  );
+}
+
 function ActionCard({
   children,
   description,
@@ -72,6 +83,7 @@ export function PersonAdminActions({
 }) {
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [adminConfirmation, setAdminConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const [mergeQuery, setMergeQuery] = useState("");
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
@@ -86,6 +98,7 @@ export function PersonAdminActions({
   const [busy, startTransition] = useTransition();
 
   const isSuspended = accessStatus === "suspended";
+  const eligibleForPortalAdmin = isPortalAdmin || hasNorstecEmail(personEmails);
   const mergeSource =
     mergeCandidates.find((candidate) => candidate.id === mergeSourceId) ?? null;
 
@@ -116,6 +129,7 @@ export function PersonAdminActions({
     startTransition(async () => {
       const result = await action();
       setPendingAction(null);
+      setAdminConfirmation("");
       setToast({
         id: Date.now(),
         message: result.message,
@@ -331,6 +345,11 @@ export function PersonAdminActions({
                 You cannot change your own role. Another portal administrator
                 has to do it.
               </p>
+            ) : !eligibleForPortalAdmin ? (
+              <p className="text-sm leading-relaxed opacity-60">
+                Only people with a {NORSTEC_EMAIL_DOMAIN} email or linked
+                Google account can become portal administrators.
+              </p>
             ) : (
               <button
                 className={`portal-button${isPortalAdmin ? "" : " portal-button-danger"}`}
@@ -428,12 +447,20 @@ export function PersonAdminActions({
       {pendingAction?.kind === "administrator" && (
         <ConfirmDialog
           busy={busy}
+          confirmDisabled={
+            pendingAction.grant &&
+            adminConfirmation.trim().toLocaleLowerCase("en") !==
+              personName.toLocaleLowerCase("en")
+          }
           confirmIcon={
             pendingAction.grant ? "admin_panel_settings" : "person_remove"
           }
           confirmLabel={pendingAction.grant ? "Grant role" : "Revoke role"}
           danger
-          onCancel={() => setPendingAction(null)}
+          onCancel={() => {
+            setPendingAction(null);
+            setAdminConfirmation("");
+          }}
           onConfirm={confirmPendingAction}
           title={
             pendingAction.grant
@@ -446,6 +473,19 @@ export function PersonAdminActions({
               ? `${personName} will administer every organization, decide alumni access, and be able to delete people.`
               : `${personName} keeps their portal access and memberships, but loses portal-wide administration.`}
           </p>
+          {pendingAction.grant && (
+            <label className="mt-5 block">
+              <span className="section-label mb-2 block opacity-50">
+                Type &quot;{personName}&quot; to confirm
+              </span>
+              <input
+                className="portal-field"
+                onChange={(event) => setAdminConfirmation(event.target.value)}
+                type="text"
+                value={adminConfirmation}
+              />
+            </label>
+          )}
         </ConfirmDialog>
       )}
 

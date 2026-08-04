@@ -59,6 +59,9 @@ function messageFor(error: { message: string }, fallback: string) {
   if (error.message.includes("portal_access_required")) {
     return "Only someone with active portal access can administer the portal.";
   }
+  if (error.message.includes("norstec_domain_required")) {
+    return "Only people with a norstec.no email or linked Google account can become portal administrators.";
+  }
   if (error.message.includes("last_organization_admin")) {
     return "This person is the last active administrator of an organization. Appoint another administrator first.";
   }

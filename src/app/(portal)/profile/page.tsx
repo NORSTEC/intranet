@@ -112,6 +112,11 @@ export default async function ProfilePage({
         access.hasAlumniAccess
       ? "Alumni"
       : "Pending";
+  const organizationName =
+    access.memberships
+      .filter((membership) => membership.status === "active")
+      .map((membership) => membership.organizationName)
+      .join(", ") || null;
   const experience = (experiencesResult.data as ProfileExperience[]).map((entry) => {
     const organization = Array.isArray(entry.organizations)
       ? entry.organizations[0]
@@ -177,6 +182,7 @@ export default async function ProfilePage({
         fieldOfStudy={access.profile.fieldOfStudy}
         linkedinUrl={access.profile.linkedinUrl}
         name={name}
+        organizationName={organizationName}
         phoneNumber={access.profile.phoneNumber}
         status={status}
         studyYear={access.profile.studyYear}

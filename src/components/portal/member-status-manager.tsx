@@ -27,7 +27,7 @@ type ManagedMember = {
 };
 
 type StatusFilter = ManagedMember["status"];
-type SortKey = "name" | "status";
+type SortKey = "name" | "email" | "status";
 function statusLabel(status: StatusFilter) {
   return status === "active" ? "Active" : "Former member";
 }
@@ -153,9 +153,12 @@ export function MemberStatusManager({
       )
       .sort((left, right) => {
         if (!sortKey) return 0;
-        const leftValue = sortKey === "name" ? left.name : statusLabel(left.status);
-        const rightValue = sortKey === "name" ? right.name : statusLabel(right.status);
-        const comparison = leftValue.localeCompare(rightValue, "en", {
+        const value = (member: ManagedMember) => {
+          if (sortKey === "name") return member.name;
+          if (sortKey === "email") return member.email ?? "";
+          return statusLabel(member.status);
+        };
+        const comparison = value(left).localeCompare(value(right), "en", {
           sensitivity: "base",
         });
         return sortDirection === "ascending" ? comparison : -comparison;
@@ -264,6 +267,13 @@ export function MemberStatusManager({
                   Name
                 </SortableTableHeader>
                 <SortableTableHeader
+                  active={sortKey === "email"}
+                  direction={sortDirection}
+                  onSort={() => changeSort("email")}
+                >
+                  Email
+                </SortableTableHeader>
+                <SortableTableHeader
                   active={sortKey === "status"}
                   direction={sortDirection}
                   onSort={() => changeSort("status")}
@@ -294,6 +304,7 @@ export function MemberStatusManager({
                       </span>
                     </div>
                   </td>
+                  <td className="py-3 pr-5">{member.email ?? "—"}</td>
                   <td className="py-3 pr-5">{statusLabel(member.status)}</td>
                   <td className="py-3 pr-4">
                     <div className="flex justify-end">

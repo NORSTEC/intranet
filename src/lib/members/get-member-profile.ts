@@ -18,6 +18,7 @@ type Person = {
 
 type OrganizationMembership = {
   status: string;
+  organizations: { name: string } | Array<{ name: string }> | null;
 };
 
 type ProfileExperience = {
@@ -47,6 +48,7 @@ export type MemberProfileData = {
   fieldOfStudy: string | null;
   linkedinUrl: string | null;
   name: string;
+  organizationName: string | null;
   phoneNumber: string | null;
   status: string;
   studyYear: number | null;
@@ -76,7 +78,7 @@ export async function getMemberProfile(
   ] = await Promise.all([
     supabase
       .from("memberships")
-      .select("status")
+      .select("status, organizations (name)")
       .eq("person_id", person.id)
       .in("status", ["active", "ended"]),
     supabase
@@ -110,6 +112,15 @@ export async function getMemberProfile(
         person.alumni_access_granted_at
       ? "Alumni"
       : "Pending";
+  const organizationName = memberships
+    .filter((membership) => membership.status === "active")
+    .map((membership) =>
+      Array.isArray(membership.organizations)
+        ? membership.organizations[0]?.name
+        : membership.organizations?.name,
+    )
+    .filter((name): name is string => Boolean(name))
+    .join(", ");
   const experience: MemberProfileExperience[] = (
     experiencesResult.data as ProfileExperience[]
   ).map((entry) => {
@@ -147,6 +158,7 @@ export async function getMemberProfile(
     fieldOfStudy: person.field_of_study,
     linkedinUrl: person.linkedin_url,
     name: person.full_name ?? "Unnamed member",
+    organizationName: organizationName || null,
     phoneNumber: person.phone_number,
     status,
     studyYear: person.study_year,

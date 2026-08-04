@@ -93,7 +93,9 @@ export default async function MembersPage() {
       organizations: new Map(),
     };
     member.statuses.add(row.status);
-    member.organizations.set(organization.id, organization);
+    if (row.status === "active") {
+      member.organizations.set(organization.id, organization);
+    }
     membersById.set(person.id, member);
   }
 

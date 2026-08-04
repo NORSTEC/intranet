@@ -186,6 +186,7 @@ export default async function TeamMemberDetailsPage({
         fieldOfStudy={person.field_of_study}
         linkedinUrl={person.linkedin_url}
         name={name}
+        organizationName={organizationResult.data.name}
         phoneNumber={person.phone_number}
         status={status}
         studyYear={person.study_year}

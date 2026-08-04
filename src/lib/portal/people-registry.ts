@@ -95,7 +95,6 @@ export async function loadRegistryPeople(): Promise<RegistryPerson[]> {
       lastSignInAt: lastSignInAt ?? null,
       name: row.full_name ?? "Unnamed person",
       organizations: activeMemberships
-        .concat(endedMemberships)
         .map((membership) => organizationName(membership.organizations))
         .filter((name): name is string => Boolean(name)),
       status: row.deleted_at

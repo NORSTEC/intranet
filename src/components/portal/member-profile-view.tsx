@@ -67,6 +67,7 @@ export function MemberProfileView({
   fieldOfStudy,
   linkedinUrl,
   name,
+  organizationName,
   phoneNumber,
   status,
   studyYear,
@@ -81,6 +82,7 @@ export function MemberProfileView({
   fieldOfStudy: string | null;
   linkedinUrl: string | null;
   name: string;
+  organizationName: string | null;
   phoneNumber: string | null;
   status: string;
   studyYear: number | null;
@@ -118,6 +120,12 @@ export function MemberProfileView({
             <div>
               <dt className="section-label opacity-45">Status</dt>
               <dd className="profile-value mt-2 font-medium">{status}</dd>
+            </div>
+            <div>
+              <dt className="section-label opacity-45">Organization</dt>
+              <dd className="profile-value mt-2 font-medium">
+                {organizationName ?? "Not provided"}
+              </dd>
             </div>
             <div>
               <dt className="section-label opacity-45">Phone</dt>

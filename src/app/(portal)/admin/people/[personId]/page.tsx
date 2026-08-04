@@ -184,7 +184,6 @@ export default async function PortalPersonPage({
     (request) => request.status === "pending",
   );
   const organizationNames = activeMemberships
-    .concat(endedMemberships)
     .map((membership) => single(membership.organizations)?.name)
     .filter((organizationName): organizationName is string =>
       Boolean(organizationName),

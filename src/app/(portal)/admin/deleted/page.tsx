@@ -27,9 +27,7 @@ export default async function DeletedUsersPage() {
     <>
       <p className="max-w-2xl text-sm opacity-55">
         Deleted users are hidden from everyone except portal administrators.
-        Their data is erased permanently 30 days after the deletion, whether or
-        not anybody acts on it. Restore them, or delete them for good before the
-        30 days run out.
+        Their data is erased permanently 30 days after the deletion.
       </p>
 
       <DeletedPeopleTable people={deletedPeople} />

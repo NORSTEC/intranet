@@ -35,6 +35,16 @@ function text(details: Record<string, unknown> | null, key: string) {
   return typeof value === "string" ? value : null;
 }
 
+// The person a `deleted_person`/`purged_person` snapshot names. Nested one
+// level below the action's own fields so the purge PII scrub — which only
+// inspects top-level keys — never strips it.
+function snapshotName(details: Record<string, unknown> | null, key: string) {
+  const snapshot = details?.[key];
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const name = (snapshot as { name?: unknown }).name;
+  return typeof name === "string" ? name : null;
+}
+
 function roleLabel(role: string | null) {
   return role === "organization_admin" ? "Organization administrator" : "Member";
 }
@@ -122,13 +132,16 @@ function describe(action: string, details: Record<string, unknown> | null): {
     case "person.merged":
       return { detail: "A duplicate profile was folded in.", title: "Profiles merged" };
     case "person.soft_deleted":
-      return { detail: null, title: "Person deleted" };
+      return { detail: snapshotName(details, "deleted_person"), title: "Person deleted" };
     case "person.self_deleted":
-      return { detail: "Requested by the person themselves.", title: "Account deleted" };
+      return {
+        detail: snapshotName(details, "deleted_person") ?? "Requested by the person themselves.",
+        title: "Account deleted",
+      };
     case "person.restored":
       return { detail: null, title: "Person restored" };
     case "person.purged":
-      return { detail: null, title: "Data purged" };
+      return { detail: snapshotName(details, "purged_person"), title: "Data purged" };
     default:
       return {
         detail: null,
@@ -174,5 +187,73 @@ export async function loadPersonAudit(
       organizationName: single(row.organizations)?.name ?? null,
       title: described.title,
     } satisfies PersonAuditEntry;
+  });
+}
+
+export type AuditLogEntry = {
+  actorName: string | null;
+  createdAt: string;
+  detail: string | null;
+  id: number;
+  organizationName: string | null;
+  targetName: string | null;
+  title: string;
+};
+
+type GlobalAuditEventRow = {
+  action: string;
+  actor: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  actor_person_id: number | null;
+  created_at: string;
+  details: Record<string, unknown> | null;
+  id: number;
+  organizations: { name: string } | Array<{ name: string }> | null;
+  target: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  target_person_id: number | null;
+};
+
+// A portal-wide history is longer-lived than one person's, so it gets its
+// own, larger cap.
+const MAX_LOG_EVENTS = 200;
+
+/**
+ * Every recorded event across the portal, newest first. A deleted or purged
+ * target falls back to the name/email snapshot `describe` and the deletion
+ * RPCs already carry in `details`, since the person row — and the join to
+ * it — may be gone by the time this is read.
+ */
+export async function loadAuditLog(): Promise<AuditLogEntry[]> {
+  const supabase = await createClient();
+
+  const result = await supabase
+    .from("audit_events")
+    .select(
+      "id, action, created_at, details, actor_person_id, target_person_id, organizations (name), actor:people!audit_events_actor_person_id_fkey (full_name), target:people!audit_events_target_person_id_fkey (full_name)",
+    )
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(MAX_LOG_EVENTS);
+
+  if (result.error) {
+    throw new Error("Could not load the audit log");
+  }
+
+  return (result.data as unknown as GlobalAuditEventRow[]).map((row) => {
+    const described = describe(row.action, row.details);
+    return {
+      actorName:
+        row.actor_person_id === null
+          ? null
+          : (single(row.actor)?.full_name ?? "Unnamed person"),
+      createdAt: row.created_at,
+      detail: described.detail,
+      id: row.id,
+      organizationName: single(row.organizations)?.name ?? null,
+      targetName:
+        (row.target_person_id !== null ? single(row.target)?.full_name : null) ??
+        snapshotName(row.details, "deleted_person") ??
+        snapshotName(row.details, "purged_person"),
+      title: described.title,
+    } satisfies AuditLogEntry;
   });
 }

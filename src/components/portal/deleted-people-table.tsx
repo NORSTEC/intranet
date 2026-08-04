@@ -55,9 +55,7 @@ function erasureLabel(deletedAt: string) {
   );
 
   if (daysLeft <= 0) return "In the next purge";
-  return `${daysLeft} ${daysLeft === 1 ? "day" : "days"} · ${formatDate(
-    erasesOn.toISOString(),
-  )}`;
+  return `${daysLeft} ${daysLeft === 1 ? "day" : "days"}`;
 }
 
 function sortValue(person: DeletedPerson, key: SortKey) {
@@ -344,7 +342,8 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
         <ConfirmDialog
           busy={busy}
           confirmDisabled={
-            purgeConfirmation.trim() !== pendingAction.person.name
+            purgeConfirmation.trim().toLocaleLowerCase("en") !==
+            pendingAction.person.name.toLocaleLowerCase("en")
           }
           confirmIcon="delete_forever"
           confirmLabel="Delete permanently"
@@ -367,7 +366,7 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
           </p>
           <label className="mt-5 block">
             <span className="section-label mb-2 block opacity-50">
-              Type {pendingAction.person.name} to confirm
+              Type &quot;{pendingAction.person.name}&quot; to confirm
             </span>
             <input
               className="portal-field"
