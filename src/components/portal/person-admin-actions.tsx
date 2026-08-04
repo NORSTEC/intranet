@@ -6,8 +6,6 @@ import {
   changePortalAccess,
   changePortalAdministrator,
   mergePeople,
-  purgePerson,
-  restorePerson,
   softDeletePerson,
   type PortalManagementResult,
 } from "@/app/(portal)/admin/actions";
@@ -50,14 +48,11 @@ type PendingAction =
   | { kind: "access" }
   | { kind: "administrator"; grant: boolean }
   | { kind: "merge" }
-  | { kind: "delete" }
-  | { kind: "restore" }
-  | { kind: "purge" };
+  | { kind: "delete" };
 
 export function PersonAdminActions({
   accessStatus,
   children,
-  deletedAt,
   isPortalAdmin,
   isSelf,
   mergeCandidates,
@@ -68,7 +63,6 @@ export function PersonAdminActions({
   accessStatus: AccessStatus;
   /** Rendered between Administration and Danger zone. */
   children?: ReactNode;
-  deletedAt: string | null;
   isPortalAdmin: boolean;
   isSelf: boolean;
   mergeCandidates: MergeCandidate[];
@@ -79,7 +73,6 @@ export function PersonAdminActions({
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [reason, setReason] = useState("");
-  const [purgeConfirmation, setPurgeConfirmation] = useState("");
   const [mergeQuery, setMergeQuery] = useState("");
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
   const [primaryEmail, setPrimaryEmail] = useState<string>(
@@ -92,7 +85,6 @@ export function PersonAdminActions({
   } | null>(null);
   const [busy, startTransition] = useTransition();
 
-  const isDeleted = Boolean(deletedAt);
   const isSuspended = accessStatus === "suspended";
   const mergeSource =
     mergeCandidates.find((candidate) => candidate.id === mergeSourceId) ?? null;
@@ -117,7 +109,10 @@ export function PersonAdminActions({
     return options;
   }, [mergeSource, personEmails]);
 
-  function run(action: () => Promise<PortalManagementResult>) {
+  function run(
+    action: () => Promise<PortalManagementResult>,
+    redirectTo?: string,
+  ) {
     startTransition(async () => {
       const result = await action();
       setPendingAction(null);
@@ -128,10 +123,10 @@ export function PersonAdminActions({
       });
       if (!result.ok) return;
       setReason("");
-      setPurgeConfirmation("");
       setMergeQuery("");
       setMergeSourceId(null);
-      router.refresh();
+      if (redirectTo) router.push(redirectTo);
+      else router.refresh();
     });
   }
 
@@ -162,28 +157,19 @@ export function PersonAdminActions({
       return;
     }
     if (pendingAction.kind === "delete") {
-      run(() => softDeletePerson({ personId, reason }));
-      return;
-    }
-    if (pendingAction.kind === "restore") {
-      run(() => restorePerson({ personId }));
-      return;
-    }
-    if (deletedAt) {
-      const deletionMoment = deletedAt;
-      run(() => purgePerson({ deletedAt: deletionMoment, personId }));
+      // This page stops existing for a deleted person, so staying on it would
+      // land on a 404. Manage users is where the decision was made from.
+      run(() => softDeletePerson({ personId, reason }), "/admin/people");
     }
   }
 
   const accessLockReason = isSelf
     ? "You cannot change your own portal access. Ask another portal administrator."
-    : isDeleted
-      ? "Restore this person before changing their access."
-      : accessStatus === "unclaimed"
-        ? "This profile has never been signed in to. Access opens the first time they sign in."
-        : isPortalAdmin
-          ? "Revoke the portal administrator role before suspending this person."
-          : null;
+    : accessStatus === "unclaimed"
+      ? "This profile has never been signed in to. Access opens the first time they sign in."
+      : isPortalAdmin
+        ? "Revoke the portal administrator role before suspending this person."
+        : null;
 
   return (
     <>
@@ -231,13 +217,7 @@ export function PersonAdminActions({
             description="Use this when the same person exists twice."
             title="Merge a duplicate"
           >
-            {isDeleted ? (
-              <p className="text-sm leading-relaxed opacity-60">
-                Restore this person before merging anything into them.
-              </p>
-            ) : (
-              <>
-                <label className="block">
+            <label className="block">
                   <span className="section-label mb-2 block opacity-50">
                     Duplicate profile
                   </span>
@@ -264,6 +244,12 @@ export function PersonAdminActions({
                       onClick={() => setMergeSourceId(null)}
                       type="button"
                     >
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[1rem]"
+                      >
+                        edit
+                      </span>
                       Change
                     </button>
                   </p>
@@ -323,8 +309,6 @@ export function PersonAdminActions({
                   </span>
                   Merge into this profile
                 </button>
-              </>
-            )}
           </ActionCard>
         </div>
       </section>
@@ -350,7 +334,7 @@ export function PersonAdminActions({
             ) : (
               <button
                 className={`portal-button${isPortalAdmin ? "" : " portal-button-danger"}`}
-                disabled={busy || isDeleted}
+                disabled={busy}
                 onClick={() =>
                   setPendingAction({
                     grant: !isPortalAdmin,
@@ -373,49 +357,14 @@ export function PersonAdminActions({
           </ActionCard>
 
           <ActionCard
-            description={
-              isDeleted
-                ? "This person is deleted but still stored. Restore them, or purge now instead of waiting out the 30 days."
-                : "Deleting ends their organization memberships and team roles. You can restore them from Deleted users within 30 days."
-            }
-            title={isDeleted ? "Restore or purge" : "Delete this person"}
+            description="Deleting ends their organization memberships and team roles. You can restore them from Deleted users within 30 days."
+            title="Delete this person"
             tone="danger"
           >
             {isSelf ? (
               <p className="text-sm leading-relaxed opacity-60">
                 You cannot delete your own profile.
               </p>
-            ) : isDeleted ? (
-              <div className="flex flex-wrap gap-3">
-                <button
-                  className="portal-button"
-                  disabled={busy}
-                  onClick={() => setPendingAction({ kind: "restore" })}
-                  type="button"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[1.1rem]"
-                  >
-                    restore_from_trash
-                  </span>
-                  Restore
-                </button>
-                <button
-                  className="portal-button portal-button-danger"
-                  disabled={busy}
-                  onClick={() => setPendingAction({ kind: "purge" })}
-                  type="button"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[1.1rem]"
-                  >
-                    delete_forever
-                  </span>
-                  Purge permanently
-                </button>
-              </div>
             ) : isPortalAdmin ? (
               <p className="text-sm leading-relaxed opacity-60">
                 Revoke the portal administrator role before deleting this
@@ -537,65 +486,12 @@ export function PersonAdminActions({
             every administrator&apos;s view, and is signed out everywhere.
           </p>
           <p className="mt-3">
-            Nothing is erased yet. You can restore them, or purge their data for
-            good from this page.
+            Nothing is erased yet. Deleted users keeps them for 30 days, where
+            you can restore them or purge their data for good.
           </p>
         </ConfirmDialog>
       )}
 
-      {pendingAction?.kind === "restore" && (
-        <ConfirmDialog
-          busy={busy}
-          confirmIcon="restore_from_trash"
-          confirmLabel="Restore"
-          onCancel={() => setPendingAction(null)}
-          onConfirm={confirmPendingAction}
-          title="Restore this person?"
-        >
-          <p>
-            {personName} becomes visible again with the portal access they had
-            before the deletion. Memberships that ended with the deletion stay
-            ended; an organization administrator has to reactivate them.
-          </p>
-        </ConfirmDialog>
-      )}
-
-      {pendingAction?.kind === "purge" && (
-        <ConfirmDialog
-          busy={busy}
-          confirmDisabled={purgeConfirmation.trim() !== personName}
-          confirmIcon="delete_forever"
-          confirmLabel="Purge permanently"
-          danger
-          onCancel={() => {
-            setPendingAction(null);
-            setPurgeConfirmation("");
-          }}
-          onConfirm={confirmPendingAction}
-          title="Purge this person permanently?"
-        >
-          <p>
-            This deletes {personName}&apos;s profile, email addresses, sign-in
-            accounts, memberships, team roles, and profile picture. It cannot be
-            undone.
-          </p>
-          <p className="mt-3">
-            Audit events are kept as a record of administrative decisions, with
-            every reference to this person removed.
-          </p>
-          <label className="mt-5 block">
-            <span className="section-label mb-2 block opacity-50">
-              Type {personName} to confirm
-            </span>
-            <input
-              className="portal-field"
-              onChange={(event) => setPurgeConfirmation(event.target.value)}
-              type="text"
-              value={purgeConfirmation}
-            />
-          </label>
-        </ConfirmDialog>
-      )}
     </>
   );
 }

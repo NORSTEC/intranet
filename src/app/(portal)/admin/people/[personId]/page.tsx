@@ -82,13 +82,6 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-// The retention window the scheduled purge enforces.
-function erasureDate(deletedAt: string) {
-  const erasesOn = new Date(deletedAt);
-  erasesOn.setDate(erasesOn.getDate() + 30);
-  return erasesOn.toISOString();
-}
-
 function Fact({
   children,
   term,
@@ -138,6 +131,11 @@ export default async function PortalPersonPage({
   if (!personResult.data) notFound();
 
   const person = personResult.data as unknown as PersonRow;
+
+  // A deleted person is administered from Deleted users, where the only two
+  // decisions left — restore or purge — live. Nothing on this page applies to
+  // them, so the route stops existing the moment they are deleted.
+  if (person.deleted_at) notFound();
 
   // Periods are read on their own rather than embedded under memberships. The
   // embed depends on PostgREST resolving the relationship from its schema
@@ -261,37 +259,6 @@ export default async function PortalPersonPage({
     <>
       <PortalBreadcrumbData labels={{ [`/admin/people/${personId}`]: name }} />
 
-      {person.deleted_at && (
-        <section
-          aria-labelledby="person-deleted-title"
-          className="portal-surface mb-10 border-copper p-6 sm:p-7"
-        >
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-copper text-moody-static">
-              <span aria-hidden="true" className="material-symbols-outlined">
-                delete
-              </span>
-            </span>
-            <div className="min-w-0">
-              <h2 className="font-medium" id="person-deleted-title">
-                Deleted {formatDate(person.deleted_at)}
-              </h2>
-              <p className="mt-1 text-sm opacity-65">
-                Hidden from every other member. Restorable until{" "}
-                {formatDate(erasureDate(person.deleted_at))}, when the data is
-                erased permanently.
-              </p>
-            </div>
-          </div>
-          {person.deletion_reason && (
-            <p className="mt-5 border-t border-moody/15 pt-5 text-sm leading-relaxed">
-              <span className="section-label opacity-50">Reason</span>
-              <span className="mt-1 block">{person.deletion_reason}</span>
-            </p>
-          )}
-        </section>
-      )}
-
       <section aria-labelledby="person-identity-heading">
         <div className="flex flex-wrap items-center gap-5">
           <MemberAvatar name={name} size="large" src={avatarUrl} />
@@ -299,7 +266,6 @@ export default async function PortalPersonPage({
             <h1 className="text-h2" id="person-identity-heading">
               {name}
             </h1>
-            {isSelf && <p className="mt-2 opacity-55">This is you</p>}
           </div>
         </div>
 
@@ -338,10 +304,7 @@ export default async function PortalPersonPage({
       </section>
 
       <PersonOrganizationRoles
-        canGrantAdmin={
-          person.portal_access_status === "active" && !person.deleted_at
-        }
-        isDeleted={Boolean(person.deleted_at)}
+        canGrantAdmin={person.portal_access_status === "active"}
         isSelf={isSelf}
         memberships={memberships}
         personId={person.id}
@@ -369,7 +332,6 @@ export default async function PortalPersonPage({
 
       <PersonAdminActions
         accessStatus={person.portal_access_status}
-        deletedAt={person.deleted_at}
         isPortalAdmin={Boolean(person.portal_administrators)}
         isSelf={isSelf}
         mergeCandidates={mergeCandidates}

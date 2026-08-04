@@ -13,6 +13,7 @@ import {
   type TableSortDirection,
 } from "@/components/portal/sortable-table-header";
 import { Toast } from "@/components/portal/toast";
+import { YouPill } from "@/components/portal/you-pill";
 
 type ManagedMember = {
   avatarUrl?: string;
@@ -20,6 +21,7 @@ type ManagedMember = {
   hasPersonalEmail: boolean;
   membershipId: number;
   name: string;
+  personId: number;
   role: "member" | "organization_admin";
   status: "active" | "ended";
 };
@@ -78,6 +80,12 @@ function MemberConfirmation({
             onClick={onCancel}
             type="button"
           >
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[1.1rem]"
+            >
+              close
+            </span>
             Cancel
           </button>
           <button
@@ -106,10 +114,12 @@ function MemberConfirmation({
 }
 
 export function MemberStatusManager({
+  currentPersonId,
   members,
   organizationName,
   organizationSlug,
 }: {
+  currentPersonId: number;
   members: ManagedMember[];
   organizationName: string;
   organizationSlug: string;
@@ -272,7 +282,10 @@ export function MemberStatusManager({
                     <div className="flex min-w-0 items-center gap-3 font-medium">
                       <MemberAvatar name={member.name} src={member.avatarUrl} />
                       <span className="min-w-0">
-                        <span className="block truncate">{member.name}</span>
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="truncate">{member.name}</span>
+                          {member.personId === currentPersonId && <YouPill />}
+                        </span>
                         {member.role === "organization_admin" && (
                           <span className="mt-0.5 block text-xs font-normal opacity-50">
                             Organization admin

@@ -72,6 +72,26 @@ Settings/profile-style pages follow one pattern, don't reinvent it:
   code the action maps to a `*_conflict` search-param the page renders as a
   `Toast`.
 
+## UI conventions
+
+Two rules that cut across most portal components:
+
+- **Every button carries a Material Symbols icon.** A `portal-button` (or
+  `portal-button-danger`) renders
+  `<span aria-hidden="true" className="material-symbols-outlined text-[1.1rem]">`
+  before its label — including secondary and dismissive buttons. Cancel is
+  always `close`; a button in a pending state swaps its icon for
+  `progress_activity`. Filter *pills* are not buttons in this sense and keep
+  their own leading icon convention (`FilterMenu`'s `icon` prop).
+- **People tables mark the signed-in person's own row with `<YouPill />`**
+  (`components/portal/you-pill.tsx`) — a beachball-filled `portal-pill` sitting
+  next to the name, never a sentence like "This is you". The table component
+  takes a `currentPersonId: number` prop and the row data carries a
+  `personId`; the server page passes `access.profile.personId`. Applied in
+  `portal-people-registry.tsx`, `members-directory.tsx` and
+  `member-status-manager.tsx` — any new people-listing table should do the
+  same.
+
 ## Breadcrumbs
 
 `components/portal/portal-shell.tsx`'s `Breadcrumbs()` builds crumbs from URL

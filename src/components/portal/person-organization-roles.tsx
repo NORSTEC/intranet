@@ -30,7 +30,6 @@ function formatDate(value: string) {
 export function PersonOrganizationRoles({
   canGrantAdmin,
   children,
-  isDeleted,
   isSelf,
   memberships,
   personId,
@@ -38,7 +37,6 @@ export function PersonOrganizationRoles({
 }: {
   canGrantAdmin: boolean;
   children?: ReactNode;
-  isDeleted: boolean;
   isSelf: boolean;
   memberships: PersonMembership[];
   personId: number;
@@ -128,8 +126,7 @@ export function PersonOrganizationRoles({
               {/* Removing the role stays available whatever the person's
                   portal access is; granting it needs an account that can
                   actually sign in and use it. */}
-              {!isDeleted &&
-                !isSelf &&
+              {!isSelf &&
                 (membership.role === "organization_admin" || canGrantAdmin) && (
                 <button
                   className="portal-button whitespace-nowrap"

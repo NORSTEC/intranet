@@ -11,6 +11,7 @@ import {
   SortableTableHeader,
   type TableSortDirection,
 } from "@/components/portal/sortable-table-header";
+import { YouPill } from "@/components/portal/you-pill";
 import {
   accessLevelLabels,
   personStatusLabels as statusLabels,
@@ -46,29 +47,12 @@ const memberStatuses: RegistryPersonStatus[] = ["active", "alumni"];
 
 type SortKey = "name" | "organizations" | "access" | "status" | "signIn";
 
-const RETENTION_DAYS = 30;
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", {
     day: "numeric",
     month: "short",
     year: "numeric",
   }).format(new Date(value));
-}
-
-// Deleted data is erased 30 days after the deletion, so the useful thing to
-// read in the list is when that happens, not when it started.
-function formatErasure(deletedAt: string) {
-  const erasesOn = new Date(deletedAt);
-  erasesOn.setDate(erasesOn.getDate() + RETENTION_DAYS);
-  const daysLeft = Math.ceil(
-    (erasesOn.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
-  );
-
-  if (daysLeft <= 0) return "Erased in the next purge";
-  return `Erased ${formatDate(erasesOn.toISOString())} · ${daysLeft} ${
-    daysLeft === 1 ? "day" : "days"
-  } left`;
 }
 
 function sortValue(person: RegistryPerson, key: SortKey) {
@@ -354,11 +338,7 @@ export function PortalPeopleRegistry({
                       <span className="min-w-0">
                         <span className="flex flex-wrap items-center gap-2 font-medium">
                           <span className="truncate">{person.name}</span>
-                          {person.id === currentPersonId && (
-                            <span className="portal-pill portal-pill-outline">
-                              You
-                            </span>
-                          )}
+                          {person.id === currentPersonId && <YouPill />}
                         </span>
                         <span className="mt-0.5 block truncate text-sm opacity-55">
                           {person.email ?? "No email registered"}
@@ -377,12 +357,7 @@ export function PortalPeopleRegistry({
                     {accessLevelLabels[person.accessLevel]}
                   </td>
                   <td className="py-3 pr-5">
-                    <span className="block">{statusLabels[person.status]}</span>
-                    {person.deletedAt && (
-                      <span className="mt-0.5 block text-sm opacity-55">
-                        {formatErasure(person.deletedAt)}
-                      </span>
-                    )}
+                    {statusLabels[person.status]}
                   </td>
                   <td className="py-3 pr-4">
                     {person.lastSignInAt ? (

@@ -99,6 +99,7 @@ export default async function OrganizationMemberStatusPage({
         ),
         membershipId: membership.id,
         name: person.full_name ?? "Unnamed member",
+        personId: person.id,
         role: membership.role,
         status: membership.status,
       },
@@ -114,6 +115,7 @@ export default async function OrganizationMemberStatusPage({
         }}
       />
       <MemberStatusManager
+        currentPersonId={access.profile.personId}
         members={members}
         organizationName={administeredOrganization.organizationName}
         organizationSlug={organizationSlug}

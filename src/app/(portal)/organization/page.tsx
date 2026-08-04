@@ -39,8 +39,8 @@ export default async function OrganizationPage() {
               <h3 className="mt-6 text-xl font-medium">{name}</h3>
               <p className="mt-1 truncate text-sm opacity-50">{email}</p>
               <div className="mt-7 flex flex-wrap gap-2">
-                <button className="portal-button" type="button">Approve</button>
-                <button className="portal-button portal-button-secondary" type="button">Decline</button>
+                <button className="portal-button" type="button"><span aria-hidden="true" className="material-symbols-outlined text-[1.1rem]">check</span>Approve</button>
+                <button className="portal-button portal-button-secondary" type="button"><span aria-hidden="true" className="material-symbols-outlined text-[1.1rem]">close</span>Decline</button>
               </div>
             </article>
           ))}

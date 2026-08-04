@@ -59,6 +59,12 @@ export function ConfirmDialog({
             onClick={onCancel}
             type="button"
           >
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[1.1rem]"
+            >
+              close
+            </span>
             Cancel
           </button>
           <button

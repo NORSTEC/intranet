@@ -52,7 +52,7 @@ type MemberAccumulator = {
 };
 
 export default async function MembersPage() {
-  await requirePortalAccess();
+  const access = await requirePortalAccess();
   const supabase = await createClient();
 
   const [membershipsResult, alumniResult] = await Promise.all([
@@ -165,5 +165,11 @@ export default async function MembersPage() {
     )
     .sort((left, right) => left.name.localeCompare(right.name));
 
-  return <MembersDirectory members={members} organizations={organizations} />;
+  return (
+    <MembersDirectory
+      currentPersonId={access.profile.personId}
+      members={members}
+      organizations={organizations}
+    />
+  );
 }

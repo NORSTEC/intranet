@@ -8,6 +8,7 @@ import {
   type TableSortDirection,
 } from "@/components/portal/sortable-table-header";
 import { TeamMemberCard } from "@/components/portal/team-member-card";
+import { YouPill } from "@/components/portal/you-pill";
 
 type DirectoryOrganization = {
   id: number;
@@ -91,9 +92,11 @@ export function FilterMenu({
 }
 
 export function MembersDirectory({
+  currentPersonId,
   members,
   organizations,
 }: {
+  currentPersonId: number;
   members: DirectoryMember[];
   organizations: DirectoryOrganization[];
 }) {
@@ -331,7 +334,10 @@ export function MembersDirectory({
                     <td className="py-3 pl-4 pr-5">
                       <div className="flex min-w-0 items-center gap-3 font-medium">
                         <MemberAvatar name={member.name} src={member.avatarUrl} />
-                        <span className="truncate">{member.name}</span>
+                        <span className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="truncate">{member.name}</span>
+                          {member.id === currentPersonId && <YouPill />}
+                        </span>
                       </div>
                     </td>
                     <td className="py-3 pr-5">
