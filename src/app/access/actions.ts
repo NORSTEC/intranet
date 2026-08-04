@@ -9,6 +9,34 @@ function optionalText(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export async function withdrawAccessRequest(formData: FormData) {
+  const requestId = Number(optionalText(formData, "requestId"));
+
+  if (!Number.isSafeInteger(requestId) || requestId <= 0) {
+    redirect("/access?error=withdraw_failed");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/login");
+  }
+
+  const { error } = await supabase.rpc("cancel_own_access_request", {
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    redirect("/access?error=withdraw_failed");
+  }
+
+  redirect("/access?withdrawn=true");
+}
+
 export async function submitAccessRequest(formData: FormData) {
   const requestTypeValue = optionalText(formData, "requestType");
   const requestType =
@@ -77,5 +105,5 @@ export async function submitAccessRequest(formData: FormData) {
     redirect("/access?error=request_failed");
   }
 
-  redirect("/access?submitted=true");
+  redirect("/access");
 }

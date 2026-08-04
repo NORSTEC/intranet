@@ -12,10 +12,10 @@ const barlow = Barlow({
 
 export const metadata: Metadata = {
   title: {
-    default: "Norstec Portal",
-    template: "%s | Norstec Portal",
+    default: "NORSTEC Portal",
+    template: "%s | NORSTEC Portal",
   },
-  description: "The internal portal for Norstec member organizations.",
+  description: "The internal portal for NORSTEC member organizations.",
   icons: {
     icon: [{ url: "/favicon.ico?v=3", type: "image/x-icon" }],
     shortcut: "/favicon.ico?v=3",

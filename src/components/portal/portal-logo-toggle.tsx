@@ -27,7 +27,7 @@ export function PortalLogoToggle({ open }: { open: boolean }) {
       >
         <Image
           src="/images/logo.png"
-          alt="Norstec"
+          alt="NORSTEC"
           fill
           priority
           className="object-contain portal-logo-monochrome"

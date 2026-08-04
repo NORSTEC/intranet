@@ -9,13 +9,13 @@ type Organization = { id: number; name: string };
 const requestTypes = [
   {
     description:
-      "You were a member of a Norstec organization and want to keep portal access. A portal administrator reviews the request.",
+      "You were a member of a NORSTEC organization and want to keep portal access. A portal administrator reviews the request.",
     label: "Alumni",
     value: "alumni",
   },
   {
     description:
-      "You are currently a member of a Norstec organization. That organization reviews the request.",
+      "You are currently a member of a NORSTEC organization. That organization reviews the request.",
     label: "Member of an organization",
     value: "organization",
   },
@@ -59,8 +59,10 @@ export function AccessRequestForm({
             const isSelected = requestType === option.value;
             return (
               <label
-                className={`portal-surface cursor-pointer p-5 transition-colors ${
-                  isSelected ? "" : "border-moody/25"
+                className={`portal-surface cursor-pointer p-5 transition-all ${
+                  isSelected
+                    ? "bg-moody/[0.06]"
+                    : "border-moody/20 opacity-55 hover:opacity-90 hover:border-moody/40"
                 }`}
                 key={option.value}
               >
@@ -73,7 +75,11 @@ export function AccessRequestForm({
                     type="radio"
                     value={option.value}
                   />
-                  <span className="font-medium">{option.label}</span>
+                  <span
+                    className={isSelected ? "font-semibold" : "font-medium"}
+                  >
+                    {option.label}
+                  </span>
                 </span>
                 <span className="mt-2 block text-sm leading-relaxed opacity-60">
                   {option.description}
@@ -119,11 +125,19 @@ export function AccessRequestForm({
 
       {isOrganizationRequest && (
         <>
-          <p className="rounded-2xl border-2 border-moody/25 p-5 text-sm leading-relaxed opacity-65 sm:col-span-2">
-            If your organization gave you an organization email address, sign in
-            with that Google account instead — it grants access right away, with
-            no approval needed.
-          </p>
+          <div className="flex items-start gap-3 text-sm leading-relaxed opacity-65 sm:col-span-2">
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined mt-0.5 shrink-0 text-base"
+            >
+              info
+            </span>
+            <p>
+              If your organization gave you an organization email address,
+              sign in with that Google account instead — it grants access
+              right away, with no approval needed.
+            </p>
+          </div>
           <label className="grid gap-2 sm:col-span-2">
             <span className="section-label opacity-45">
               Organization{" "}

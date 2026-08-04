@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(127);
+select plan(161);
 
 insert into public.people (
   full_name,
@@ -295,14 +295,6 @@ values
     'google',
     now(),
     now()
-  ),
-  (
-    'google-member-orbit',
-    '11111111-1111-4111-8111-111111111111',
-    '{"email":"eirikkvam@orbitntnu.no","email_verified":true}'::jsonb,
-    'google',
-    now(),
-    now()
   );
 
 select ok(
@@ -475,130 +467,20 @@ select is(
   'claiming a person activates portal access'
 );
 
-set local role authenticated;
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
-  true
-);
-
-select lives_ok(
-  $$ select public.sync_linked_google_identities() $$,
-  'an active member can synchronize Google identities linked in Supabase Auth'
-);
-
-select is(
-  (
-    select email_type
-    from public.person_emails
-    where email = 'eirikkvam@orbitntnu.no'
-  ),
-  'organization',
-  'a linked approved-domain identity becomes an organization email'
-);
-
-select is(
-  (
-    select membership.status
-    from public.memberships as membership
-    join public.portal_accounts as account on account.person_id = membership.person_id
-    join public.organizations as organization on organization.id = membership.organization_id
-    where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
-      and organization.slug = 'orbit-ntnu'
-  ),
-  'active',
-  'a linked approved-domain identity creates membership in that organization'
-);
-
+-- Identity synchronization was granted to every authenticated role while the
+-- application only ever linked accounts through the link-intent flow. Its
+-- absence is the guarantee: a signed-in user cannot link a Google identity in
+-- Supabase Auth and turn it into an organization membership on their own.
 select is(
   (
     select count(*)
-    from public.memberships as membership
-    join public.portal_accounts as account on account.person_id = membership.person_id
-    where account.auth_user_id = '11111111-1111-4111-8111-111111111111'
-      and membership.status = 'active'
-  ),
-  2::bigint,
-  'one portal person can have active memberships in two organizations'
-);
-
-reset role;
-
-select is(
-  (
-    select count(*)
-    from public.audit_events
-    where action = 'auth.identity_linked'
-  ),
-  1::bigint,
-  'the alternative sign-in email is audited without duplicating the primary email'
-);
-
-set local role authenticated;
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
-  true
-);
-
-select lives_ok(
-  $$ select public.sync_linked_google_identities() $$,
-  'linked identity synchronization is idempotent'
-);
-
-reset role;
-
-select is(
-  (
-    select count(*)
-    from public.audit_events
-    where action = 'auth.identity_linked'
-  ),
-  1::bigint,
-  'repeated synchronization creates no duplicate audit events'
-);
-
-insert into auth.identities (
-  provider_id,
-  user_id,
-  identity_data,
-  provider,
-  created_at,
-  updated_at
-)
-values (
-  'google-member-personal',
-  '11111111-1111-4111-8111-111111111111',
-  '{"email":"member.private@example.com","email_verified":true}'::jsonb,
-  'google',
-  now(),
-  now()
-);
-
-set local role authenticated;
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
-  true
-);
-
-select throws_ok(
-  $$ select public.sync_linked_google_identities() $$,
-  'P0001',
-  'too_many_linked_google_identities',
-  'a profile cannot synchronize more than one alternative Google account'
-);
-
-reset role;
-
-select is(
-  (
-    select count(*)
-    from public.person_emails
-    where email = 'member.private@example.com'
+    from pg_proc
+    join pg_namespace on pg_namespace.oid = pg_proc.pronamespace
+    where pg_namespace.nspname = 'public'
+      and pg_proc.proname = 'sync_linked_google_identities'
   ),
   0::bigint,
-  'a third Google identity is not copied into the portal profile'
+  'the superseded identity-synchronization RPC no longer exists'
 );
 
 set local role authenticated;
@@ -1387,8 +1269,8 @@ select is(
       select id from public.people where full_name = 'Pre-created Member'
     )
   ),
-  1::bigint,
-  'a portal admin receives organization-admin email visibility'
+  2::bigint,
+  'a portal admin reads every address of a person, as an organization admin does'
 );
 
 reset role;
@@ -1651,33 +1533,35 @@ select set_config(
 );
 
 select lives_ok(
-  $$ select public.deactivate_own_portal_access() $$,
-  'an alumnus with no active memberships can leave the portal'
-);
-
-select is(
-  (
-    select person.portal_access_status
-    from public.people as person
-    where person.full_name = 'Organization Email Only'
-  ),
-  'deactivated',
-  'leaving the portal deactivates access without deleting membership history'
+  $$ select public.delete_own_account() $$,
+  'a person who holds no portal-admin role can delete their own account'
 );
 
 reset role;
 
 select is(
   (
+    select person.portal_access_status
+    from public.people as person
+    where person.full_name = 'Organization Email Only'
+      and person.deleted_at is not null
+      and person.deleted_by_person_id = person.id
+  ),
+  'suspended',
+  'self-deletion soft deletes the person and blocks sign-in'
+);
+
+select is(
+  (
     select count(*)
     from public.audit_events
-    where action = 'portal_access.deactivated'
+    where action = 'person.self_deleted'
       and actor_person_id = (
         select id from public.people where full_name = 'Organization Email Only'
       )
   ),
   1::bigint,
-  'self-service portal deactivation is audited'
+  'self-service account deletion is audited'
 );
 
 select lives_ok(
@@ -1686,7 +1570,7 @@ select lives_ok(
     set raw_app_meta_data = raw_app_meta_data || '{"lifecycle_refresh":2}'::jsonb
     where id = '55555555-5555-4555-8555-555555555555'
   $$,
-  'a later identity refresh succeeds for a deactivated account'
+  'a later identity refresh succeeds for a deleted account'
 );
 
 select is(
@@ -1696,8 +1580,8 @@ select is(
     join public.memberships as membership on membership.person_id = person.id
     where person.full_name = 'Organization Email Only'
   ),
-  'deactivated:ended',
-  'identity refresh never reactivates portal access or membership'
+  'suspended:ended',
+  'identity refresh never restores a deleted account or its membership'
 );
 
 set local role authenticated;
@@ -1748,7 +1632,7 @@ select is(
     where person_id = (select private.current_person_id())
       and membership_id is not null
   ),
-  2::bigint,
+  1::bigint,
   'each authoritative organization membership created one default profile experience'
 );
 
@@ -1802,26 +1686,6 @@ select is(
   ),
   false,
   'the deprecated profile RPC cannot edit authoritative membership data'
-);
-
-select is(
-  has_function_privilege(
-    'anon',
-    'public.sync_linked_google_identities()',
-    'execute'
-  ),
-  false,
-  'anonymous users cannot synchronize linked identities'
-);
-
-select is(
-  has_function_privilege(
-    'authenticated',
-    'public.sync_linked_google_identities()',
-    'execute'
-  ),
-  true,
-  'authenticated portal users may synchronize their own linked identities'
 );
 
 select is(
@@ -2013,6 +1877,928 @@ select is(
   ),
   1::bigint,
   'linking an alternative account is audited'
+);
+
+reset role;
+
+-- Deleting a person cascades into their emails. The guard that keeps an
+-- active member from losing their last email must not mistake that cascade
+-- for someone stripping a live member, which is what made members
+-- undeletable.
+insert into public.people (full_name, portal_access_status, source)
+values ('Cascade Member', 'active', 'manual');
+
+insert into public.person_emails (
+  person_id,
+  email,
+  email_type,
+  is_primary,
+  source
+)
+select person.id, 'cascade.member@example.com', 'personal', true, 'manual'
+from public.people as person
+where person.full_name = 'Cascade Member';
+
+insert into public.memberships (
+  person_id,
+  organization_id,
+  role,
+  status,
+  provisioning_method
+)
+select person.id, organization.id, 'member', 'active', 'manual'
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Cascade Member'
+  and organization.slug = 'norstec';
+
+select throws_ok(
+  $$ delete from public.person_emails where email = 'cascade.member@example.com' $$,
+  '23514',
+  'member_must_keep_email',
+  'an active member still cannot have their last email removed on its own'
+);
+
+select lives_ok(
+  $$ delete from public.people where full_name = 'Cascade Member' $$,
+  'deleting a person is not blocked by the email their membership required'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where email = 'cascade.member@example.com'
+  ),
+  0::bigint,
+  'the delete cascaded through the emails of the deleted person'
+);
+
+-- GoTrue updates auth.users on every sign-in, so provisioning runs again and
+-- again for the same account. Offboarding that deleted a membership row must
+-- not be undone the next time the person signs in.
+insert into public.people (full_name, portal_access_status, source)
+values ('Returning Member', 'unclaimed', 'manual');
+
+insert into public.person_emails (
+  person_id,
+  email,
+  email_type,
+  is_primary,
+  source
+)
+select person.id, 'returning@norstec.no', 'organization', true, 'manual'
+from public.people as person
+where person.full_name = 'Returning Member';
+
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  is_sso_user,
+  is_anonymous
+)
+values (
+  '99999999-9999-4999-8999-999999999999',
+  'authenticated',
+  'authenticated',
+  'returning@norstec.no',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Returning Member"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Returning Member'
+  ),
+  1::bigint,
+  'first sign-in with an approved organization domain creates the membership'
+);
+
+delete from public.memberships
+where person_id = (
+  select id from public.people where full_name = 'Returning Member'
+);
+
+update auth.users
+set raw_app_meta_data = '{"provider":"google","providers":["google"]}'::jsonb,
+    updated_at = now()
+where id = '99999999-9999-4999-8999-999999999999';
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Returning Member'
+  ),
+  0::bigint,
+  'a later sign-in does not recreate a membership that offboarding removed'
+);
+
+-- Unlinking used to remove the organization email a domain membership rested
+-- on while leaving the membership active, which let a borrowed organization
+-- account be cashed in for membership and then erased.
+insert into public.people (full_name, portal_access_status, source)
+values ('Unlink Member', 'active', 'manual');
+
+insert into public.person_emails (
+  person_id,
+  email,
+  email_type,
+  is_primary,
+  source
+)
+select person.id, 'unlink.personal@example.com', 'personal', true, 'manual'
+from public.people as person
+where person.full_name = 'Unlink Member';
+
+insert into public.person_emails (
+  person_id,
+  email,
+  email_type,
+  is_primary,
+  source
+)
+select person.id, 'unlink.org@norstec.no', 'organization', false, 'manual'
+from public.people as person
+where person.full_name = 'Unlink Member';
+
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  is_sso_user,
+  is_anonymous
+)
+values
+  (
+    '77777777-7777-4777-8777-777777777777',
+    'authenticated',
+    'authenticated',
+    'unlink.personal@example.com',
+    now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Unlink Member"}'::jsonb,
+    now(),
+    now(),
+    false,
+    false
+  ),
+  (
+    '88888888-8888-4888-8888-888888888888',
+    'authenticated',
+    'authenticated',
+    'unlink.org@norstec.no',
+    now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Unlink Member"}'::jsonb,
+    now(),
+    now(),
+    false,
+    false
+  );
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.unlink_own_portal_account(
+      '88888888-8888-4888-8888-888888888888'::uuid
+    )
+  $$,
+  'P0001',
+  'membership_requires_account',
+  'the account an active domain membership rests on cannot be unlinked'
+);
+
+reset role;
+
+update public.memberships
+set status = 'ended',
+    ends_on = current_date,
+    ended_at = now()
+where person_id = (
+    select id from public.people where full_name = 'Unlink Member'
+  )
+  and status = 'active';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.unlink_own_portal_account(
+      '88888888-8888-4888-8888-888888888888'::uuid
+    )
+  $$,
+  'the same account unlinks once the membership has been ended'
+);
+
+reset role;
+
+-- Access review lifecycle: an administrator decides a request, the requester
+-- reads the decision, and a request that is still open can be withdrawn.
+-- Row level security hides other people's portal_accounts rows, so the request
+-- under test is pinned in a temporary table instead of looked up per role.
+reset role;
+
+create temporary table access_review_target as
+select request.id
+from public.access_requests as request
+join public.portal_accounts as account on account.person_id = request.person_id
+where account.auth_user_id = '22222222-2222-4222-8222-222222222222'
+  and request.status = 'pending';
+
+grant select on access_review_target to authenticated;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.review_access_request(
+      (select id from access_review_target),
+      'rejected',
+      'Ask your organization to add your address first.'
+    )
+  $$,
+  'an administrator can decline a pending access request'
+);
+
+reset role;
+
+-- Declining is an erasure, not a status. The applicant only ever existed
+-- because they asked, so the request, the profile, and the Google sign-in go
+-- together and the audit event carries the decision on alone.
+select is(
+  (
+    select count(*)
+    from public.access_requests
+    where id = (select id from access_review_target)
+  ),
+  0::bigint,
+  'a declined request is removed with the profile behind it'
+);
+
+select is(
+  (
+    select count(*)
+    from public.people
+    where full_name = 'Personal User'
+  ),
+  0::bigint,
+  'declining deletes the applicant profile'
+);
+
+select is(
+  (
+    select count(*)
+    from auth.users
+    where id = '22222222-2222-4222-8222-222222222222'
+  ),
+  0::bigint,
+  'declining deletes the Google sign-in the applicant used'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'access_request_rejected'
+  ),
+  1::bigint,
+  'the decision survives in the audit log'
+);
+
+-- A second applicant, so withdrawing a still-open request can be tested after
+-- the declined one has been erased.
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  is_sso_user,
+  is_anonymous
+)
+values (
+  'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  'authenticated',
+  'authenticated',
+  'withdrawer@example.com',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Withdrawing Applicant"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}',
+  true
+);
+
+select public.submit_access_request(
+  null,
+  'Withdrawing',
+  'Applicant',
+  'Computer Science',
+  null::smallint,
+  'Requesting alumni access',
+  'alumni'
+);
+
+reset role;
+
+create temporary table access_withdraw_target as
+select request.id
+from public.access_requests as request
+join public.portal_accounts as account on account.person_id = request.person_id
+where account.auth_user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  and request.status = 'pending';
+
+grant select on access_withdraw_target to authenticated;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.cancel_own_access_request(
+      (select id from access_withdraw_target)
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'no one can withdraw another person access request'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.cancel_own_access_request(
+      (select id from access_withdraw_target)
+    )
+  $$,
+  'a requester can withdraw their own pending request'
+);
+
+select is(
+  (
+    select status
+    from public.access_requests
+    where id = (select id from access_withdraw_target)
+  ),
+  'cancelled',
+  'withdrawing marks the request as cancelled'
+);
+
+select throws_ok(
+  $$
+    select public.cancel_own_access_request(
+      (select id from access_withdraw_target)
+    )
+  $$,
+  'P0001',
+  'request_not_pending',
+  'a withdrawn request cannot be withdrawn twice'
+);
+
+reset role;
+
+-- Portal management: suspending, deleting, purging, and merging a person are
+-- portal-admin-only operations that exist nowhere else in the product.
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  is_sso_user,
+  is_anonymous
+)
+values (
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  'authenticated',
+  'authenticated',
+  'managed@example.com',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Managed Person"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+create temporary table portal_management_people as
+select
+  (
+    select person_id
+    from public.portal_accounts
+    where auth_user_id = '11111111-1111-4111-8111-111111111111'
+  ) as admin_person_id,
+  (
+    select person_id
+    from public.portal_accounts
+    where auth_user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  ) as managed_person_id;
+
+grant select on portal_management_people to authenticated;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.set_person_portal_access(
+      (select managed_person_id from portal_management_people),
+      'suspended'
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot suspend portal access'
+);
+
+select throws_ok(
+  $$
+    select public.soft_delete_person(
+      (select managed_person_id from portal_management_people),
+      null
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot delete a person'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.set_person_portal_access(
+      (select admin_person_id from portal_management_people),
+      'suspended'
+    )
+  $$,
+  'P0001',
+  'self_action_blocked',
+  'a portal administrator cannot suspend their own access'
+);
+
+select throws_ok(
+  $$
+    select public.set_portal_administrator(
+      (select admin_person_id from portal_management_people),
+      false
+    )
+  $$,
+  'P0001',
+  'self_action_blocked',
+  'a portal administrator cannot revoke their own role'
+);
+
+select lives_ok(
+  $$
+    select public.set_person_portal_access(
+      (select managed_person_id from portal_management_people),
+      'suspended'
+    )
+  $$,
+  'a portal administrator can suspend portal access'
+);
+
+reset role;
+
+select is(
+  (
+    select portal_access_status
+    from public.people
+    where id = (select managed_person_id from portal_management_people)
+  ),
+  'suspended',
+  'suspension is stored on the person'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'portal_access.suspended'
+      and target_person_id
+        = (select managed_person_id from portal_management_people)
+  ),
+  1::bigint,
+  'suspending portal access is audited'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+reset role;
+
+select lives_ok(
+  $$
+    insert into public.memberships (
+      person_id, organization_id, role, status, provisioning_method, starts_on
+    )
+    select
+      (select managed_person_id from portal_management_people),
+      organization.id,
+      'member',
+      'active',
+      'manual',
+      current_date
+    from public.organizations as organization
+    where organization.slug = 'orbit-ntnu'
+  $$,
+  'a person can hold an active membership before being deleted'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.soft_delete_person(
+      (select managed_person_id from portal_management_people),
+      'duplicate profile'
+    )
+  $$,
+  'a portal administrator can delete a person, ending their memberships'
+);
+
+reset role;
+
+select is(
+  (
+    select person.portal_access_status || ':' || membership.status
+    from public.people as person
+    join public.memberships as membership on membership.person_id = person.id
+    where person.id = (select managed_person_id from portal_management_people)
+      and person.deleted_at is not null
+      and person.access_status_before_deletion = 'suspended'
+  ),
+  'suspended:ended',
+  'deletion suspends access, remembers the previous state, and ends the membership'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+
+select is(
+  (
+    select count(*)
+    from public.people
+    where id = (select managed_person_id from portal_management_people)
+  ),
+  0::bigint,
+  'a deleted person disappears for ordinary members'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select is(
+  (
+    select count(*)
+    from public.people
+    where id = (select managed_person_id from portal_management_people)
+  ),
+  1::bigint,
+  'a deleted person stays visible to portal administrators'
+);
+
+select throws_ok(
+  $$
+    select public.purge_person(
+      (select managed_person_id from portal_management_people),
+      now() - interval '1 hour'
+    )
+  $$,
+  'P0001',
+  'purge_conflict',
+  'purging requires the exact deletion the administrator saw'
+);
+
+select lives_ok(
+  $$
+    select public.restore_person(
+      (select managed_person_id from portal_management_people)
+    )
+  $$,
+  'a deleted person can be restored'
+);
+
+reset role;
+
+select is(
+  (
+    select portal_access_status
+    from public.people
+    where id = (select managed_person_id from portal_management_people)
+      and deleted_at is null
+  ),
+  'suspended',
+  'restoring returns the access state the person had before deletion'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.soft_delete_person(
+      (select managed_person_id from portal_management_people),
+      null
+    )
+  $$,
+  'a restored person can be deleted again'
+);
+
+select lives_ok(
+  $$
+    select public.purge_person(
+      (select managed_person_id from portal_management_people),
+      (
+        select deleted_at
+        from public.people
+        where id = (select managed_person_id from portal_management_people)
+      )
+    )
+  $$,
+  'a deleted person can be purged'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.people
+    where id = (select managed_person_id from portal_management_people)
+  ),
+  0::bigint,
+  'purging removes the person row'
+);
+
+select is(
+  (
+    select count(*)
+    from auth.users
+    where email = 'managed@example.com'
+  ),
+  0::bigint,
+  'purging removes the Auth identity behind the person'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'person.purged'
+  ),
+  1::bigint,
+  'purging is audited without naming the purged person'
+);
+
+-- Duplicate repair: two profiles for the same human, one of them holding the
+-- organization membership.
+insert into public.people (full_name, portal_access_status, source)
+values ('Duplicate Keeper', 'unclaimed', 'manual');
+
+insert into public.people (full_name, portal_access_status, source)
+values ('Duplicate Copy', 'active', 'manual');
+
+insert into public.person_emails (person_id, email, email_type, is_primary, source)
+select id, 'duplicate.keeper@norstec.no', 'organization', true, 'manual'
+from public.people
+where full_name = 'Duplicate Keeper';
+
+insert into public.person_emails (person_id, email, email_type, is_primary, source)
+select id, 'duplicate.copy@example.com', 'personal', true, 'manual'
+from public.people
+where full_name = 'Duplicate Copy';
+
+insert into public.memberships (
+  person_id, organization_id, role, status, provisioning_method
+)
+select person.id, organization.id, 'member', 'ended', 'manual'
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Duplicate Keeper'
+  and organization.slug = 'norstec';
+
+insert into public.memberships (
+  person_id, organization_id, role, status, provisioning_method
+)
+select person.id, organization.id, 'member', 'active', 'manual'
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Duplicate Copy'
+  and organization.slug = 'norstec';
+
+insert into public.portal_administrators (person_id)
+select id from public.people where full_name = 'Duplicate Copy';
+
+create temporary table duplicate_people as
+select
+  (select id from public.people where full_name = 'Duplicate Keeper') as keeper_id,
+  (select id from public.people where full_name = 'Duplicate Copy') as copy_id;
+
+grant select on duplicate_people to authenticated;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.merge_people(
+      (select keeper_id from duplicate_people),
+      (select copy_id from duplicate_people),
+      null
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot merge two profiles'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.merge_people(
+      (select keeper_id from duplicate_people),
+      (select copy_id from duplicate_people),
+      'duplicate.copy@example.com'
+    )
+  $$,
+  'a portal administrator can merge a duplicate profile'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.people
+    where id = (select copy_id from duplicate_people)
+  ),
+  0::bigint,
+  'merging removes the duplicate profile'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where person_id = (select keeper_id from duplicate_people)
+  ),
+  2::bigint,
+  'merging moves every email address to the surviving profile'
+);
+
+select is(
+  (
+    select email
+    from public.person_emails
+    where person_id = (select keeper_id from duplicate_people)
+      and is_primary
+  ),
+  'duplicate.copy@example.com',
+  'merging honours the chosen primary address'
+);
+
+select is(
+  (
+    select status
+    from public.memberships
+    where person_id = (select keeper_id from duplicate_people)
+  ),
+  'active',
+  'merging folds two memberships in one organization into the live one'
+);
+
+select is(
+  (
+    select count(*)
+    from public.membership_periods as period
+    join public.memberships as membership on membership.id = period.membership_id
+    where membership.person_id = (select keeper_id from duplicate_people)
+      and period.ends_on is null
+  ),
+  1::bigint,
+  'the merged membership keeps exactly one open period'
+);
+
+select is(
+  (
+    select count(*)
+    from public.portal_administrators
+    where person_id = (select keeper_id from duplicate_people)
+  ),
+  0::bigint,
+  'merging never carries the portal administrator role over'
 );
 
 select * from finish();

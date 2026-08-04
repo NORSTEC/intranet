@@ -15,7 +15,8 @@ rules.
 - **Alumni** is a derived person-level label: no active organization memberships
   and at least one ended organization membership.
 - **Portal access** is separate from membership. Alumni keep ordinary portal
-  access until they choose `Leave portal` or a portal administrator suspends it.
+  access until a portal administrator suspends it or the person deletes their
+  own account.
 
 ## Derived person status
 
@@ -25,13 +26,16 @@ flowchart TD
     B -- Yes --> C["Active"]
     B -- No --> D{"Any ended membership?"}
     D -- Yes --> E["Alumni"]
-    D -- No --> F{"Pending access request?"}
-    F -- Yes --> G["Applicant"]
-    F -- No --> H["No membership"]
+    D -- No --> F["Applicant: no portal user yet"]
 ```
 
-The `Active` and `Alumni` labels above do not replace account status. A person
-can be an alumnus while portal access is enabled, suspended, or deactivated.
+Only `Active` and `Alumni` describe a user of the portal. A person with no
+membership at all is an applicant whose request is still waiting or was
+declined, and a declined request takes the profile with it, so the state is
+never a resting place.
+
+The `Active` and `Alumni` labels do not replace account status. A person can be
+an alumnus while portal access is enabled or suspended.
 
 ## Ending an organization membership
 
@@ -121,23 +125,82 @@ For every deployed Supabase environment, manual identity linking and the
 `identity linked` and `identity unlinked` security notification templates must
 remain disabled so the flow sends no email.
 
-## Leaving the portal
+## Deleting your own account
 
 ```mermaid
 flowchart TD
-    A["Person selects Leave portal"] --> B{"Any active organization membership?"}
-    B -- Yes --> C["Block: organization membership must be ended first"]
-    B -- No --> D{"Portal administrator?"}
-    D -- Yes --> E["Block until portal-admin responsibility is transferred"]
-    D -- No --> F["Set portal access to deactivated"]
-    F --> G["Sign out all refresh-token sessions"]
-    G --> H["Keep membership periods and required audit history"]
+    A["Person selects Delete my account"] --> B{"Portal administrator?"}
+    B -- Yes --> C["Block until portal-admin responsibility is transferred"]
+    B -- No --> D{"Last active admin of an organization?"}
+    D -- Yes --> E["Block until another organization admin is appointed"]
+    D -- No --> F["End active memberships, membership periods, and team roles"]
+    F --> G["Soft delete the person and revoke every session"]
+    G --> H["Purge permanently 30 days later"]
 ```
 
-`Leave portal` is not GDPR erasure. Re-enabling a deactivated account requires a
-controlled administrator process. Full erasure is a separate portal-admin
-workflow that must handle Auth identities, Storage objects, personal profile
-data, legal retention, and audit anonymization together.
+Portal access has exactly two states a person can be in: they can sign in, or
+they cannot. There is no separate self-service state that only disables
+sign-in — a person asking to leave is asking to be deleted, and GDPR requires
+that erasure actually happens. Deleting is therefore the only self-service
+exit, and it is the same operation a portal administrator runs, on the same
+30-day retention.
+
+The 30 days are a recovery window, not a review queue. Restoring within them
+requires a portal administrator, so the interface tells the person to email
+portal@norstec.no. Restoring returns the person and their portal access;
+memberships that ended with the deletion stay ended, because reactivating one
+is the organization's decision and starts a new period.
+
+Erasure is enforced by a scheduled database job rather than by an
+administrator remembering, and it removes Auth identities, personal rows, and
+the avatar object. Audit events survive with every reference to the person
+removed.
+
+## Portal management
+
+Suspending access, deleting a person, purging their data, and merging duplicate
+profiles exist only in Portal management and only for portal administrators.
+Organization administration stops at membership state.
+
+```mermaid
+flowchart TD
+    A["Portal admin opens a person"] --> B{"Action"}
+    B -- Suspend --> C["Block sign-in and revoke sessions"]
+    C --> D["Reversible: set back to active"]
+    B -- Delete --> E{"Portal administrator?"}
+    E -- Yes --> F["Block: revoke the role first"]
+    E -- No --> G{"Last active admin of an organization?"}
+    G -- Yes --> H["Block: appoint another organization admin first"]
+    G -- No --> I["End memberships and team roles, then soft delete"]
+    I --> J{"Next decision"}
+    J -- Restore --> K["Return the access state held before deletion"]
+    J -- Purge --> L["Delete Auth identities, personal rows, and the avatar object"]
+    J -- "30 days pass" --> L
+    L --> M["Keep audit events with person references removed"]
+```
+
+Deletion is deliberately two stages. GDPR requires erasure without undue delay,
+not in the same transaction as the decision, so the reversible stage is safe and
+gives a recovery path for a mistaken deletion. Purging is irreversible and names
+the exact deletion it finishes, so a stale page cannot purge somebody who was
+restored in the meantime.
+
+`Manage users` lists a person only once they hold, or have held, an
+organization membership, plus every portal administrator. A profile that a
+Google sign-in created but that never led to a membership belongs to `Access
+review`, not to the user table: while the request waits it is a request, and
+declining it deletes the profile, its emails, and its Google sign-in outright.
+The audit event is the only thing a declined request leaves behind. The
+table states one access level per person: portal admin, organization admin,
+member, or suspended. `Deleted users` is the separate list of people inside
+the 30-day recovery window.
+
+Merging keeps the target profile and folds the duplicate into it: emails,
+sign-in accounts, memberships and their periods, team roles, requests, profile
+experiences, and audit history all move, and two memberships in one organization
+become one that keeps the live state and every separate period. A merge never
+carries the portal-administrator role over and never promotes a membership role;
+roles are only ever assigned by an explicit, audited operation.
 
 ## Edge-case decisions
 
@@ -153,6 +216,7 @@ data, legal retention, and audit anonymization together.
 | Person links a second approved organization account | Keep one person and create only the missing organization membership. |
 | Linked domain membership already ended | Keep it ended; identity linking never reactivates it. |
 | Linked email belongs to another profile | Block linking and require controlled duplicate review. |
+| Duplicate profiles are confirmed | A portal admin merges them; the surviving profile keeps its own fields and role. |
 | Existing user arrives with an unknown account | Instruct them to sign in with an existing account and link it from Profile. |
 | Alumni wants a future membership | No alumni application flow in the current release. |
 | Domain user signs in after being ended | Sign-in must not reactivate the membership. |
@@ -162,4 +226,6 @@ data, legal retention, and audit anonymization together.
 | Repeated or concurrent status action | Lock the membership row and make identical transitions idempotent. |
 | Ordinary admin selects Delete | Hard deletion is unavailable; use End membership. |
 | Person wants to leave the portal | Deactivate portal access after all active memberships have ended. |
-| Person requests GDPR erasure | Use a separate global workflow; never treat membership deletion as erasure. |
+| Person requests GDPR erasure | Use Portal management: delete, then purge; never treat membership deletion as erasure. |
+| Deleted person is still needed | Restore returns the access state held before the deletion, until the data is purged. |
+| Purged person appears in the audit log | The event stays; its person references are null and personal fields are stripped. |

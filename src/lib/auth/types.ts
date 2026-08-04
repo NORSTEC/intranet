@@ -36,7 +36,7 @@ export type PortalAccessState =
   | { status: "error" }
   | {
       status: "inactive";
-      reason: "unclaimed" | "suspended" | "deactivated";
+      reason: "unclaimed" | "suspended" | "deleted";
     }
   | {
       status: "authenticated";

@@ -28,7 +28,8 @@ organization memberships; it is not a separate membership type.
 - Manage organizations, teams, and roles
 - End and reactivate organization memberships while retaining history
 - Link multiple verified Google accounts to one portal profile
-- Allow an alumnus with no active memberships to deactivate portal access
+- Let a person delete their own account, with a 30-day recovery window before
+  permanent erasure
 - Synchronize approved membership changes with Slack
 - Record administrative and integration events in an audit log
 

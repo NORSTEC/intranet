@@ -21,7 +21,11 @@ type TeamMembershipRow = {
 
 export default async function DashboardPage() {
   const access = await requirePortalAccess();
-  const canAdminister = access.memberships.some((membership) => membership.role !== "member");
+  // Portal administrators decide alumni requests without holding any
+  // organization admin role, so the review card has to reach them too.
+  const canAdminister =
+    access.isPortalAdmin ||
+    access.memberships.some((membership) => membership.role !== "member");
   const supabase = await createClient();
 
   const [teamsResult, requestsResult] = await Promise.all([
@@ -107,7 +111,9 @@ export default async function DashboardPage() {
                 <span>
                   <span className="block text-h3 font-medium">Review access requests</span>
                   <span className="mt-2 block text-sm opacity-55">
-                    {requestsResult.count} requests are waiting
+                    {requestsResult.count === 1
+                      ? "1 request is waiting for a decision"
+                      : `${requestsResult.count} requests are waiting for a decision`}
                   </span>
                 </span>
                 <span className="portal-pill portal-pill-filled">

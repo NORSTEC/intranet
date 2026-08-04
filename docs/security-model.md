@@ -53,6 +53,9 @@ Roles must always be assigned through an authorized and audited operation.
 | Manage teams in assigned organization | No | Yes | All organizations |
 | Manage organization settings | No | Yes | All organizations |
 | Assign administrator roles | No | No | Yes |
+| Suspend or restore portal access | No | No | Yes |
+| Delete, restore, or purge a person | No | No | Yes |
+| Merge duplicate profiles | No | No | Yes |
 | Access system-wide audit information | No | No | Yes |
 
 ## Authorization rules
@@ -70,8 +73,20 @@ Roles must always be assigned through an authorized and audited operation.
   user-editable metadata supplied by the browser.
 - Ending a membership is organization-scoped and preserves its periods and
   audit history. Reactivation starts a new period with the safe `member` role.
-- Portal access is independent of organization membership. Self-deactivation is
-  allowed only after every active membership has ended and is not data erasure.
+- Portal access is independent of organization membership and has two states:
+  sign-in is allowed, or it is suspended by a portal administrator.
+- Erasure is two staged operations: a reversible deletion that ends the
+  person's memberships, hides them, and revokes their sessions, and an
+  irreversible purge that removes Auth identities, Storage objects, and
+  personal rows while keeping audit events without any reference to the person.
+  A person may start it on their own profile; only a portal administrator may
+  start it on somebody else's.
+- The purge runs automatically 30 days after the deletion, scheduled in the
+  database so that no administrator action is required for erasure to happen.
+- A declined access request deletes the profile it was made from, including its
+  Google sign-in, and leaves only the audit event behind.
+- Merging duplicate profiles never grants a permission. The portal-admin role is
+  not carried over and no membership role is promoted.
 - Administrative access requires an additional authentication factor before
   production launch.
 

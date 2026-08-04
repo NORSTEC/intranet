@@ -183,7 +183,7 @@ export function AddTeamExperience({
                     organizationName: event.target.value,
                     teams: [],
                   })}
-                  placeholder="e.g. Norstec or another organization"
+                  placeholder="e.g. NORSTEC or another organization"
                   required
                   value={draft.organizationName}
                 />

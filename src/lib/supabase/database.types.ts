@@ -438,10 +438,14 @@ export type Database = {
       }
       people: {
         Row: {
+          access_status_before_deletion: string | null
           alumni_access_granted_at: string | null
           avatar_alt: string | null
           avatar_path: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_by_person_id: number | null
+          deletion_reason: string | null
           field_of_study: string | null
           first_name: string | null
           full_name: string | null
@@ -456,10 +460,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_status_before_deletion?: string | null
           alumni_access_granted_at?: string | null
           avatar_alt?: string | null
           avatar_path?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_person_id?: number | null
+          deletion_reason?: string | null
           field_of_study?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -474,10 +482,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_status_before_deletion?: string | null
           alumni_access_granted_at?: string | null
           avatar_alt?: string | null
           avatar_path?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by_person_id?: number | null
+          deletion_reason?: string | null
           field_of_study?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -491,7 +503,15 @@ export type Database = {
           study_year?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "people_deleted_by_person_id_fkey"
+            columns: ["deleted_by_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       person_emails: {
         Row: {
@@ -843,6 +863,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_own_access_request: {
+        Args: { p_request_id: number }
+        Returns: undefined
+      }
       complete_own_organization_onboarding: { Args: never; Returns: Json }
       complete_portal_account_link: {
         Args: { p_token_hash: string }
@@ -879,15 +903,28 @@ export type Database = {
         }
         Returns: Json
       }
-      deactivate_own_portal_access: { Args: never; Returns: undefined }
+      delete_own_account: { Args: never; Returns: undefined }
       delete_team: {
         Args: { p_team_id: number }
         Returns: undefined
+      }
+      merge_people: {
+        Args: {
+          p_primary_email?: string | null
+          p_source_person_id: number
+          p_target_person_id: number
+        }
+        Returns: undefined
+      }
+      purge_person: {
+        Args: { p_expected_deleted_at: string; p_person_id: number }
+        Returns: string | null
       }
       restore_own_team_experience: {
         Args: { p_expected_updated_at: string; p_team_membership_id: number }
         Returns: string
       }
+      restore_person: { Args: { p_person_id: number }; Returns: undefined }
       review_access_request: {
         Args: {
           p_decision: string
@@ -994,8 +1031,25 @@ export type Database = {
         }
         Returns: string
       }
+      set_membership_role: {
+        Args: { p_membership_id: number; p_role: string }
+        Returns: undefined
+      }
       set_organization_membership_status: {
         Args: { p_membership_id: number; p_status: string }
+        Returns: undefined
+      }
+      set_person_portal_access: {
+        Args: { p_person_id: number; p_status: string }
+        Returns: undefined
+      }
+      set_portal_administrator: {
+        Args: { p_is_administrator: boolean; p_person_id: number }
+        Returns: undefined
+      }
+      sign_in_block_reason: { Args: never; Returns: string | null }
+      soft_delete_person: {
+        Args: { p_person_id: number; p_reason?: string | null }
         Returns: undefined
       }
       start_portal_account_link: {
@@ -1025,7 +1079,6 @@ export type Database = {
         }
         Returns: number
       }
-      sync_linked_google_identities: { Args: never; Returns: Json }
       unlink_own_portal_account: {
         Args: { p_auth_user_id: string }
         Returns: Json

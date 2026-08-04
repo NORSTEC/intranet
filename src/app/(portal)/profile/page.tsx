@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeleteAccountSettings } from "@/components/portal/delete-account-settings";
 import {
   LoginAccountsSettings,
   type LinkedLoginAccount,
@@ -8,6 +9,18 @@ import { Toast } from "@/components/portal/toast";
 import { requirePortalAccess } from "@/lib/auth/access";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
+
+const accountLinkErrors: Record<string, string> = {
+  expired: "The account-link request expired. Please try again.",
+  limit: "You can only connect one alternative Google account.",
+  oauth: "Google sign-in could not be completed. Please try again.",
+  profile_has_data:
+    "That account belongs to a portal profile with existing data. Contact NORSTEC IT to merge the profiles.",
+  same: "Choose a different Google account.",
+  source_inactive:
+    "That account belongs to a portal profile without portal access. Contact NORSTEC IT.",
+  start: "Account linking could not be started. Please try again.",
+};
 
 type ProfileExperience = {
   id: number;
@@ -141,25 +154,15 @@ export default async function ProfilePage({
       {accountLinkError && (
         <Toast
           clearParams={["accountLinkError"]}
-          message={accountLinkError === "limit"
-              ? "You can only connect one alternative Google account."
-            : accountLinkError === "same"
-              ? "Choose a different Google account."
-            : accountLinkError === "profile_has_data"
-              ? "That account belongs to a portal profile with existing data. Contact Norstec IT to merge the profiles."
-            : accountLinkError === "expired"
-              ? "The account-link request expired. Please try again."
-            : "The Google account could not be linked. Please try again."}
+          message={
+            accountLinkErrors[accountLinkError] ??
+            "The Google account could not be linked. Please try again."
+          }
           status="error"
         />
       )}
       <MemberProfileView
-        accountSettings={(
-          <LoginAccountsSettings
-            accounts={loginAccounts}
-            canLeavePortal={status === "Alumni" && !access.isPortalAdmin}
-          />
-        )}
+        accountSettings={<LoginAccountsSettings accounts={loginAccounts} />}
         action={
           <Link className="portal-button" href="/profile/edit">
             <span className="material-symbols-outlined text-[1.1rem]">edit</span>
@@ -168,6 +171,7 @@ export default async function ProfilePage({
         }
         avatarAlt={access.profile.avatarAlt}
         avatarUrl={avatarUrl}
+        dangerZone={<DeleteAccountSettings />}
         email={primaryEmail}
         experience={experience}
         fieldOfStudy={access.profile.fieldOfStudy}

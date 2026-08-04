@@ -36,7 +36,7 @@ const generalNavigation: NavigationItem[] = [
 
 const administrationNavigation: NavigationItem[] = [
   {
-    label: "Access requests",
+    label: "Access review",
     href: "/administration/access-requests",
     icon: "person_check",
     admin: "organization",
@@ -66,12 +66,7 @@ const administrationNavigation: NavigationItem[] = [
     label: "Portal management",
     href: "/admin",
     icon: "admin_panel_settings",
-    admin: "portal",
-  },
-  {
-    label: "Audit log",
-    href: "/admin/audit-log",
-    icon: "history",
+    nested: true,
     admin: "portal",
   },
 ];
@@ -79,9 +74,11 @@ const administrationNavigation: NavigationItem[] = [
 const breadcrumbLabels: Record<string, string> = {
   admin: "Portal management",
   administration: "Administration",
-  "access-requests": "Access requests",
+  "access-requests": "Access review",
   "audit-log": "Audit log",
+  deleted: "Deleted users",
   members: "Members",
+  people: "Manage users",
   organization: "Organization",
   organizations: "Organizations",
   profile: "Profile",
@@ -391,7 +388,7 @@ function DesktopSidebar({
             </span>
               <span className={`whitespace-nowrap transition-opacity duration-150 ${collapsed ? "opacity-0" : "opacity-100"}`}>
                 <span className="relative -left-px block font-display text-xl font-light uppercase tracking-[0.14em]">
-                  Norstec
+                  NORSTEC
                 </span>
                 <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.34em] opacity-55">
                   Portal

@@ -23,7 +23,7 @@ export default async function LoginPage({
             <EggNorstecLogo />
             <div className="text-left">
               <p className="-ml-[0.06em] text-5xl font-light uppercase tracking-[0.16em] text-[#EDE8DA] xl:text-6xl">
-                Norstec
+                NORSTEC
               </p>
               <p className="mt-3 text-left text-base font-medium uppercase tracking-[0.46em] text-[#EDE8DA]/65">
                 Portal
@@ -59,24 +59,19 @@ export default async function LoginPage({
               Portal access could not be checked. Please try again.
             </p>
           )}
-          {error === "deactivated" && (
+          {error === "deleted" && (
             <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
-              This portal account has been deactivated. Contact Norstec IT if you want to return.
+              This account has been deleted and is erased permanently 30 days after the deletion. Email portal@norstec.no before then if you want it back.
             </p>
           )}
           {error === "suspended" && (
             <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
-              This portal account is suspended. Contact Norstec IT for help.
+              This portal account is suspended. Contact NORSTEC IT for help.
             </p>
           )}
           {error === "account_unlinked" && (
             <p className="mt-3 text-sm" role="status">
               That Google account was removed from your profile, so you were signed out. Sign in with your other account to continue.
-            </p>
-          )}
-          {error === "account_link" && (
-            <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
-              The Google accounts could not be connected. You were signed out to prevent switching to the wrong profile. Sign in with your original account and try again.
             </p>
           )}
 
@@ -85,7 +80,7 @@ export default async function LoginPage({
             <ol className="mt-5 space-y-5">
               <li className="flex gap-4">
                 <span className="material-symbols-outlined mt-0.5 text-[1.3rem]">domain</span>
-                <div><p className="text-sm font-medium">Organization account</p><p className="mt-1 text-sm leading-5 opacity-55">Use the Google account provided by a Norstec member organization. On first sign-in, you can connect it to an existing portal profile or create a new one.</p></div>
+                <div><p className="text-sm font-medium">Organization account</p><p className="mt-1 text-sm leading-5 opacity-55">Use the Google account provided by a NORSTEC member organization. On first sign-in, you can connect it to an existing portal profile or create a new one.</p></div>
               </li>
               <li className="flex gap-4">
                 <span className="material-symbols-outlined mt-0.5 text-[1.3rem]">person</span>

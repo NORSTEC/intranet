@@ -33,13 +33,14 @@ export async function unlinkLoginAccount(
       ? "The primary sign-in account cannot be removed."
       : error.message.includes("last_portal_account")
         ? "You must keep at least one sign-in account."
-        : "That sign-in account could not be removed.";
+        : error.message.includes("membership_requires_account")
+          ? "An active organization membership rests on this account. Ask an organization administrator to end the membership first."
+          : "That sign-in account could not be removed.";
     return { ok: false, message };
   }
 
   // The removed account no longer reaches this profile, so a session held by
-  // it has to end. Linking leaves you signed in as the account you just
-  // added, which makes this the common case rather than the edge case.
+  // it has to end.
   if (authUserId === access.profile.userId) {
     await supabase.auth.signOut();
     redirect("/login?error=account_unlinked");
@@ -49,26 +50,24 @@ export async function unlinkLoginAccount(
   return { ok: true };
 }
 
-export type DeactivatePortalAccessResult =
-  | { ok: false; message: string }
-  | never;
+export type DeleteOwnAccountResult = { ok: false; message: string } | never;
 
-export async function deactivatePortalAccess(): Promise<DeactivatePortalAccessResult> {
+export async function deleteOwnAccount(): Promise<DeleteOwnAccountResult> {
   await requirePortalAccess();
   const supabase = await createClient();
-  const { error } = await supabase.rpc("deactivate_own_portal_access");
+  const { error } = await supabase.rpc("delete_own_account");
 
   if (error) {
-    const message = error.message.includes("active_membership_exists")
-      ? "All active organization memberships must end before you can leave the portal."
-      : error.message.includes("portal_admin_transfer_required")
-        ? "Transfer your portal administrator responsibility before leaving the portal."
-        : "Portal access could not be deactivated.";
+    const message = error.message.includes("portal_admin_transfer_required")
+      ? "Hand your portal administrator responsibility to somebody else before deleting your account."
+      : error.message.includes("last_organization_admin")
+        ? "You are the last active administrator of an organization. Appoint another administrator before deleting your account."
+        : "Your account could not be deleted. Email portal@norstec.no for help.";
     return { ok: false, message };
   }
 
   await supabase.auth.signOut({ scope: "global" });
-  redirect("/login?error=deactivated");
+  redirect("/login?error=deleted");
 }
 
 function textValue(formData: FormData, key: string) {

@@ -22,8 +22,17 @@ type ProfileRow = {
   study_year: number | null;
   phone_number: string | null;
   linkedin_url: string | null;
-  portal_access_status: "unclaimed" | "active" | "suspended" | "deactivated";
+  portal_access_status: "unclaimed" | "active" | "suspended";
 };
+
+type SignInBlockReason = "unclaimed" | "suspended" | "deleted";
+
+async function signInBlockReason(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<SignInBlockReason | null> {
+  const { data, error } = await supabase.rpc("sign_in_block_reason");
+  return error || !data ? null : (data as SignInBlockReason);
+}
 
 type PortalAccountRow = {
   auth_user_id: string;
@@ -92,13 +101,18 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
   const profileRow = Array.isArray(accountRow.people)
     ? accountRow.people[0]
     : accountRow.people;
+  // A deleted person is hidden from their own row, so an absent profile is
+  // the expected shape of a deleted account rather than a failure.
   if (!profileRow) {
-    return { status: "error" };
+    const blockReason = await signInBlockReason(supabase);
+    return blockReason
+      ? { status: "inactive", reason: blockReason }
+      : { status: "error" };
   }
   if (profileRow.portal_access_status !== "active") {
     return {
       status: "inactive",
-      reason: profileRow.portal_access_status,
+      reason: (await signInBlockReason(supabase)) ?? profileRow.portal_access_status,
     };
   }
   const membershipRows = (membershipsResult.data ?? []) as MembershipRow[];

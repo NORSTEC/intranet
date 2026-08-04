@@ -1,39 +1,54 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireOrganizationAdminAccess } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 
-function requestId(formData: FormData) {
-  const value = Number(formData.get("requestId"));
-  return Number.isSafeInteger(value) && value > 0 ? value : null;
-}
+export type ReviewActionResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string };
 
-function decision(formData: FormData) {
-  const value = formData.get("decision");
-  return value === "approved" || value === "rejected" ? value : null;
-}
-
-async function review(formData: FormData) {
+export async function reviewAccessRequest(input: {
+  decision: "approved" | "rejected";
+  note: string;
+  requestId: number;
+}): Promise<ReviewActionResult> {
   await requireOrganizationAdminAccess();
-  const id = requestId(formData);
-  const nextStatus = decision(formData);
-  if (!id || !nextStatus) redirect("/administration/access-requests?error=invalid_request");
+  const note = input.note.trim();
+
+  if (
+    !Number.isSafeInteger(input.requestId) ||
+    input.requestId <= 0 ||
+    (input.decision !== "approved" && input.decision !== "rejected") ||
+    note.length > 1000
+  ) {
+    return { ok: false, message: "The request could not be reviewed." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("review_access_request", {
-    p_decision: nextStatus,
-    p_decision_note: null,
-    p_request_id: id,
+    p_decision: input.decision,
+    p_decision_note: note || null,
+    p_request_id: input.requestId,
   });
 
-  if (error) redirect("/administration/access-requests?error=review_failed");
+  if (error) {
+    const message = error.message.includes("request_not_pending")
+      ? "This request has already been decided."
+      : error.message.includes("not_authorized")
+        ? "You cannot decide this request."
+        : "The request could not be reviewed.";
+    return { ok: false, message };
+  }
+
   revalidatePath("/administration/access-requests");
   revalidatePath("/members");
-  redirect(`/administration/access-requests?reviewed=${nextStatus}`);
-}
-
-export async function reviewAccessRequest(formData: FormData) {
-  return review(formData);
+  revalidatePath("/");
+  return {
+    ok: true,
+    message:
+      input.decision === "approved"
+        ? "Access granted."
+        : "Request declined.",
+  };
 }

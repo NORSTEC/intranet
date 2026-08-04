@@ -61,6 +61,7 @@ export function MemberProfileView({
   action,
   avatarAlt,
   avatarUrl,
+  dangerZone,
   email,
   experience,
   fieldOfStudy,
@@ -74,6 +75,7 @@ export function MemberProfileView({
   action?: ReactNode;
   avatarAlt?: string | null;
   avatarUrl?: string;
+  dangerZone?: ReactNode;
   email: string | null;
   experience: MemberProfileExperience[];
   fieldOfStudy: string | null;
@@ -250,6 +252,8 @@ export function MemberProfileView({
           )}
         </div>
       </section>
+
+      {dangerZone}
     </>
   );
 }

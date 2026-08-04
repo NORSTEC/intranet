@@ -1,8 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
+import {
+  accountLinkFlowCookie,
+  createAccountLinkClient,
+} from "@/lib/supabase/account-link";
 import { createClient } from "@/lib/supabase/server";
 
 const LINK_COOKIE = "portal-account-link";
+const LINK_COOKIE_PATH = "/auth/account-link";
 
 function errorDestination(origin: string, mode: string, reason: string) {
   const path = mode === "use_existing" ? "/onboarding/account" : "/profile";
@@ -40,7 +45,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+  // The OAuth round trip runs on its own client, so the session it produces
+  // never replaces the one the user is signed in with right now.
+  const { client: linkClient, store } = await createAccountLinkClient();
+  const { data, error: oauthError } = await linkClient.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: new URL("/auth/account-link/callback", requestUrl.origin).toString(),
@@ -59,9 +67,12 @@ export async function GET(request: Request) {
   response.cookies.set(LINK_COOKIE, `${mode}.${token}`, {
     httpOnly: true,
     maxAge: 10 * 60,
-    path: "/auth/account-link",
+    path: LINK_COOKIE_PATH,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
+
+  const flowCookie = accountLinkFlowCookie(store);
+  response.cookies.set(flowCookie.name, flowCookie.value, flowCookie.options);
   return response;
 }

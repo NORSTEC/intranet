@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+type PersonAccess = {
+  alumni_access_granted_at: string | null;
+  portal_access_status: string;
+};
+
 type LinkedAccount = {
   onboarding_status: "pending" | "complete";
   person_id: number;
-  people:
-    | { portal_access_status: string }
-    | Array<{ portal_access_status: string }>;
+  people: PersonAccess | PersonAccess[];
 };
 
 export async function GET(request: Request) {
@@ -35,7 +38,9 @@ export async function GET(request: Request) {
 
   const { data: account, error: accountError } = await supabase
     .from("portal_accounts")
-    .select("person_id, onboarding_status, people (portal_access_status)")
+    .select(
+      "person_id, onboarding_status, people (portal_access_status, alumni_access_granted_at)",
+    )
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -48,11 +53,13 @@ export async function GET(request: Request) {
     ? linkedAccount.people[0]
     : linkedAccount.people;
   if (!person || person.portal_access_status !== "active") {
+    // A deleted person cannot read their own row, so the reason comes from a
+    // function rather than from the join above.
+    const { data: blockReason } = await supabase.rpc("sign_in_block_reason");
     await supabase.auth.signOut();
-    const reason = person?.portal_access_status === "deactivated"
-      ? "deactivated"
-      : person?.portal_access_status === "suspended"
-        ? "suspended"
+    const reason =
+      blockReason === "deleted" || blockReason === "suspended"
+        ? blockReason
         : "authorization";
     return NextResponse.redirect(new URL(`/login?error=${reason}`, requestUrl.origin));
   }
@@ -73,7 +80,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=authorization", requestUrl.origin));
   }
 
+  // An approved alumnus holds portal access without any membership row, so
+  // sending them to /access would only bounce them straight back to the portal.
+  const hasPortalAccess = Boolean(membership) || Boolean(person.alumni_access_granted_at);
+
   return NextResponse.redirect(
-    new URL(membership ? "/" : "/access", requestUrl.origin),
+    new URL(hasPortalAccess ? "/" : "/access", requestUrl.origin),
   );
 }

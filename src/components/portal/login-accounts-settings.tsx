@@ -2,10 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import {
-  deactivatePortalAccess,
-  unlinkLoginAccount,
-} from "@/app/(portal)/profile/actions";
+import { unlinkLoginAccount } from "@/app/(portal)/profile/actions";
 
 export type LinkedLoginAccount = {
   email: string;
@@ -23,37 +20,30 @@ function accountTypeLabel(account: LinkedLoginAccount) {
 
 export function LoginAccountsSettings({
   accounts,
-  canLeavePortal,
 }: {
   accounts: LinkedLoginAccount[];
-  canLeavePortal: boolean;
 }) {
   const router = useRouter();
   const [isLinking, setIsLinking] = useState(false);
-  const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<LinkedLoginAccount | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
-  const [leavePending, startLeaveTransition] = useTransition();
   const [unlinkPending, startUnlinkTransition] = useTransition();
   const canLinkAlternativeAccount = accounts.length < 2;
   const hasOnlyOneOrganizationAccount =
     accounts.length === 1 && accounts[0].emailType === "organization";
-  const dialogOpen = confirmingLeave || unlinkTarget !== null;
 
   useEffect(() => {
-    if (!dialogOpen) return;
+    if (!unlinkTarget) return;
 
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setConfirmingLeave(false);
-      setUnlinkTarget(null);
+      if (event.key === "Escape") setUnlinkTarget(null);
     }
 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [dialogOpen]);
+  }, [unlinkTarget]);
 
   function linkGoogleAccount() {
     if (!canLinkAlternativeAccount) return;
@@ -72,17 +62,6 @@ export function LoginAccountsSettings({
       }
       setUnlinkTarget(null);
       if (result.ok) router.refresh();
-    });
-  }
-
-  function leavePortal() {
-    setError(null);
-    startLeaveTransition(async () => {
-      const result = await deactivatePortalAccess();
-      if (result && !result.ok) {
-        setError(result.message);
-        setConfirmingLeave(false);
-      }
     });
   }
 
@@ -167,22 +146,6 @@ export function LoginAccountsSettings({
       )}
       {error && <p className="mt-3 text-sm text-[#a33b2b]" role="alert">{error}</p>}
 
-      {canLeavePortal && (
-        <div className="mt-10 border-t border-moody pt-7">
-          <p className="max-w-3xl text-sm leading-relaxed opacity-65">
-            Leaving disables future portal sign-in while preserving required membership history. It is not a GDPR deletion.
-          </p>
-          <button
-            className="portal-button mt-5"
-            onClick={() => setConfirmingLeave(true)}
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">logout</span>
-            Leave portal
-          </button>
-        </div>
-      )}
-
       {unlinkTarget && (
         <div
           aria-labelledby="unlink-account-title"
@@ -195,7 +158,7 @@ export function LoginAccountsSettings({
               Remove this sign-in account?
             </h2>
             <p className="mt-4 leading-relaxed opacity-65">
-              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile, and the address is removed from your profile. Organization memberships you already have are kept.
+              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile, and the address is removed from your profile. An active organization membership that rests on this address has to be ended by an organization administrator first.
             </p>
             {unlinkTarget.isCurrentSession && (
               <p className="mt-3 leading-relaxed opacity-65">
@@ -231,43 +194,6 @@ export function LoginAccountsSettings({
         </div>
       )}
 
-      {confirmingLeave && (
-        <div
-          aria-labelledby="leave-portal-title"
-          aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(15,17,24,0.72)] p-5"
-          role="alertdialog"
-        >
-          <div className="portal-surface w-full max-w-md p-7 sm:p-8">
-            <h2 className="text-2xl font-medium" id="leave-portal-title">Leave the portal?</h2>
-            <p className="mt-4 leading-relaxed opacity-65">
-              You will be signed out on all devices and cannot sign in again without help from Norstec IT. Your membership history will be preserved.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button
-                autoFocus
-                className="portal-button"
-                disabled={leavePending}
-                onClick={() => setConfirmingLeave(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="portal-button"
-                disabled={leavePending}
-                onClick={leavePortal}
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">
-                  {leavePending ? "progress_activity" : "logout"}
-                </span>
-                {leavePending ? "Leaving…" : "Leave portal"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

@@ -1,76 +1,112 @@
-import { reviewAccessRequest } from "@/app/(portal)/administration/access-requests/actions";
+import {
+  AccessReviewTable,
+  type AccessReviewRequest,
+  type AccessReviewStatus,
+} from "@/components/portal/access-review-table";
 import { PageHeader } from "@/components/portal/page-header";
 import { requireOrganizationAdminAccess } from "@/lib/auth/access";
+import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
-type RelatedName = { name: string } | Array<{ name: string }>;
-type RelatedPerson =
-  | { full_name: string | null }
-  | Array<{ full_name: string | null }>;
-
-type AccessRequest = {
-  id: number;
-  created_at: string;
-  field_of_study: string | null;
-  message: string | null;
-  request_type: "organization" | "alumni";
-  study_year: number | null;
-  organizations: RelatedName | null;
-  people: RelatedPerson;
+type RequesterRow = {
+  avatar_path: string | null;
+  full_name: string | null;
+  person_emails: Array<{ email: string; is_primary: boolean }>;
 };
 
-function relatedName(value: RelatedName | null) {
-  const row = Array.isArray(value) ? value[0] : value;
-  return row?.name ?? "Unknown";
+type ReviewerRow = { full_name: string | null };
+
+type AccessRequestRow = {
+  created_at: string;
+  decision_note: string | null;
+  field_of_study: string | null;
+  id: number;
+  message: string | null;
+  organization_id: number | null;
+  organizations: { name: string } | Array<{ name: string }> | null;
+  people: RequesterRow | RequesterRow[] | null;
+  request_type: "organization" | "alumni";
+  reviewed_at: string | null;
+  reviewer: ReviewerRow | ReviewerRow[] | null;
+  status: AccessReviewStatus;
+  study_year: number | null;
+};
+
+const statusRank: Record<AccessReviewStatus, number> = {
+  pending: 0,
+  approved: 1,
+  rejected: 2,
+  cancelled: 3,
+};
+
+function single<Row>(value: Row | Row[] | null): Row | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-function personName(value: RelatedPerson) {
-  const row = Array.isArray(value) ? value[0] : value;
-  return row?.full_name ?? "Unnamed member";
+function formatMoment(value: string | null) {
+  if (!value) return null;
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
-function ReviewButtons({
-  action,
-  requestId,
-}: {
-  action: (formData: FormData) => void | Promise<void>;
-  requestId: number;
-}) {
-  return (
-    <form action={action} className="mt-7 flex flex-wrap gap-2">
-      <input name="requestId" type="hidden" value={requestId} />
-      <button className="portal-button" name="decision" type="submit" value="approved">
-        <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">check</span>
-        Approve
-      </button>
-      <button className="portal-button" name="decision" type="submit" value="rejected">
-        <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">close</span>
-        Decline
-      </button>
-    </form>
-  );
-}
-
-export default async function AccessRequestsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; reviewed?: string }>;
-}) {
+export default async function AccessRequestsPage() {
   const access = await requireOrganizationAdminAccess();
-  const { error, reviewed } = await searchParams;
   const supabase = await createClient();
-  const accessResult = await supabase
+  // Row level security narrows this to the requests the signed-in
+  // administrator may decide: their own organizations, plus alumni requests
+  // when they are a portal administrator.
+  const requestsResult = await supabase
     .from("access_requests")
-    .select("id, created_at, field_of_study, study_year, message, request_type, organizations (name), people!access_requests_person_id_fkey (full_name)")
-    .eq("status", "pending")
-    .order("created_at");
+    .select(
+      "id, created_at, decision_note, field_of_study, message, organization_id, request_type, reviewed_at, status, study_year, organizations (name), people!access_requests_person_id_fkey (full_name, avatar_path, person_emails (email, is_primary)), reviewer:people!access_requests_reviewed_by_person_id_fkey (full_name)",
+    )
+    .order("created_at", { ascending: false });
 
-  if (accessResult.error) {
+  if (requestsResult.error) {
     throw new Error("Could not load access requests");
   }
 
-  const accessRequests = accessResult.data as AccessRequest[];
-  const pendingCount = accessRequests.length;
+  const requestRows = requestsResult.data as AccessRequestRow[];
+  const avatarUrls = await getMemberAvatarUrls(
+    requestRows.map((row) => single(row.people)?.avatar_path ?? null),
+  );
+
+  const requests: AccessReviewRequest[] = requestRows
+    .map((row) => {
+      const requester = single(row.people);
+      const avatarPath = requester?.avatar_path ?? null;
+      const emails = [...(requester?.person_emails ?? [])].sort(
+        (left, right) => Number(right.is_primary) - Number(left.is_primary),
+      );
+
+      return {
+        avatarUrl: avatarPath ? avatarUrls.get(avatarPath) : undefined,
+        createdAt: row.created_at,
+        decidedLabel: formatMoment(row.reviewed_at),
+        decisionNote: row.decision_note,
+        email: emails[0]?.email ?? null,
+        fieldOfStudy: row.field_of_study,
+        id: row.id,
+        message: row.message,
+        organizationId: row.organization_id,
+        organizationName: single(row.organizations)?.name ?? null,
+        requesterName: requester?.full_name ?? "Unnamed member",
+        requestType: row.request_type,
+        reviewerName: single(row.reviewer)?.full_name ?? null,
+        status: row.status,
+        studyYear: row.study_year,
+        submittedLabel: formatMoment(row.created_at) ?? "",
+      } satisfies AccessReviewRequest;
+    })
+    .sort(
+      (left, right) =>
+        statusRank[left.status] - statusRank[right.status] ||
+        right.createdAt.localeCompare(left.createdAt),
+    );
 
   return (
     <>
@@ -81,35 +117,14 @@ export default async function AccessRequestsPage({
             : `${access.administeredOrganizations.length} organizations`
         }
       />
-      {error && <p className="mb-6 font-medium text-copper" role="alert">The request could not be reviewed.</p>}
-      {reviewed && <p className="mb-6 font-medium" role="status">Request {reviewed}.</p>}
-      <p className="mb-10 text-sm opacity-55">
-        {pendingCount === 1 ? "1 request awaiting review" : `${pendingCount} requests awaiting review`}
-      </p>
-
-      <section>
-        <h2 className="text-h2">Portal access</h2>
-        <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          {accessRequests.map((request) => (
-            <article className="portal-surface flex flex-col p-6" key={request.id}>
-              <span className="portal-pill portal-pill-outline w-fit">
-                {request.request_type === "alumni"
-                  ? "Alumni"
-                  : relatedName(request.organizations)}
-              </span>
-              <h3 className="mt-6 text-xl font-medium">{personName(request.people)}</h3>
-              {(request.field_of_study || request.study_year) && (
-                <p className="mt-2 text-sm opacity-55">
-                  {[request.field_of_study, request.study_year ? `Year ${request.study_year}` : null].filter(Boolean).join(" · ")}
-                </p>
-              )}
-              {request.message && <p className="mt-4 text-sm leading-relaxed opacity-65">{request.message}</p>}
-              <ReviewButtons action={reviewAccessRequest} requestId={request.id} />
-            </article>
-          ))}
-          {accessRequests.length === 0 && <p className="text-sm opacity-50">No portal access requests.</p>}
-        </div>
-      </section>
+      <AccessReviewTable
+        canReviewAlumni={access.isPortalAdmin}
+        organizations={access.administeredOrganizations.map((organization) => ({
+          id: organization.organizationId,
+          name: organization.organizationName,
+        }))}
+        requests={requests}
+      />
     </>
   );
 }
