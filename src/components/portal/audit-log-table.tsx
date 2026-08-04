@@ -1,0 +1,289 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import {
+  CheckboxOption,
+  FilterMenu,
+} from "@/components/portal/members-directory";
+import {
+  SortableTableHeader,
+  type TableSortDirection,
+} from "@/components/portal/sortable-table-header";
+import {
+  auditCategoryLabels,
+  type AuditCategory,
+} from "@/lib/portal/audit-categories";
+import type { AuditLogEntry } from "@/lib/portal/person-audit";
+
+type SortKey = "time" | "category" | "activity" | "target" | "actor";
+
+function formatMoment(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function sortValue(entry: AuditLogEntry, key: SortKey) {
+  if (key === "time") return entry.createdAt;
+  if (key === "category") return auditCategoryLabels[entry.category];
+  if (key === "activity") return entry.title;
+  if (key === "target") return entry.targetName ?? "";
+  return entry.actorName ?? "";
+}
+
+export function AuditLogTable({
+  entries,
+  emptyMessage = "No events recorded yet.",
+  showDateRangeFilter = true,
+}: {
+  entries: AuditLogEntry[];
+  emptyMessage?: string;
+  showDateRangeFilter?: boolean;
+}) {
+  const router = useRouter();
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDirection, setSortDirection] =
+    useState<TableSortDirection>("ascending");
+
+  const categoryOptions = useMemo(
+    () =>
+      [...new Set(entries.map((entry) => entry.category))].sort((left, right) =>
+        auditCategoryLabels[left].localeCompare(auditCategoryLabels[right], "en"),
+      ),
+    [entries],
+  );
+  const [selectedCategories, setSelectedCategories] =
+    useState<AuditCategory[]>(categoryOptions);
+
+  const visibleEntries = useMemo(() => {
+    return entries
+      .filter((entry) => {
+        if (
+          categoryOptions.includes(entry.category) &&
+          !selectedCategories.includes(entry.category)
+        ) {
+          return false;
+        }
+        if (showDateRangeFilter) {
+          // The timestamps are ISO, so the date part compares correctly as
+          // text and the range stays in the reader's calendar days rather
+          // than UTC instants.
+          const day = entry.createdAt.slice(0, 10);
+          if (from && day < from) return false;
+          if (to && day > to) return false;
+        }
+        return true;
+      })
+      .sort((left, right) => {
+        if (!sortKey) return 0;
+        const comparison = sortValue(left, sortKey).localeCompare(
+          sortValue(right, sortKey),
+          "en",
+          { sensitivity: "base" },
+        );
+        return sortDirection === "ascending" ? comparison : -comparison;
+      });
+  }, [
+    entries,
+    categoryOptions,
+    selectedCategories,
+    showDateRangeFilter,
+    from,
+    to,
+    sortKey,
+    sortDirection,
+  ]);
+
+  function toggleCategory(category: AuditCategory) {
+    setSelectedCategories((current) =>
+      current.includes(category)
+        ? current.filter((candidate) => candidate !== category)
+        : [...current, category],
+    );
+  }
+
+  function changeSort(nextSortKey: SortKey) {
+    if (nextSortKey === sortKey) {
+      if (sortDirection === "descending") {
+        setSortKey(null);
+        setSortDirection("ascending");
+        return;
+      }
+      setSortDirection((current) =>
+        current === "ascending" ? "descending" : "ascending",
+      );
+      return;
+    }
+    setSortKey(nextSortKey);
+    setSortDirection("ascending");
+  }
+
+  function openEvent(eventId: number) {
+    router.push(`/admin/audit-log/${eventId}`);
+  }
+
+  const categoryFilterLabel =
+    selectedCategories.length === categoryOptions.length
+      ? "Category: All"
+      : selectedCategories.length === 1
+        ? `Category: ${auditCategoryLabels[selectedCategories[0]]}`
+        : selectedCategories.length === 0
+          ? "Category: None"
+          : `Category: ${selectedCategories.length} selected`;
+  const isDateFiltered = Boolean(from || to);
+  const dateFilterLabel = isDateFiltered ? "Date: custom range" : "Date: All time";
+
+  return (
+    <>
+      {entries.length > 0 && (
+        <div className="mt-8 flex flex-wrap gap-2">
+          {showDateRangeFilter && (
+            <FilterMenu icon="calendar_month" label={dateFilterLabel}>
+              <fieldset className="grid gap-4">
+                <legend className="section-label mb-2 opacity-45">
+                  Date range
+                </legend>
+                <label className="block">
+                  <span className="section-label mb-2 block opacity-45">
+                    From
+                  </span>
+                  <input
+                    className="portal-field w-auto"
+                    max={to || undefined}
+                    onChange={(event) => setFrom(event.target.value)}
+                    type="date"
+                    value={from}
+                  />
+                </label>
+                <label className="block">
+                  <span className="section-label mb-2 block opacity-45">
+                    To
+                  </span>
+                  <input
+                    className="portal-field w-auto"
+                    min={from || undefined}
+                    onChange={(event) => setTo(event.target.value)}
+                    type="date"
+                    value={to}
+                  />
+                </label>
+                {isDateFiltered && (
+                  <button
+                    className="portal-button"
+                    onClick={() => {
+                      setFrom("");
+                      setTo("");
+                    }}
+                    type="button"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="material-symbols-outlined text-[1.1rem]"
+                    >
+                      filter_alt_off
+                    </span>
+                    Clear dates
+                  </button>
+                )}
+              </fieldset>
+            </FilterMenu>
+          )}
+
+          <FilterMenu icon="filter_alt" label={categoryFilterLabel}>
+            <fieldset>
+              <legend className="section-label mb-2 opacity-45">
+                Category
+              </legend>
+              {categoryOptions.map((category) => (
+                <CheckboxOption
+                  checked={selectedCategories.includes(category)}
+                  key={category}
+                  label={auditCategoryLabels[category]}
+                  onChange={() => toggleCategory(category)}
+                />
+              ))}
+            </fieldset>
+          </FilterMenu>
+        </div>
+      )}
+
+      {visibleEntries.length > 0 ? (
+        <div className="mt-8 overflow-x-auto">
+          <table className="w-full min-w-[54rem] border-collapse">
+            <caption className="sr-only">
+              Audit events with time, category, activity, affected account and
+              who performed it
+            </caption>
+            <thead>
+              <tr>
+                {(
+                  [
+                    ["time", "Time"],
+                    ["category", "Category"],
+                    ["activity", "Activity"],
+                    ["target", "Affected account"],
+                    ["actor", "Performed by"],
+                  ] as const
+                ).map(([key, heading]) => (
+                  <SortableTableHeader
+                    active={sortKey === key}
+                    direction={sortDirection}
+                    key={key}
+                    onSort={() => changeSort(key)}
+                  >
+                    {heading}
+                  </SortableTableHeader>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleEntries.map((entry) => (
+                <tr
+                  aria-label={`View ${entry.title}`}
+                  className="cursor-pointer border-b border-moody transition-colors hover:bg-moody hover:text-egg focus-visible:bg-moody focus-visible:text-egg focus-visible:outline-none"
+                  key={entry.id}
+                  onClick={() => openEvent(entry.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEvent(entry.id);
+                    }
+                  }}
+                  role="link"
+                  tabIndex={0}
+                >
+                  <td className="whitespace-nowrap py-3 pl-4 pr-5">
+                    <time dateTime={entry.createdAt}>
+                      {formatMoment(entry.createdAt)}
+                    </time>
+                  </td>
+                  <td className="py-3 pr-5">
+                    {auditCategoryLabels[entry.category]}
+                  </td>
+                  <td className="py-3 pr-5">{entry.title}</td>
+                  <td className="py-3 pr-5">
+                    {entry.targetName ?? "Deleted account"}
+                  </td>
+                  <td className="py-3 pr-4">
+                    {entry.actorName ?? "Automatic"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-8 text-sm opacity-55">
+          {entries.length === 0 ? emptyMessage : "No events match these filters."}
+        </p>
+      )}
+    </>
+  );
+}

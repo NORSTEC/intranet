@@ -1,29 +1,55 @@
 import "server-only";
 
+import { categoryFor, type AuditCategory } from "@/lib/portal/audit-categories";
 import { createClient } from "@/lib/supabase/server";
 
-export type PersonAuditEntry = {
+export type { AuditCategory };
+
+export type AuditLogEntry = {
+  action: string;
+  actorId: number | null;
   actorName: string | null;
+  category: AuditCategory;
   createdAt: string;
-  detail: string | null;
   id: number;
   organizationName: string | null;
+  targetId: number | null;
+  targetName: string | null;
   title: string;
 };
 
+/** One labelled fact on an event's own page. */
+export type AuditField = {
+  term: string;
+  value: string;
+};
+
+export type AuditLogEntryDetail = AuditLogEntry & { fields: AuditField[] };
+
+export type PersonAuditEntry = AuditLogEntry;
+
 type AuditEventRow = {
   action: string;
+  actor: { full_name: string | null } | Array<{ full_name: string | null }> | null;
   actor_person_id: number | null;
   created_at: string;
   details: Record<string, unknown> | null;
   id: number;
   organizations: { name: string } | Array<{ name: string }> | null;
-  people: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  target: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  target_person_id: number | null;
 };
+
+const SELECT_COLUMNS =
+  "id, action, created_at, details, actor_person_id, target_person_id, organizations (name), actor:people!audit_events_actor_person_id_fkey (full_name), target:people!audit_events_target_person_id_fkey (full_name)";
 
 // The number of events one person accumulates is small; a cap only exists so a
 // pathological history cannot turn the page into a scroll of hundreds of rows.
 const MAX_EVENTS = 120;
+
+// A portal-wide history is longer-lived than one person's, so it gets its own,
+// larger cap.
+const MAX_LOG_EVENTS = 200;
 
 function single<Row>(value: Row | Row[] | null): Row | null {
   if (!value) return null;
@@ -35,18 +61,73 @@ function text(details: Record<string, unknown> | null, key: string) {
   return typeof value === "string" ? value : null;
 }
 
-// The person a `deleted_person`/`purged_person` snapshot names. Nested one
-// level below the action's own fields so the purge PII scrub — which only
-// inspects top-level keys — never strips it.
-function snapshotName(details: Record<string, unknown> | null, key: string) {
-  const snapshot = details?.[key];
-  if (!snapshot || typeof snapshot !== "object") return null;
-  const name = (snapshot as { name?: unknown }).name;
-  return typeof name === "string" ? name : null;
+function number(details: Record<string, unknown> | null, key: string) {
+  const value = details?.[key];
+  return typeof value === "number" ? value : null;
+}
+
+function flag(details: Record<string, unknown> | null, key: string) {
+  const value = details?.[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+// A person snapshot the writing RPC left behind — `deleted_person`,
+// `purged_person`, `applicant`. Nested one level below the action's own fields
+// so the purge PII scrub, which only inspects top-level keys, never strips it.
+function snapshot(details: Record<string, unknown> | null, key: string) {
+  const value = details?.[key];
+  if (!value || typeof value !== "object") return null;
+  const { email, name } = value as { email?: unknown; name?: unknown };
+  return {
+    email: typeof email === "string" ? email : null,
+    name: typeof name === "string" ? name : null,
+  };
+}
+
+/** The name on any snapshot this event may carry, whichever one it wrote. */
+function snapshotName(details: Record<string, unknown> | null) {
+  return (
+    snapshot(details, "deleted_person")?.name ??
+    snapshot(details, "purged_person")?.name ??
+    snapshot(details, "applicant")?.name ??
+    null
+  );
 }
 
 function roleLabel(role: string | null) {
   return role === "organization_admin" ? "Organization administrator" : "Member";
+}
+
+function accessStatusLabel(status: string | null) {
+  if (status === "active") return "Active";
+  if (status === "suspended") return "Suspended";
+  if (status === "unclaimed") return "Unclaimed";
+  if (status === "deactivated") return "Deactivated";
+  return "Unknown";
+}
+
+function membershipStatusLabel(status: string | null) {
+  return status === "active" ? "Active" : "Ended";
+}
+
+function requestTypeLabel(type: string | null) {
+  return type === "alumni" ? "Alumni access" : "Organization membership";
+}
+
+// Every RPC stamps where it was called from, and the raw value is a database
+// token rather than something an administrator should have to read.
+function sourceLabel(source: string | null) {
+  if (source === "portal_management") return "Portal management";
+  if (source === "self_service") return "Requested by the person themselves";
+  if (source === "database_admin") return "Database administrator";
+  if (source === "retention_expiry") return "Automatic, retention period expired";
+  if (source === "access_request") return "Access request";
+  return source;
+}
+
+function yesNo(value: boolean | null) {
+  if (value === null) return null;
+  return value ? "Yes" : "No";
 }
 
 /**
@@ -55,99 +136,95 @@ function roleLabel(role: string | null) {
  * humanised form of the action itself rather than disappearing from the
  * history — an unexplained gap is worse than an unpolished label.
  */
-function describe(action: string, details: Record<string, unknown> | null): {
-  detail: string | null;
-  title: string;
-} {
+function describe(action: string, details: Record<string, unknown> | null) {
   switch (action) {
     case "portal_access.active":
-      return { detail: "Sign-in is allowed again.", title: "Portal access activated" };
+      return "Portal access activated";
     case "portal_access.suspended":
-      return {
-        detail: "Signed out everywhere and blocked from signing in.",
-        title: "Portal access suspended",
-      };
+      return "Portal access suspended";
     case "portal_access.deactivated":
-      return { detail: null, title: "Portal access deactivated" };
+      return "Portal access deactivated";
     case "portal_administrator.granted":
     case "portal_admin.assigned":
-      return { detail: null, title: "Portal administrator role granted" };
+      return "Portal administrator role granted";
     case "portal_administrator.revoked":
-      return { detail: null, title: "Portal administrator role revoked" };
+      return "Portal administrator role revoked";
     case "membership.role_changed":
-      return {
-        detail: `${roleLabel(text(details, "previous_role"))} → ${roleLabel(
-          text(details, "role"),
-        )}`,
-        title:
-          text(details, "role") === "organization_admin"
-            ? "Organization administrator role granted"
-            : "Organization administrator role revoked",
-      };
+      return text(details, "role") === "organization_admin"
+        ? "Organization administrator role granted"
+        : "Organization administrator role revoked";
     case "membership.role_assigned":
-      return {
-        detail: roleLabel(text(details, "role")),
-        title: "Membership role assigned",
-      };
+      return "Membership role assigned";
     case "membership.status_changed":
-      return {
-        detail: null,
-        title:
-          text(details, "status") === "active"
-            ? "Membership activated"
-            : "Membership ended",
-      };
+      return text(details, "status") === "active"
+        ? "Membership activated"
+        : "Membership ended";
     case "team_membership.added":
-      return { detail: text(details, "team_name"), title: "Added to team" };
+      return "Added to team";
     case "team_membership.removed":
-      return { detail: text(details, "team_name"), title: "Removed from team" };
+      return "Removed from team";
     case "team_experience_archived":
-      return { detail: null, title: "Team experience archived" };
+      return "Team experience archived";
     case "team_experience_restored":
-      return { detail: null, title: "Team experience restored" };
+      return "Team experience restored";
     case "access_request_approved":
-      return { detail: null, title: "Access request approved" };
+      return "Access request approved";
     case "access_request_rejected":
-      return { detail: null, title: "Access request rejected" };
+      return "Access request rejected";
     case "access_request_cancelled":
-      return {
-        detail: text(details, "request_type") === "alumni" ? "Alumni access" : null,
-        title: "Access request cancelled",
-      };
+      return "Access request cancelled";
     case "historical_membership_requested":
-      return { detail: null, title: "Past membership requested" };
+      return "Past membership requested";
     case "historical_membership_approved":
-      return { detail: null, title: "Past membership approved" };
+      return "Past membership approved";
     case "historical_membership_rejected":
-      return { detail: null, title: "Past membership rejected" };
+      return "Past membership rejected";
     case "auth.portal_account_linked":
-      return { detail: text(details, "account_email"), title: "Sign-in account linked" };
+      return "Sign-in account linked";
     case "auth.portal_account_unlinked":
-      return {
-        detail: text(details, "account_email"),
-        title: "Sign-in account unlinked",
-      };
+      return "Sign-in account unlinked";
     case "auth.identity_linked":
-      return { detail: text(details, "email"), title: "Google identity linked" };
+      return "Google identity linked";
     case "person.merged":
-      return { detail: "A duplicate profile was folded in.", title: "Profiles merged" };
+      return "Profiles merged";
     case "person.soft_deleted":
-      return { detail: snapshotName(details, "deleted_person"), title: "Person deleted" };
+      return "Person deleted";
     case "person.self_deleted":
-      return {
-        detail: snapshotName(details, "deleted_person") ?? "Requested by the person themselves.",
-        title: "Account deleted",
-      };
+      return "Account deleted";
     case "person.restored":
-      return { detail: null, title: "Person restored" };
+      return "Person restored";
     case "person.purged":
-      return { detail: snapshotName(details, "purged_person"), title: "Data purged" };
+      return "Data purged";
     default:
-      return {
-        detail: null,
-        title: action.replace(/[._]/g, " ").replace(/^./, (first) => first.toUpperCase()),
-      };
+      return action
+        .replace(/[._]/g, " ")
+        .replace(/^./, (first) => first.toUpperCase());
   }
+}
+
+function mapRow(row: AuditEventRow): AuditLogEntry {
+  return {
+    action: row.action,
+    actorId: row.actor_person_id,
+    actorName:
+      row.actor_person_id === null
+        ? null
+        : (single(row.actor)?.full_name ?? "Unnamed person"),
+    category: categoryFor(row.action),
+    createdAt: row.created_at,
+    id: row.id,
+    organizationName: single(row.organizations)?.name ?? null,
+    targetId: row.target_person_id,
+    // A person the event still points at is named from their row. Once the
+    // profile is gone — purged, or discarded with a declined request — only
+    // the snapshot the writing RPC left behind can name them, and a purge
+    // deliberately erases even that.
+    targetName:
+      row.target_person_id !== null
+        ? (single(row.target)?.full_name ?? "Unnamed person")
+        : snapshotName(row.details),
+    title: describe(row.action, row.details),
+  } satisfies AuditLogEntry;
 }
 
 /**
@@ -162,9 +239,7 @@ export async function loadPersonAudit(
 
   const result = await supabase
     .from("audit_events")
-    .select(
-      "id, action, created_at, details, actor_person_id, organizations (name), people!audit_events_actor_person_id_fkey (full_name)",
-    )
+    .select(SELECT_COLUMNS)
     .eq("target_person_id", personId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -174,47 +249,8 @@ export async function loadPersonAudit(
     throw new Error("Could not load this person's history");
   }
 
-  return (result.data as unknown as AuditEventRow[]).map((row) => {
-    const described = describe(row.action, row.details);
-    return {
-      actorName:
-        row.actor_person_id === null
-          ? null
-          : (single(row.people)?.full_name ?? "Unnamed person"),
-      createdAt: row.created_at,
-      detail: described.detail,
-      id: row.id,
-      organizationName: single(row.organizations)?.name ?? null,
-      title: described.title,
-    } satisfies PersonAuditEntry;
-  });
+  return (result.data as unknown as AuditEventRow[]).map(mapRow);
 }
-
-export type AuditLogEntry = {
-  actorName: string | null;
-  createdAt: string;
-  detail: string | null;
-  id: number;
-  organizationName: string | null;
-  targetName: string | null;
-  title: string;
-};
-
-type GlobalAuditEventRow = {
-  action: string;
-  actor: { full_name: string | null } | Array<{ full_name: string | null }> | null;
-  actor_person_id: number | null;
-  created_at: string;
-  details: Record<string, unknown> | null;
-  id: number;
-  organizations: { name: string } | Array<{ name: string }> | null;
-  target: { full_name: string | null } | Array<{ full_name: string | null }> | null;
-  target_person_id: number | null;
-};
-
-// A portal-wide history is longer-lived than one person's, so it gets its
-// own, larger cap.
-const MAX_LOG_EVENTS = 200;
 
 /**
  * Every recorded event across the portal, newest first. A deleted or purged
@@ -227,9 +263,7 @@ export async function loadAuditLog(): Promise<AuditLogEntry[]> {
 
   const result = await supabase
     .from("audit_events")
-    .select(
-      "id, action, created_at, details, actor_person_id, target_person_id, organizations (name), actor:people!audit_events_actor_person_id_fkey (full_name), target:people!audit_events_target_person_id_fkey (full_name)",
-    )
+    .select(SELECT_COLUMNS)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(MAX_LOG_EVENTS);
@@ -238,22 +272,224 @@ export async function loadAuditLog(): Promise<AuditLogEntry[]> {
     throw new Error("Could not load the audit log");
   }
 
-  return (result.data as unknown as GlobalAuditEventRow[]).map((row) => {
-    const described = describe(row.action, row.details);
-    return {
-      actorName:
-        row.actor_person_id === null
-          ? null
-          : (single(row.actor)?.full_name ?? "Unnamed person"),
-      createdAt: row.created_at,
-      detail: described.detail,
-      id: row.id,
-      organizationName: single(row.organizations)?.name ?? null,
-      targetName:
-        (row.target_person_id !== null ? single(row.target)?.full_name : null) ??
-        snapshotName(row.details, "deleted_person") ??
-        snapshotName(row.details, "purged_person"),
-      title: described.title,
-    } satisfies AuditLogEntry;
-  });
+  return (result.data as unknown as AuditEventRow[]).map(mapRow);
+}
+
+// Facts an event references by id rather than by value, resolved once for the
+// single event its own page shows.
+type ResolvedContext = {
+  deletionReason: string | null;
+  teamName: string | null;
+};
+
+/**
+ * The facts that belong to this kind of event and no other. Every field is
+ * spelled out under its own heading — an event's page states what changed
+ * rather than hinting at it in secondary text.
+ */
+function buildFields(
+  row: AuditEventRow,
+  context: ResolvedContext,
+): AuditField[] {
+  const details = row.details;
+  const fields: AuditField[] = [];
+  const add = (term: string, value: string | null | undefined) => {
+    if (value) fields.push({ term, value });
+  };
+
+  switch (row.action) {
+    case "portal_access.active":
+    case "portal_access.suspended":
+    case "portal_access.deactivated":
+      add(
+        "Access change",
+        `${accessStatusLabel(text(details, "previous_status"))} → ${accessStatusLabel(
+          row.action.slice("portal_access.".length),
+        )}`,
+      );
+      add("Performed from", sourceLabel(text(details, "source")));
+      break;
+
+    case "portal_administrator.granted":
+    case "portal_admin.assigned":
+      add("Role change", "Member → Portal administrator");
+      add("Performed from", sourceLabel(text(details, "source")));
+      break;
+
+    case "portal_administrator.revoked":
+      add("Role change", "Portal administrator → Member");
+      add("Performed from", sourceLabel(text(details, "source")));
+      break;
+
+    case "membership.role_changed":
+      add(
+        "Role change",
+        `${roleLabel(text(details, "previous_role"))} → ${roleLabel(
+          text(details, "role"),
+        )}`,
+      );
+      break;
+
+    case "membership.role_assigned":
+      add("Role", roleLabel(text(details, "role")));
+      add("Performed from", sourceLabel(text(details, "source")));
+      break;
+
+    case "membership.status_changed":
+      add(
+        "Status change",
+        `${membershipStatusLabel(
+          text(details, "previous_status"),
+        )} → ${membershipStatusLabel(text(details, "status"))}`,
+      );
+      break;
+
+    case "team_membership.added":
+    case "team_membership.removed":
+      add("Team", text(details, "team_name") ?? context.teamName);
+      break;
+
+    case "team_experience_archived":
+    case "team_experience_restored":
+      add("Team", context.teamName);
+      break;
+
+    case "access_request_approved":
+    case "access_request_rejected":
+    case "access_request_cancelled":
+      add("Request type", requestTypeLabel(text(details, "request_type")));
+      add("Applicant email", snapshot(details, "applicant")?.email);
+      add("Decision note", text(details, "decision_note"));
+      break;
+
+    case "historical_membership_requested":
+    case "historical_membership_approved":
+    case "historical_membership_rejected":
+      add("Team", context.teamName);
+      break;
+
+    case "auth.portal_account_linked":
+      add("Linked account", text(details, "account_email"));
+      add(
+        "Membership created",
+        yesNo(flag(details, "membership_created")),
+      );
+      break;
+
+    case "auth.portal_account_unlinked":
+      add("Unlinked account", text(details, "account_email"));
+      add("Provider", text(details, "provider") === "google" ? "Google" : null);
+      break;
+
+    case "auth.identity_linked":
+      add("Linked email", text(details, "email"));
+      add(
+        "Address type",
+        text(details, "email_type") === "organization"
+          ? "Organization address"
+          : "Personal address",
+      );
+      add("Provider", text(details, "provider") === "google" ? "Google" : null);
+      break;
+
+    case "person.merged": {
+      const sourceId = number(details, "source_person_id");
+      add("Folded-in profile", sourceId === null ? null : `Person #${sourceId}`);
+      add(
+        "Folded-in profile was a portal administrator",
+        yesNo(flag(details, "source_was_portal_administrator")),
+      );
+      add(
+        "Avatar taken from folded-in profile",
+        yesNo(flag(details, "source_avatar_path")),
+      );
+      break;
+    }
+
+    case "person.soft_deleted":
+    case "person.self_deleted":
+      add("Deleted account email", snapshot(details, "deleted_person")?.email);
+      add(
+        "Access before deletion",
+        accessStatusLabel(text(details, "previous_access_status")),
+      );
+      add(
+        "Reason",
+        context.deletionReason ??
+          (flag(details, "has_reason") === false ? "None given" : null),
+      );
+      add("Requested by", sourceLabel(text(details, "source")));
+      break;
+
+    case "person.restored":
+      add(
+        "Access restored to",
+        accessStatusLabel(text(details, "restored_access_status")),
+      );
+      break;
+
+    case "person.purged": {
+      const purged = snapshot(details, "purged_person");
+      const purgedId = number(details, "purged_person_id");
+      add("Purged account", purged?.name);
+      add("Purged account email", purged?.email);
+      add("Purged profile", purgedId === null ? null : `Person #${purgedId}`);
+      add("Triggered by", sourceLabel(text(details, "source")));
+      break;
+    }
+
+    default:
+      break;
+  }
+
+  return fields;
+}
+
+/**
+ * One audit event by id, with the facts specific to its kind resolved, for the
+ * event's own page.
+ */
+export async function loadAuditLogEntry(
+  id: number,
+): Promise<AuditLogEntryDetail | null> {
+  const supabase = await createClient();
+
+  const result = await supabase
+    .from("audit_events")
+    .select(SELECT_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (result.error) {
+    throw new Error("Could not load this event");
+  }
+  if (!result.data) return null;
+
+  const row = result.data as unknown as AuditEventRow;
+  const teamId = number(row.details, "team_id");
+  const wasDeletion =
+    row.action === "person.soft_deleted" || row.action === "person.self_deleted";
+
+  const [teamResult, personResult] = await Promise.all([
+    teamId === null
+      ? null
+      : supabase.from("teams").select("name").eq("id", teamId).maybeSingle(),
+    // The reason itself never enters the audit payload — only whether one was
+    // given — so it is read from the person, and disappears with them.
+    wasDeletion && row.target_person_id !== null
+      ? supabase
+          .from("people")
+          .select("deletion_reason")
+          .eq("id", row.target_person_id)
+          .maybeSingle()
+      : null,
+  ]);
+
+  return {
+    ...mapRow(row),
+    fields: buildFields(row, {
+      deletionReason: personResult?.data?.deletion_reason ?? null,
+      teamName: teamResult?.data?.name ?? null,
+    }),
+  };
 }
