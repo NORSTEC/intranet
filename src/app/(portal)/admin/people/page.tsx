@@ -8,10 +8,13 @@ export default async function ManageUsersPage() {
   // A user is someone who belongs, or once belonged, to an organization.
   // Profiles created by a Google sign-in that never led to a membership stay
   // in Access review instead. Portal administrators are always listed, even
-  // in the rare case that they hold no membership of their own.
+  // in the rare case that they hold no membership of their own — and so are
+  // alumni granted portal access directly, whose approval creates no
+  // membership row at all.
   const users = people.filter(
     (person) =>
-      !person.isDeleted && (person.hasMembership || person.isPortalAdmin),
+      !person.isDeleted &&
+      (person.hasMembership || person.isPortalAdmin || person.hasAlumniAccess),
   );
 
   return (

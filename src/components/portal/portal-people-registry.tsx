@@ -26,6 +26,9 @@ export type RegistryPerson = {
   avatarUrl?: string;
   deletedAt: string | null;
   email: string | null;
+  // Portal access granted to an alumnus who belongs to no organization, and so
+  // holds no membership row of their own.
+  hasAlumniAccess: boolean;
   hasMembership: boolean;
   id: number;
   isDeleted: boolean;

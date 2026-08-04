@@ -17,9 +17,14 @@ export function MemberAvatar({
 }: {
   name: string;
   src?: string;
-  size?: "small" | "large";
+  size?: "small" | "large" | "hero";
 }) {
-  const sizeClass = size === "large" ? "size-20 text-lg" : "size-11 text-xs";
+  const sizeClass =
+    size === "hero"
+      ? "size-28 text-2xl sm:size-32"
+      : size === "large"
+        ? "size-20 text-lg"
+        : "size-11 text-xs";
 
   return (
     <span
@@ -30,7 +35,7 @@ export function MemberAvatar({
           alt=""
           className="object-cover"
           fill
-          sizes={size === "large" ? "80px" : "44px"}
+          sizes={size === "hero" ? "128px" : size === "large" ? "80px" : "44px"}
           src={src}
           unoptimized
         />

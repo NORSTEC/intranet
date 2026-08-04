@@ -1,156 +1,167 @@
-import Link from "next/link";
-import { PageHeader } from "@/components/portal/page-header";
+import { DashboardHero } from "@/components/portal/dashboard/dashboard-hero";
+import { NewMemberCard } from "@/components/portal/dashboard/new-member-card";
+import { OrganizationCard } from "@/components/portal/dashboard/organization-card";
+import { PortalPulse } from "@/components/portal/dashboard/portal-pulse";
+import {
+  RecommendedActions,
+  type RecommendedAction,
+} from "@/components/portal/dashboard/recommended-actions";
+import { TeamCard } from "@/components/portal/dashboard/team-card";
 import { requirePortalAccess } from "@/lib/auth/access";
-import { createClient } from "@/lib/supabase/server";
+import { formatMonth, loadDashboard } from "@/lib/portal/dashboard";
 
-type TeamMembershipRow = {
-  id: number;
-  role_title: string | null;
-  teams:
-    | {
-        name: string;
-        slug: string;
-        organizations: { name: string; slug: string } | Array<{ name: string; slug: string }>;
-      }
-    | Array<{
-        name: string;
-        slug: string;
-        organizations: { name: string; slug: string } | Array<{ name: string; slug: string }>;
-      }>;
-};
+/** A list an English sentence can carry: "A, B and C". */
+function sentenceList(items: string[]) {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+function greetingName(fullName: string | null, firstName: string | null, email: string) {
+  return firstName ?? fullName?.split(/\s+/)[0] ?? email.split("@")[0];
+}
 
 export default async function DashboardPage() {
   const access = await requirePortalAccess();
   // Portal administrators decide alumni requests without holding any
-  // organization admin role, so the review card has to reach them too.
-  const canAdminister =
+  // organization admin role, so the review action has to reach them too.
+  const canReviewAccessRequests =
     access.isPortalAdmin ||
-    access.memberships.some((membership) => membership.role !== "member");
-  const supabase = await createClient();
+    access.memberships.some(
+      (membership) => membership.status === "active" && membership.role === "organization_admin",
+    );
 
-  const [teamsResult, requestsResult] = await Promise.all([
-    supabase
-      .from("team_memberships")
-      .select("id, role_title, teams (name, slug, organizations (name, slug))")
-      .eq("person_id", access.profile.personId)
-      .is("archived_at", null),
-    canAdminister
-      ? supabase
-          .from("access_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pending")
-      : Promise.resolve({ count: 0, error: null }),
-  ]);
+  const dashboard = await loadDashboard({
+    profile: access.profile,
+    isPortalAdmin: access.isPortalAdmin,
+    canReviewAccessRequests,
+  });
 
-  if (teamsResult.error || requestsResult.error) {
-    throw new Error("Could not load dashboard");
+  const activeOrganizations = dashboard.organizations.filter(
+    (organization) => organization.status === "active",
+  );
+  const isAlumni = activeOrganizations.length === 0;
+  const lastEnded = dashboard.organizations.find((organization) => organization.until);
+
+  const displayName = access.profile.fullName ?? access.profile.email;
+  // The role and the membership date are separate facts: holding the portal
+  // administrator role today says nothing about when it was granted, so the
+  // date belongs to the membership sentence alone.
+  const organizationNames = sentenceList(
+    activeOrganizations.map((organization) => organization.name),
+  );
+  const membershipSentence = isAlumni
+    ? lastEnded?.until
+      ? `You hold alumni access to the portal. Your membership in ${lastEnded.name} ended ${formatMonth(lastEnded.until)}.`
+      : "You hold alumni access to the portal. The member directory and the statistics stay open to you."
+    : `Member of ${organizationNames}${
+        dashboard.memberSince ? ` since ${formatMonth(dashboard.memberSince)}` : ""
+      }.`;
+  const roleSentence = access.isPortalAdmin
+    ? " You administer the portal."
+    : !isAlumni && activeOrganizations.some((organization) => organization.role === "organization_admin")
+      ? ` You administer ${sentenceList(
+          activeOrganizations
+            .filter((organization) => organization.role === "organization_admin")
+            .map((organization) => organization.name),
+        )}.`
+      : "";
+  const subtitle = `${membershipSentence}${roleSentence}`;
+
+  const { missingProfileFields, profileFieldCount, canLinkBackupAccount, pendingAccessRequests } =
+    dashboard.actions;
+  const actions: RecommendedAction[] = [];
+  if (pendingAccessRequests > 0) {
+    actions.push({
+      description:
+        pendingAccessRequests === 1
+          ? "1 person is waiting for a decision on portal access."
+          : `${pendingAccessRequests} people are waiting for a decision on portal access.`,
+      href: "/administration/access-requests",
+      icon: "person_check",
+      title: "Access requests waiting",
+    });
+  }
+  if (missingProfileFields.length > 0) {
+    actions.push({
+      description: `${profileFieldCount - missingProfileFields.length} of ${profileFieldCount} details filled in — missing ${sentenceList(missingProfileFields)}.`,
+      href: "/profile/edit",
+      icon: "person_edit",
+      title: "Finish your profile",
+    });
+  }
+  if (canLinkBackupAccount) {
+    actions.push({
+      description:
+        "If your organization closes your student or work account, a second Google account keeps you signed in.",
+      href: "/profile#login-accounts-heading",
+      icon: "shield_person",
+      title: "Add a backup sign-in account",
+    });
   }
 
-  const teams = (teamsResult.data as TeamMembershipRow[])
-    .map((membership) => {
-      const team = Array.isArray(membership.teams)
-        ? membership.teams[0]
-        : membership.teams;
-      if (!team) return null;
-      const organization = Array.isArray(team.organizations)
-        ? team.organizations[0]
-        : team.organizations;
-      if (!organization) return null;
-      return { ...membership, team, organization };
-    })
-    .filter((team): team is NonNullable<typeof team> => Boolean(team));
-  const profileIncomplete = !access.profile.fullName || !access.profile.fieldOfStudy;
-  const activeMemberships = access.memberships.filter(
-    (membership) => membership.status === "active",
-  );
-
   return (
-    <>
-      <PageHeader description={
-        activeMemberships.length === 1
-          ? activeMemberships[0].organizationName
-          : activeMemberships.length === 0
-            ? "Alumni"
-          : `${access.memberships.length} organizations`
-      } />
+    <div className="dashboard-page space-y-16 lg:space-y-20">
+      <DashboardHero
+        avatarUrl={dashboard.avatarUrl}
+        greetingName={greetingName(
+          access.profile.fullName,
+          access.profile.firstName,
+          access.profile.email,
+        )}
+        name={displayName}
+        subtitle={subtitle}
+      />
 
-      <section aria-label="Membership overview" className="flex flex-wrap gap-3">
-        <span className="portal-pill">
-          <span className="size-2 rounded-full bg-beachball" />
-          {activeMemberships.length > 0 ? "Active member" : "Alumni"}
-        </span>
-        <span className="portal-pill portal-pill-outline">
-          {access.memberships.length} organizations
-        </span>
-        <span className="portal-pill portal-pill-outline">{teams.length} teams</span>
+      <RecommendedActions actions={actions} />
+
+      {dashboard.organizations.length > 0 && (
+        <section aria-labelledby="organizations-heading" className="dashboard-rise">
+          <h2 className="text-h2" id="organizations-heading">
+            Your organizations
+          </h2>
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {dashboard.organizations.map((organization) => (
+              <OrganizationCard key={organization.id} organization={organization} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section aria-labelledby="teams-heading" className="dashboard-rise">
+        <h2 className="text-h2" id="teams-heading">
+          Your teams
+        </h2>
+        {dashboard.teams.length > 0 ? (
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {dashboard.teams.map((team) => (
+              <TeamCard key={team.id} team={team} />
+            ))}
+          </div>
+        ) : (
+          <p className="portal-surface mt-6 p-6 text-sm opacity-55 sm:p-8">
+            You are not on a team yet. Your organization adds you to one, and teams you were part of
+            earlier can be recorded on your profile.
+          </p>
+        )}
       </section>
 
-      <div className="mt-14 grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
-        <section>
-          <h2 className="text-h2">Next</h2>
-          <div className="mt-6 grid gap-4">
-            {profileIncomplete && (
-              <Link
-                href="/profile"
-                className="portal-surface portal-card-link group flex items-center justify-between gap-6 p-6 sm:p-7"
-              >
-                <span>
-                  <span className="block text-h3 font-medium">Complete your profile</span>
-                  <span className="mt-2 block text-sm opacity-55">Add missing profile details</span>
-                </span>
-                <span className="portal-pill portal-pill-filled">
-                  Open<span className="material-symbols-outlined text-[1rem]">trending_flat</span>
-                </span>
-              </Link>
-            )}
-            {canAdminister && (requestsResult.count ?? 0) > 0 && (
-              <Link
-                href="/administration/access-requests"
-                className="portal-surface portal-card-link group flex items-center justify-between gap-6 p-6 sm:p-7"
-              >
-                <span>
-                  <span className="block text-h3 font-medium">Review access requests</span>
-                  <span className="mt-2 block text-sm opacity-55">
-                    {requestsResult.count === 1
-                      ? "1 request is waiting for a decision"
-                      : `${requestsResult.count} requests are waiting for a decision`}
-                  </span>
-                </span>
-                <span className="portal-pill portal-pill-filled">
-                  Review<span className="material-symbols-outlined text-[1rem]">trending_flat</span>
-                </span>
-              </Link>
-            )}
-            {!profileIncomplete && (!canAdminister || (requestsResult.count ?? 0) === 0) && (
-              <p className="text-sm opacity-55">Nothing needs your attention.</p>
-            )}
+      {dashboard.newMembers.length > 0 && (
+        <section aria-labelledby="new-members-heading" className="dashboard-rise">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+            <h2 className="text-h2" id="new-members-heading">
+              New around you
+            </h2>
+            <p className="text-sm opacity-55">The most recent members of {organizationNames}</p>
           </div>
-        </section>
-
-        <section>
-          <h2 className="text-h2">Your teams</h2>
-          <div className="mt-6 grid gap-3">
-            {teams.map(({ id, role_title: roleTitle, team, organization }) => (
-              <Link
-                className="portal-surface portal-card-link flex items-center justify-between gap-5 p-5"
-                href={`/organizations/${organization.slug}/teams/${team.slug}`}
-                key={id}
-              >
-                <span>
-                  <span className="block font-medium">{team.name}</span>
-                  <span className="mt-1 block text-sm opacity-55">
-                    {organization.name}{roleTitle ? ` · ${roleTitle}` : ""}
-                  </span>
-                </span>
-                <span className="material-symbols-outlined">trending_flat</span>
-              </Link>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
+            {dashboard.newMembers.map((member) => (
+              <NewMemberCard key={member.personId} member={member} />
             ))}
-            {teams.length === 0 && (
-              <p className="text-sm opacity-55">You have not been added to a team yet.</p>
-            )}
           </div>
         </section>
-      </div>
-    </>
+      )}
+
+      <PortalPulse pulse={dashboard.pulse} />
+    </div>
   );
 }

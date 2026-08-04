@@ -5,6 +5,7 @@ import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
 type PersonRow = {
+  alumni_access_granted_at: string | null;
   avatar_path: string | null;
   deleted_at: string | null;
   full_name: string | null;
@@ -43,7 +44,7 @@ export async function loadRegistryPeople(): Promise<RegistryPerson[]> {
   const peopleResult = await supabase
     .from("people")
     .select(
-      "id, full_name, avatar_path, portal_access_status, deleted_at, person_emails (email, is_primary), memberships (role, status, organizations (name)), portal_accounts (last_seen_at), portal_administrators!portal_administrators_person_id_fkey (person_id)",
+      "id, full_name, avatar_path, portal_access_status, deleted_at, alumni_access_granted_at, person_emails (email, is_primary), memberships (role, status, organizations (name)), portal_accounts (last_seen_at), portal_administrators!portal_administrators_person_id_fkey (person_id)",
     )
     .order("full_name", { ascending: true, nullsFirst: false });
 
@@ -88,6 +89,7 @@ export async function loadRegistryPeople(): Promise<RegistryPerson[]> {
       avatarUrl: row.avatar_path ? avatarUrls.get(row.avatar_path) : undefined,
       deletedAt: row.deleted_at,
       email: emails[0]?.email ?? null,
+      hasAlumniAccess: Boolean(row.alumni_access_granted_at),
       hasMembership: row.memberships.length > 0,
       id: row.id,
       isDeleted: Boolean(row.deleted_at),
@@ -101,7 +103,9 @@ export async function loadRegistryPeople(): Promise<RegistryPerson[]> {
         ? "deleted"
         : activeMemberships.length > 0
           ? "active"
-          : endedMemberships.length > 0
+          : // Alumni access granted by a portal administrator makes someone an
+            // alumnus even when no membership was ever recorded for them.
+            endedMemberships.length > 0 || row.alumni_access_granted_at
             ? "alumni"
             : "none",
     } satisfies RegistryPerson;
