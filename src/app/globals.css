@@ -749,39 +749,95 @@ html.theme-switching *::after {
     filter: none;
   }
 
+  /* The constellation is placed across the whole hero rather than piled into
+     the corner the avatar already occupies: two large marks bleed off opposite
+     edges, and the small ones are scattered between them. Horizontal positions
+     are percentages so the spread survives every width. */
   .dashboard-hero-star-1 {
-    top: -3.5rem;
-    right: -3rem;
-    width: 16rem;
-    height: 16rem;
-    opacity: 0.15;
+    top: -4rem;
+    right: -3.5rem;
+    width: 15rem;
+    height: 15rem;
+    opacity: 0.13;
+    rotate: 8deg;
   }
 
   .dashboard-hero-star-2 {
-    right: 6.5rem;
-    bottom: -2.25rem;
-    width: 7rem;
-    height: 7rem;
-    opacity: 0.12;
+    right: 12%;
+    bottom: -2.75rem;
+    width: 7.5rem;
+    height: 7.5rem;
+    opacity: 0.1;
     rotate: 14deg;
   }
 
   .dashboard-hero-star-3 {
-    top: 0.5rem;
-    right: 21rem;
-    width: 4rem;
-    height: 4rem;
-    opacity: 0.14;
-    rotate: -10deg;
+    top: 0.75rem;
+    right: 27%;
+    width: 3.5rem;
+    height: 3.5rem;
+    opacity: 0.16;
+    rotate: -12deg;
   }
 
   .dashboard-hero-star-4 {
-    right: 0.5rem;
-    bottom: 1.5rem;
-    width: 2.75rem;
-    height: 2.75rem;
-    opacity: 0.2;
+    right: 1rem;
+    bottom: 1.25rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    opacity: 0.22;
     rotate: 22deg;
+  }
+
+  /* The two on the left sit under the greeting, so they are the faintest of
+     the set — texture behind the words, never competition for them. */
+  .dashboard-hero-star-5 {
+    top: -1.5rem;
+    left: -2rem;
+    width: 6.5rem;
+    height: 6.5rem;
+    opacity: 0.09;
+    rotate: 18deg;
+  }
+
+  .dashboard-hero-star-6 {
+    left: 14%;
+    bottom: -1.75rem;
+    width: 4rem;
+    height: 4rem;
+    opacity: 0.11;
+    rotate: -8deg;
+  }
+
+  /* On a phone the hero is barely wider than the largest star, so the whole
+     set is scaled down and the two that would land on top of each other at
+     that width are dropped. */
+  @media (max-width: 639px) {
+    .dashboard-hero-star-1 {
+      top: -2.5rem;
+      right: -2.25rem;
+      width: 10rem;
+      height: 10rem;
+    }
+
+    .dashboard-hero-star-2 {
+      right: 8%;
+      bottom: -1.75rem;
+      width: 5rem;
+      height: 5rem;
+    }
+
+    .dashboard-hero-star-5 {
+      top: -1rem;
+      left: -1.25rem;
+      width: 4.5rem;
+      height: 4.5rem;
+    }
+
+    .dashboard-hero-star-3,
+    .dashboard-hero-star-6 {
+      display: none;
+    }
   }
 
   .dashboard-avatar-stack > * + * {

@@ -62,9 +62,10 @@ export type PortalPulse = {
  * redirects straight through the moment access exists.
  */
 export type DashboardWelcome = {
+  decidedLabel: string | null;
   note: string | null;
-  organizationName: string | null;
   requestId: number;
+  reviewerName: string | null;
 };
 
 export type DashboardData = {
@@ -179,6 +180,14 @@ export function formatMonth(isoDate: string) {
   });
 }
 
+/** A single day, formatted on the server so the markup hydrates identically. */
+function formatDay(isoMoment: string) {
+  return new Date(`${isoMoment.slice(0, 10)}T00:00:00Z`).toLocaleDateString(
+    "en-US",
+    { day: "numeric", month: "short", timeZone: "UTC", year: "numeric" },
+  );
+}
+
 /**
  * Profile fields the portal shows to other members. They drive the member
  * directory and the statistics page, so an empty one costs everybody, not just
@@ -251,7 +260,9 @@ export async function loadDashboard({
     // person they belong to.
     supabase
       .from("access_requests")
-      .select("id, decision_note, organizations (name)")
+      .select(
+        "id, decision_note, reviewed_at, reviewer:people!access_requests_reviewed_by_person_id_fkey (full_name)",
+      )
       .eq("person_id", profile.personId)
       .eq("status", "approved")
       .is("decision_acknowledged_at", null)
@@ -274,13 +285,23 @@ export async function loadDashboard({
   const welcomeRow = welcomeResult.data as {
     decision_note: string | null;
     id: number;
-    organizations: { name: string } | Array<{ name: string }> | null;
+    reviewed_at: string | null;
+    reviewer:
+      | { full_name: string | null }
+      | Array<{ full_name: string | null }>
+      | null;
   } | null;
   const welcome: DashboardWelcome | null = welcomeRow
     ? {
+        decidedLabel: welcomeRow.reviewed_at
+          ? formatDay(welcomeRow.reviewed_at)
+          : null,
         note: welcomeRow.decision_note,
-        organizationName: single(welcomeRow.organizations)?.name ?? null,
         requestId: welcomeRow.id,
+        // A portal administrator who decided an alumni request may share no
+        // organization with the requester, in which case row level security
+        // hides their name and the card simply omits it.
+        reviewerName: single(welcomeRow.reviewer)?.full_name ?? null,
       }
     : null;
 

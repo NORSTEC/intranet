@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { RegistryPerson } from "@/components/portal/portal-people-registry";
+import { derivePersonStatus } from "@/lib/portal/access-labels";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
@@ -99,15 +100,12 @@ export async function loadRegistryPeople(): Promise<RegistryPerson[]> {
       organizations: activeMemberships
         .map((membership) => organizationName(membership.organizations))
         .filter((name): name is string => Boolean(name)),
-      status: row.deleted_at
-        ? "deleted"
-        : activeMemberships.length > 0
-          ? "active"
-          : // Alumni access granted by a portal administrator makes someone an
-            // alumnus even when no membership was ever recorded for them.
-            endedMemberships.length > 0 || row.alumni_access_granted_at
-            ? "alumni"
-            : "none",
+      status: derivePersonStatus({
+        activeMembershipCount: activeMemberships.length,
+        deletedAt: row.deleted_at,
+        endedMembershipCount: endedMemberships.length,
+        hasAlumniAccess: Boolean(row.alumni_access_granted_at),
+      }),
     } satisfies RegistryPerson;
   });
 }

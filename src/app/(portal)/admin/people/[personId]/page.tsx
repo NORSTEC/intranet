@@ -13,6 +13,7 @@ import { PortalBreadcrumbData } from "@/components/portal/portal-breadcrumb-data
 import { requirePortalAdminAccess } from "@/lib/auth/access";
 import {
   accessLevelLabels,
+  derivePersonStatus,
   personStatusLabels,
 } from "@/lib/portal/access-labels";
 import { loadPersonAudit } from "@/lib/portal/person-audit";
@@ -47,6 +48,7 @@ type PersonRow = {
     request_type: string;
     status: string;
   }>;
+  alumni_access_granted_at: string | null;
   avatar_path: string | null;
   created_at: string;
   deleted_at: string | null;
@@ -113,7 +115,7 @@ export default async function PortalPersonPage({
     supabase
       .from("people")
       .select(
-        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, person_emails (email, email_type, is_primary), portal_accounts (account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
+        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, alumni_access_granted_at, person_emails (email, email_type, is_primary), portal_accounts (account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
       )
       .eq("id", personId)
       .maybeSingle(),
@@ -215,15 +217,15 @@ export default async function PortalPersonPage({
     .at(-1);
   // Both derived exactly as Manage people derives them, so a person reads the
   // same in the table and on their own page.
-  const derivedStatus = personStatusLabels[
-    person.deleted_at
-      ? "deleted"
-      : activeMemberships.length > 0
-        ? "active"
-        : endedMemberships.length > 0
-          ? "alumni"
-          : "none"
-  ];
+  const derivedStatus =
+    personStatusLabels[
+      derivePersonStatus({
+        activeMembershipCount: activeMemberships.length,
+        deletedAt: person.deleted_at,
+        endedMembershipCount: endedMemberships.length,
+        hasAlumniAccess: Boolean(person.alumni_access_granted_at),
+      })
+    ];
   const derivedAccessLevel =
     accessLevelLabels[
       person.portal_access_status === "suspended"

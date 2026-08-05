@@ -22,10 +22,14 @@ export function AccessWelcome({ welcome }: { welcome: DashboardWelcome }) {
       <h2 className="text-h2" id="access-welcome-heading">
         Your request was approved
       </h2>
+      {/* What access this granted is already the greeting above, so this says
+          the one thing the greeting cannot: who decided it, and when. */}
       <p className="mt-4 max-w-[65ch] leading-relaxed opacity-65">
-        {welcome.organizationName
-          ? `You are an active member of ${welcome.organizationName} and the portal is yours to use.`
-          : "You hold alumni access to the portal."}
+        {welcome.reviewerName
+          ? `${welcome.reviewerName} approved it${welcome.decidedLabel ? ` on ${welcome.decidedLabel}` : ""}.`
+          : welcome.decidedLabel
+            ? `Approved on ${welcome.decidedLabel}.`
+            : "Welcome to the portal."}
       </p>
 
       {welcome.note && (

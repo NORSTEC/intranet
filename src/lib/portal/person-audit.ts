@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  accessLevelLabels,
+  personStatusLabels,
+} from "@/lib/portal/access-labels";
 import { categoryFor, type AuditCategory } from "@/lib/portal/audit-categories";
 import { createClient } from "@/lib/supabase/server";
 
@@ -128,12 +132,32 @@ function roleLabel(role: string | null) {
   return role === "organization_admin" ? "Organization administrator" : "Member";
 }
 
+// portal_access.status — whether the person may sign in at all. It is not the
+// access level (member, organization admin, portal admin), so every field that
+// prints it says "Portal access" rather than "Access".
 function accessStatusLabel(status: string | null) {
   if (status === "active") return "Active";
   if (status === "suspended") return "Suspended";
-  if (status === "unclaimed") return "Unclaimed";
+  if (status === "unclaimed") return "Never signed in";
   if (status === "deactivated") return "Deactivated";
   return "Unknown";
+}
+
+// Deletion snapshots taken before these facts were recorded carry neither
+// value, and a heading is better left out than filled with a guess — every
+// label below returns null when the event does not hold the fact.
+function personStatusLabel(status: string | null) {
+  if (status === "active") return personStatusLabels.active;
+  if (status === "alumni") return personStatusLabels.alumni;
+  if (status === "none") return personStatusLabels.none;
+  return null;
+}
+
+function accessLevelLabel(level: string | null) {
+  if (level === "portal_admin") return accessLevelLabels.portal_admin;
+  if (level === "organization_admin") return accessLevelLabels.organization_admin;
+  if (level === "member") return accessLevelLabels.member;
+  return null;
 }
 
 function membershipStatusLabel(status: string | null) {
@@ -340,7 +364,7 @@ function buildFields(
     case "portal_access.suspended":
     case "portal_access.deactivated":
       add(
-        "Access change",
+        "Portal access change",
         `${accessStatusLabel(text(details, "previous_status"))} → ${accessStatusLabel(
           row.action.slice("portal_access.".length),
         )}`,
@@ -440,8 +464,19 @@ function buildFields(
     case "person.self_deleted":
       add("Deleted account email", snapshot(details, "deleted_person")?.email);
       add(
+        "Status before deletion",
+        personStatusLabel(text(details, "previous_status")),
+      );
+      add(
         "Access before deletion",
-        accessStatusLabel(text(details, "previous_access_status")),
+        accessLevelLabel(text(details, "previous_access_level")),
+      );
+      // Deletion suspends portal access on its way through, so printing the
+      // portal access a person held says nothing. Having already been
+      // suspended before the deletion does.
+      add(
+        "Was suspended",
+        text(details, "previous_access_status") === "suspended" ? "Yes" : null,
       );
       add(
         "Reason",
@@ -453,7 +488,7 @@ function buildFields(
 
     case "person.restored":
       add(
-        "Access restored to",
+        "Portal access restored to",
         accessStatusLabel(text(details, "restored_access_status")),
       );
       break;

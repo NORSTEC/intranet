@@ -32,3 +32,28 @@ export const personStatusLabels: Record<RegistryPersonStatus, string> = {
   deleted: "Deleted",
   none: "No membership",
 };
+
+/**
+ * The one place a person's status is decided. Manage people and the person
+ * page describe the same person, so they read it from here rather than each
+ * repeating the rules — the two drifted apart once already, and alumni access
+ * granted without any membership row rendered as "No membership".
+ */
+export function derivePersonStatus({
+  activeMembershipCount,
+  deletedAt,
+  endedMembershipCount,
+  hasAlumniAccess,
+}: {
+  activeMembershipCount: number;
+  deletedAt: string | null;
+  endedMembershipCount: number;
+  hasAlumniAccess: boolean;
+}): RegistryPersonStatus {
+  if (deletedAt) return "deleted";
+  if (activeMembershipCount > 0) return "active";
+  // Alumni access granted by a portal administrator makes someone an alumnus
+  // even when no membership was ever recorded for them.
+  if (endedMembershipCount > 0 || hasAlumniAccess) return "alumni";
+  return "none";
+}

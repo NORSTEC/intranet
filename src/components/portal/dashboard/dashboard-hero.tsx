@@ -16,7 +16,16 @@ export function DashboardHero({
       aria-label="Your portal membership"
       className="dashboard-hero dashboard-rise portal-surface-strong px-6 py-9 sm:px-10 sm:py-12"
     >
-      <span aria-hidden="true" className="dashboard-hero-star" />
+      {/* A constellation rather than one mark: the geometry of each star lives
+          in its own numbered class, so the arrangement is tuned in CSS and the
+          markup only says how many there are. */}
+      {[1, 2, 3, 4, 5, 6].map((star) => (
+        <span
+          aria-hidden="true"
+          className={`dashboard-hero-star dashboard-hero-star-${star}`}
+          key={star}
+        />
+      ))}
 
       <div className="relative flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between sm:gap-12">
         <div className="min-w-0">
