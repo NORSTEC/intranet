@@ -37,7 +37,6 @@ export function MemberAvatar({
           fill
           sizes={size === "hero" ? "128px" : size === "large" ? "80px" : "44px"}
           src={src}
-          unoptimized
         />
       ) : (
         initials(name)

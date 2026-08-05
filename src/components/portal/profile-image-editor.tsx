@@ -46,7 +46,10 @@ export function ProfileImageEditor({
           priority
           sizes="(min-width: 1024px) 320px, 90vw"
           src={previewUrl}
-          unoptimized
+          // The stored avatar is optimized like everywhere else. A picture the
+          // person just picked is an object URL that only exists in this tab,
+          // which the optimizer cannot fetch, so that one stays as it is.
+          unoptimized={previewUrl.startsWith("blob:")}
         />
       ) : (
         <span className="absolute inset-0 flex items-center justify-center text-egg-static">

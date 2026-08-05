@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PortalAccessState,
@@ -57,14 +58,25 @@ const rolePriority: Record<MembershipRole, number> = {
   organization_admin: 2,
 };
 
-export async function getPortalAccess(): Promise<PortalAccessState> {
+/**
+ * The whole access state for the signed-in person, resolved once per request.
+ *
+ * Both the portal layout and the page inside it need this, and every
+ * `require*` helper goes through it — without the memo each of those repeated
+ * the entire chain, auth round trip included, on the same render.
+ */
+export const getPortalAccess = cache(async function getPortalAccess(): Promise<
+  PortalAccessState
+> {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  // Verifies the token's signature rather than asking the Auth server who the
+  // caller is — same guarantee, no network hop. The proxy already authenticates
+  // this way, so an expired session is refreshed before reaching here.
+  const { data: claimsResult, error: claimsError } =
+    await supabase.auth.getClaims();
+  const authUserId = claimsResult?.claims.sub;
 
-  if (userError || !user) {
+  if (claimsError || !authUserId) {
     return { status: "unauthenticated" };
   }
 
@@ -73,7 +85,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     .select(
       "auth_user_id, person_id, account_email, onboarding_status, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, portal_access_status, alumni_access_granted_at)",
     )
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", authUserId)
     .maybeSingle();
 
   if (accountResult.error || !accountResult.data) {
@@ -167,7 +179,7 @@ export async function getPortalAccess(): Promise<PortalAccessState> {
     isPortalAdmin: Boolean(portalAdministratorResult.data),
     hasAlumniAccess: Boolean(profileRow.alumni_access_granted_at),
   };
-}
+});
 
 export async function requirePortalAccess() {
   const access = await getPortalAccess();

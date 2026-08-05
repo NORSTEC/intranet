@@ -433,7 +433,10 @@ export async function saveProfile(formData: FormData) {
     const { error } = await supabase.storage
       .from("member-avatars")
       .upload(uploadedAvatarPath, avatar, {
-        cacheControl: "3600",
+        // The path carries a fresh UUID for every upload, so an object at a
+        // given path never changes and a short life only forces re-fetches of
+        // bytes that are already correct.
+        cacheControl: "31536000",
         contentType: avatar.type,
         upsert: false,
       });

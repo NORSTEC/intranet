@@ -38,9 +38,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={barlow.variable} suppressHydrationWarning>
       <head>
+        {/* The icon font is vendored under public/fonts and declared in
+            globals.css — next/font cannot host it, since Google's icon
+            families are not in its catalogue. Icons stay invisible until it
+            arrives, so it is fetched alongside the stylesheet rather than
+            after it. Same-origin fonts are still requested anonymously, hence
+            crossOrigin. */}
         <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
+          as="font"
+          crossOrigin="anonymous"
+          href="/fonts/material-symbols-outlined.woff2"
+          rel="preload"
+          type="font/woff2"
         />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

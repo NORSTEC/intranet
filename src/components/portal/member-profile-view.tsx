@@ -104,7 +104,6 @@ export function MemberProfileView({
               priority
               sizes="(min-width: 1024px) 320px, 90vw"
               src={avatarUrl}
-              unoptimized
             />
           ) : (
             <span className="absolute inset-0 flex items-center justify-center text-5xl font-medium text-egg-static">

@@ -89,7 +89,6 @@ export function TeamMemberCard({
               fill
               sizes="(min-width: 1280px) 30vw, (min-width: 640px) 45vw, 90vw"
               src={avatarUrl}
-              unoptimized
             />
           ) : (
             <span className="absolute inset-0 flex items-center justify-center text-4xl font-medium text-egg-static">
