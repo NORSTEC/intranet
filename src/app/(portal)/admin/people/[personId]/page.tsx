@@ -43,7 +43,10 @@ type MembershipRow = {
   ended_at: string | null;
   id: number;
   joined_at: string;
-  organizations: { name: string } | Array<{ name: string }> | null;
+  organizations:
+    | { name: string; slug: string }
+    | Array<{ name: string; slug: string }>
+    | null;
   role: string;
   status: string;
 };
@@ -128,7 +131,7 @@ export default async function PortalPersonPage({
     supabase
       .from("people")
       .select(
-        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, alumni_access_granted_at, person_emails (email, email_type, is_primary), portal_accounts (account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
+        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, alumni_access_granted_at, person_emails (email, email_type, is_primary), portal_accounts (account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name, slug)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
       )
       .eq("id", personId)
       .maybeSingle(),
@@ -251,6 +254,21 @@ export default async function PortalPersonPage({
     .map((account) => account.last_seen_at)
     .sort()
     .at(-1);
+  // Only Norstec's own people have a Workspace account, so for everybody else
+  // the section had nothing to say and said it anyway. Membership is the
+  // question, but not the whole of it: someone who signed in with a norstec.no
+  // address before their membership was recorded still has an account to
+  // administer, and so does someone the directory has already matched.
+  const belongsToNorstec =
+    Boolean(norstecAccount) ||
+    person.memberships.some(
+      (membership) =>
+        single(membership.organizations)?.slug === NORSTEC_ORGANIZATION_SLUG,
+    ) ||
+    hasNorstecEmail([
+      ...emails.map((email) => email.email),
+      ...person.portal_accounts.map((account) => account.account_email),
+    ]);
   // Both derived exactly as Manage people derives them, so a person reads the
   // same in the table and on their own page.
   const derivedStatus =
@@ -406,12 +424,14 @@ export default async function PortalPersonPage({
         personId={person.id}
         personName={name}
       >
-        <NorstecAccountCard
-          account={norstecAccount}
-          personId={person.id}
-          personName={name}
-          workspaceConfigured={isWorkspaceConfigured()}
-        />
+        {belongsToNorstec && (
+          <NorstecAccountCard
+            account={norstecAccount}
+            personId={person.id}
+            personName={name}
+            workspaceConfigured={isWorkspaceConfigured()}
+          />
+        )}
         <PersonAuditFeed entries={auditEntries} />
       </PersonAdminActions>
     </>

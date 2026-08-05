@@ -194,6 +194,22 @@ html.theme-switching *::after {
     color: var(--color-copper);
   }
 
+  /* The counterpart to danger: the button that gives something back rather
+     than takes it away. Beachball filled, the same treatment `YouPill` uses to
+     be found without being read. Hover drops to `--color-sky`, the darker end
+     of the same hue, because beachball on the page background is too faint to
+     read once the fill is gone. */
+  .portal-button-primary {
+    border-color: var(--color-beachball);
+    background: var(--color-beachball);
+    color: #0f1118;
+  }
+
+  .portal-button-primary:hover {
+    background: transparent;
+    color: var(--color-sky);
+  }
+
   .portal-field {
     width: 100%;
     border: 2px solid color-mix(in srgb, var(--color-moody) 20%, transparent);

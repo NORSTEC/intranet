@@ -13,8 +13,8 @@ const sections = [
     description:
       "Every account in the norstec.no Google Workspace, and which of them belong to nobody in the portal.",
     href: "/admin/workspace",
-    icon: "cloud_sync",
-    title: "Workspace accounts",
+    icon: "cloud",
+    title: "Google accounts",
   },
   {
     description:

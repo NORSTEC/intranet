@@ -105,6 +105,39 @@ Four rules that cut across most portal components:
   a `relative` label, `className="portal-field w-full pr-10"`, a `sr-only`
   span for the label, and the trailing `material-symbols-outlined` magnifier.
 
+## Table structure
+
+Every listing table in the portal is built the same way. `deleted-people-table.tsx`
+and `portal-people-registry.tsx` are the two to copy from; a new table that
+invents its own shape will look wrong next to them.
+
+- **A controls row above the table**, always:
+  `mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between`,
+  with `FilterMenu` pills on the left and **a search box on the right** — every
+  table is searchable, there is no such thing as a portal table you cannot
+  filter by typing. With no filters, keep the row and use `xl:justify-end`.
+- `<table className="w-full min-w-[Nrem] border-collapse">` inside
+  `<div className="mt-8 overflow-x-auto">`, with a `<caption className="sr-only">`
+  describing what the rows are and what the columns say.
+- Headers are `SortableTableHeader` (`sortable-table-header.tsx`), which owns
+  `scope="col"`, `aria-sort` and the three-state sort cycle
+  (ascending → descending → unsorted). A non-sortable trailing **Actions**
+  column is a plain
+  `<th className="pb-3 pr-4 text-right font-semibold italic" scope="col">`.
+- Rows are `<tr className="border-b border-moody">`; cells are `py-3 pr-5`,
+  the first `py-3 pl-4 pr-5` and the last `py-3 pr-4`.
+- **No pills inside table cells.** A cell holds plain text — `portal-pill` is
+  for filter menus and `YouPill`, not for restating a value the column header
+  already names. State that reads as a flag gets a yes/no column
+  (`Suspended` → `Yes`/`No`), not a coloured badge.
+- Actions live in the last cell as full `portal-button`s inside
+  `<div className="flex flex-wrap justify-end gap-3">`, each
+  `whitespace-nowrap`. A row carrying action buttons is **not** itself
+  clickable — put a navigating button in the Actions cell instead, since
+  nesting interactive elements breaks both keyboard and screen-reader use.
+- The empty state is a sibling `<p className="mt-8 text-sm opacity-55">` that
+  distinguishes "nothing exists" from "nothing matches these filters".
+
 ## Menu active state
 
 A menu item stays active for every page under its href, not just the exact

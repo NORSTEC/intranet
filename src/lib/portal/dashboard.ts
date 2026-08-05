@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { MembershipRole, PortalProfile } from "@/lib/auth/types";
+import { NORSTEC_ORGANIZATION_SLUG } from "@/lib/portal/norstec";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
@@ -47,6 +48,7 @@ export type DashboardActions = {
   profileFieldCount: number;
   canLinkBackupAccount: boolean;
   pendingAccessRequests: number;
+  unmatchedWorkspaceAccounts: number;
 };
 
 export type PortalPulse = {
@@ -226,6 +228,7 @@ export async function loadDashboard({
     accountsResult,
     accessRequestsResult,
     welcomeResult,
+    unmatchedWorkspaceResult,
   ] = await Promise.all([
     supabase
       .from("memberships")
@@ -269,6 +272,20 @@ export async function loadDashboard({
       .order("reviewed_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Workspace accounts no portal profile claims. Only a portal administrator
+    // can act on one, and only they can read the table, so for everybody else
+    // the query is not merely hidden — it is never asked.
+    isPortalAdmin
+      ? supabase
+          .from("external_accounts")
+          .select("id, organizations!inner (slug)", {
+            count: "exact",
+            head: true,
+          })
+          .eq("provider", "google_workspace")
+          .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
+          .is("person_id", null)
+      : Promise.resolve({ count: 0, error: null }),
   ]);
 
   if (
@@ -277,7 +294,8 @@ export async function loadDashboard({
     portalMembershipsResult.error ||
     accountsResult.error ||
     accessRequestsResult.error ||
-    welcomeResult.error
+    welcomeResult.error ||
+    unmatchedWorkspaceResult.error
   ) {
     throw new Error("Could not load dashboard");
   }
@@ -490,6 +508,7 @@ export async function loadDashboard({
       pendingAccessRequests: isPortalAdmin || canReviewAccessRequests
         ? (accessRequestsResult.count ?? 0)
         : 0,
+      unmatchedWorkspaceAccounts: unmatchedWorkspaceResult.count ?? 0,
     },
     avatarUrl: profile.avatarPath ? avatarUrls.get(profile.avatarPath) : undefined,
     memberSince: ownStartDates[0] ?? null,

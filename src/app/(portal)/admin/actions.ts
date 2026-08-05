@@ -67,7 +67,7 @@ function messageFor(error: { message: string }, fallback: string) {
     return "Only someone with active portal access can administer the portal.";
   }
   if (error.message.includes("norstec_domain_required")) {
-    return "Only people with a norstec.no email or linked Google account can become portal administrators.";
+    return "Only people with a norstec.no Google account can become portal administrators.";
   }
   if (error.message.includes("last_organization_admin")) {
     return "This person is the last active administrator of an organization. Appoint another administrator first.";
@@ -234,7 +234,6 @@ export async function changePortalAccess(input: {
 
   const change = await applyWorkspaceSuspension({
     externalId: workspaceAccount?.externalId ?? null,
-    personId: input.personId,
     suspended: suspending,
   });
 
@@ -374,7 +373,6 @@ export async function softDeletePerson(input: {
 
   const suspension = await applyWorkspaceSuspension({
     externalId: workspaceAccount.externalId,
-    personId: input.personId,
     suspended: true,
   });
 
@@ -426,7 +424,6 @@ export async function restorePerson(input: {
 
   const change = await applyWorkspaceSuspension({
     externalId: workspaceAccount.externalId,
-    personId: input.personId,
     suspended: false,
   });
 
@@ -543,7 +540,6 @@ async function loadWorkspaceAccount(
  */
 async function applyWorkspaceSuspension(input: {
   externalId: string | null;
-  personId: number;
   suspended: boolean;
 }): Promise<PortalManagementResult> {
   if (!input.externalId) {
@@ -564,7 +560,7 @@ async function applyWorkspaceSuspension(input: {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_workspace_account_suspended", {
-    p_person_id: input.personId,
+    p_external_id: input.externalId,
     p_suspended: input.suspended,
   });
 
@@ -606,10 +602,44 @@ export async function setNorstecAccountSuspension(input: {
   const account = await loadWorkspaceAccount(input.personId);
   const result = await applyWorkspaceSuspension({
     externalId: account?.externalId ?? null,
-    personId: input.personId,
     suspended: input.suspended,
   });
 
   revalidatePersonViews(input.personId);
+  revalidatePath("/admin/workspace");
+  return result;
+}
+
+/**
+ * The same suspension, reached from the directory rather than from a person.
+ * Accounts nobody in the portal claims are the ones this page exists to find,
+ * and they have no person page to act from — so Google's user id is what the
+ * caller names, and the portal never has to invent a profile to hang the
+ * decision on.
+ */
+export async function setWorkspaceAccountSuspension(input: {
+  externalId: string;
+  suspended: boolean;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!input.externalId.trim()) {
+    return { ok: false, message: "This account could not be changed." };
+  }
+
+  if (!isWorkspaceConfigured()) {
+    return {
+      ok: false,
+      message: "Google Workspace is not configured on this server.",
+    };
+  }
+
+  const result = await applyWorkspaceSuspension({
+    externalId: input.externalId,
+    suspended: input.suspended,
+  });
+
+  revalidatePath("/admin/workspace");
+  revalidatePath("/admin/people");
   return result;
 }

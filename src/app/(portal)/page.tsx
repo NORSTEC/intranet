@@ -68,9 +68,25 @@ export default async function DashboardPage() {
       : "";
   const subtitle = `${membershipSentence}${roleSentence}`;
 
-  const { missingProfileFields, profileFieldCount, canLinkBackupAccount, pendingAccessRequests } =
-    dashboard.actions;
+  const {
+    missingProfileFields,
+    profileFieldCount,
+    canLinkBackupAccount,
+    pendingAccessRequests,
+    unmatchedWorkspaceAccounts,
+  } = dashboard.actions;
   const actions: RecommendedAction[] = [];
+  if (unmatchedWorkspaceAccounts > 0) {
+    actions.push({
+      description:
+        unmatchedWorkspaceAccounts === 1
+          ? "1 account in the norstec.no Google Workspace belongs to nobody in the portal."
+          : `${unmatchedWorkspaceAccounts} accounts in the norstec.no Google Workspace belong to nobody in the portal.`,
+      href: "/admin/workspace",
+      icon: "cloud",
+      title: "Google accounts to review",
+    });
+  }
   if (pendingAccessRequests > 0) {
     actions.push({
       description:

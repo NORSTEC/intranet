@@ -85,7 +85,7 @@ export function NorstecAccountCard({
           <ActionCard
             description={
               account
-                ? "Their account in the norstec.no Google Workspace. Suspending it blocks every Google sign-in — including into this portal — while their mail and files stay untouched."
+                ? "Their account in the norstec.no Google Workspace. Suspending it suspends it both in this portal and in Google Workspace."
                 : "No account in the norstec.no Google Workspace is linked to this person."
             }
             title="Google Workspace"
@@ -102,31 +102,25 @@ export function NorstecAccountCard({
               </p>
             ) : (
               <div className="grid gap-5">
-                <div>
-                  <span className="section-label block opacity-45">Address</span>
-                  <p className="mt-2 font-medium break-words">
-                    {account.accountEmail ?? "—"}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="portal-pill">
-                    <span
-                      aria-hidden="true"
-                      className="material-symbols-outlined text-[1rem]"
-                    >
-                      {isSuspended ? "lock" : "check_circle"}
-                    </span>
-                    {isSuspended ? "Suspended" : "Active"}
-                  </span>
-                  {account.lastSyncedAt && (
-                    <span className="text-sm opacity-55">
-                      As of {formatDate(account.lastSyncedAt)}
-                    </span>
-                  )}
-                </div>
+                <dl className="grid gap-5 sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <dt className="section-label opacity-45">Address</dt>
+                    <dd className="mt-2 font-medium break-words">
+                      {account.accountEmail ?? "—"}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="section-label opacity-45">Suspended</dt>
+                    <dd className="mt-2 font-medium">
+                      {isSuspended ? "Yes" : "No"}
+                    </dd>
+                  </div>
+                </dl>
                 <div className="flex flex-wrap gap-3">
                   <button
-                    className={`portal-button${isSuspended ? "" : " portal-button-danger"}`}
+                    className={`portal-button ${
+                      isSuspended ? "portal-button-primary" : "portal-button-danger"
+                    }`}
                     disabled={busy}
                     onClick={() => setConfirming(true)}
                     type="button"
@@ -141,7 +135,7 @@ export function NorstecAccountCard({
                           ? "lock_open"
                           : "lock"}
                     </span>
-                    {isSuspended ? "Reactivate account" : "Suspend account"}
+                    {isSuspended ? "Activate account" : "Suspend account"}
                   </button>
                   {account.adminUrl && (
                     <a
@@ -160,6 +154,15 @@ export function NorstecAccountCard({
                     </a>
                   )}
                 </div>
+                {/* Read from Google at the last sync, not now — so how old the
+                    answer is belongs on the card. As its own sentence, though:
+                    hung off the value it read as a badge, which is not a thing
+                    this portal does anywhere else. */}
+                {account.lastSyncedAt && (
+                  <p className="text-sm leading-relaxed opacity-55">
+                    Last synced from Google {formatDate(account.lastSyncedAt)}.
+                  </p>
+                )}
               </div>
             )}
           </ActionCard>
@@ -170,13 +173,13 @@ export function NorstecAccountCard({
         <ConfirmDialog
           busy={busy}
           confirmIcon={isSuspended ? "lock_open" : "lock"}
-          confirmLabel={isSuspended ? "Reactivate" : "Suspend"}
+          confirmLabel={isSuspended ? "Activate" : "Suspend"}
           danger={!isSuspended}
           onCancel={() => setConfirming(false)}
           onConfirm={confirmSuspension}
           title={
             isSuspended
-              ? "Reactivate this Norstec account?"
+              ? "Activate this Norstec account?"
               : "Suspend this Norstec account?"
           }
         >

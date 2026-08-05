@@ -8,14 +8,20 @@ import {
   workspaceAdminUrl,
 } from "@/lib/google/workspace";
 import { NORSTEC_ORGANIZATION_SLUG } from "@/lib/portal/norstec";
+import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
+
+type DirectoryPerson = {
+  avatar_path: string | null;
+  full_name: string | null;
+};
 
 type DirectoryRow = {
   account_email: string | null;
   display_name: string | null;
   external_id: string | null;
   last_synced_at: string | null;
-  people: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  people: DirectoryPerson | DirectoryPerson[] | null;
   person_id: number | null;
   status: string;
 };
@@ -32,7 +38,7 @@ export default async function WorkspaceAccountsPage() {
   const { data, error } = await supabase
     .from("external_accounts")
     .select(
-      "person_id, external_id, account_email, display_name, status, last_synced_at, organizations!inner (slug), people (full_name)",
+      "person_id, external_id, account_email, display_name, status, last_synced_at, organizations!inner (slug), people (full_name, avatar_path)",
     )
     .eq("provider", "google_workspace")
     .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
@@ -44,24 +50,34 @@ export default async function WorkspaceAccountsPage() {
 
   const rows = data as unknown as DirectoryRow[];
 
-  const accounts: WorkspaceDirectoryRow[] = rows.flatMap((row) =>
+  // One signing round for every linked person, so the table shows the same
+  // faces Manage people does rather than falling back to initials.
+  const avatarUrls = await getMemberAvatarUrls(
+    rows.map((row) => single(row.people)?.avatar_path ?? null),
+  );
+
+  const accounts: WorkspaceDirectoryRow[] = rows.flatMap((row) => {
     // A row without Google's user id predates the sync and cannot be linked
     // back to an account in the Admin console, so there is nothing useful to
     // show for it. The next sync either fills it in or removes it.
-    row.external_id && row.account_email
-      ? [
-          {
-            accountEmail: row.account_email,
-            adminUrl: workspaceAdminUrl(row.external_id),
-            displayName: row.display_name,
-            externalId: row.external_id,
-            personId: row.person_id,
-            personName: single(row.people)?.full_name ?? null,
-            suspended: row.status === "suspended",
-          } satisfies WorkspaceDirectoryRow,
-        ]
-      : [],
-  );
+    if (!row.external_id || !row.account_email) return [];
+
+    const person = single(row.people);
+    return [
+      {
+        accountEmail: row.account_email,
+        adminUrl: workspaceAdminUrl(row.external_id),
+        avatarUrl: person?.avatar_path
+          ? avatarUrls.get(person.avatar_path)
+          : undefined,
+        displayName: row.display_name,
+        externalId: row.external_id,
+        personId: row.person_id,
+        personName: person?.full_name ?? null,
+        suspended: row.status === "suspended",
+      } satisfies WorkspaceDirectoryRow,
+    ];
+  });
 
   const lastSyncedAt =
     rows
@@ -74,8 +90,7 @@ export default async function WorkspaceAccountsPage() {
     <>
       <p className="max-w-2xl text-sm opacity-55">
         What the norstec.no Google Workspace contains, and how much of it the
-        portal recognises. Accounts are never created or deleted from here —
-        both happen in the Google Admin console.
+        portal recognises.
       </p>
 
       <div className="mt-10">

@@ -1061,7 +1061,7 @@ export type Database = {
         Returns: undefined
       }
       set_workspace_account_suspended: {
-        Args: { p_person_id: number; p_suspended: boolean }
+        Args: { p_external_id: string; p_suspended: boolean }
         Returns: undefined
       }
       sign_in_block_reason: { Args: never; Returns: string | null }

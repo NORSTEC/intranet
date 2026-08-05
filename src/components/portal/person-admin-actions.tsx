@@ -182,7 +182,9 @@ export function PersonAdminActions({
               </p>
             ) : (
               <button
-                className={`portal-button${isSuspended ? "" : " portal-button-danger"}`}
+                className={`portal-button ${
+                  isSuspended ? "portal-button-primary" : "portal-button-danger"
+                }`}
                 disabled={busy}
                 onClick={() => setPendingAction({ kind: "access" })}
                 type="button"
@@ -322,8 +324,7 @@ export function PersonAdminActions({
               </p>
             ) : !eligibleForPortalAdmin ? (
               <p className="text-sm leading-relaxed opacity-60">
-                Only people with a {NORSTEC_EMAIL_DOMAIN} email or linked
-                Google account can become portal administrators.
+                Only people with a {NORSTEC_EMAIL_DOMAIN} Google account can become portal administrators.
               </p>
             ) : (
               <button
