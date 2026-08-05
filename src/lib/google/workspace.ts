@@ -117,7 +117,10 @@ function authClient() {
 
 async function accessToken() {
   try {
-    const token = await authClient().getAccessToken();
+    // This returns `{ token, res }`, not the token itself — an easy thing to
+    // read past, and doing so sends the object's string form as the bearer,
+    // which Google rejects as though the federation had failed.
+    const { token } = await authClient().getAccessToken();
     if (!token) throw new WorkspaceError("Google returned no access token.");
     return token;
   } catch (error) {
