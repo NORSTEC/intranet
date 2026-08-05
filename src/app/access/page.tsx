@@ -116,10 +116,6 @@ export default async function AccessPage({
           <section className="portal-surface mt-8 max-w-4xl p-6 sm:p-8">
             <h2 className="flex items-center gap-2 text-h2">
               Waiting for approval
-              <span
-                aria-hidden="true"
-                className="entry-heading-star inline-block shrink-0"
-              />
             </h2>
             <p className="mt-4 max-w-[65ch] leading-relaxed opacity-65">
               {pendingRequest.request_type === "alumni"
