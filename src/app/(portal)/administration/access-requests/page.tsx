@@ -3,13 +3,10 @@ import {
   type AccessReviewRequest,
   type AccessReviewStatus,
 } from "@/components/portal/access-review-table";
-import { PageHeader } from "@/components/portal/page-header";
 import { requireOrganizationAdminAccess } from "@/lib/auth/access";
-import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
 type RequesterRow = {
-  avatar_path: string | null;
   full_name: string | null;
   person_emails: Array<{ email: string; is_primary: boolean }>;
 };
@@ -62,7 +59,7 @@ export default async function AccessRequestsPage() {
   const requestsResult = await supabase
     .from("access_requests")
     .select(
-      "id, created_at, decision_note, field_of_study, message, organization_id, request_type, reviewed_at, status, study_year, organizations (name), people!access_requests_person_id_fkey (full_name, avatar_path, person_emails (email, is_primary)), reviewer:people!access_requests_reviewed_by_person_id_fkey (full_name)",
+      "id, created_at, decision_note, field_of_study, message, organization_id, request_type, reviewed_at, status, study_year, organizations (name), people!access_requests_person_id_fkey (full_name, person_emails (email, is_primary)), reviewer:people!access_requests_reviewed_by_person_id_fkey (full_name)",
     )
     .order("created_at", { ascending: false });
 
@@ -71,20 +68,15 @@ export default async function AccessRequestsPage() {
   }
 
   const requestRows = requestsResult.data as AccessRequestRow[];
-  const avatarUrls = await getMemberAvatarUrls(
-    requestRows.map((row) => single(row.people)?.avatar_path ?? null),
-  );
 
   const requests: AccessReviewRequest[] = requestRows
     .map((row) => {
       const requester = single(row.people);
-      const avatarPath = requester?.avatar_path ?? null;
       const emails = [...(requester?.person_emails ?? [])].sort(
         (left, right) => Number(right.is_primary) - Number(left.is_primary),
       );
 
       return {
-        avatarUrl: avatarPath ? avatarUrls.get(avatarPath) : undefined,
         createdAt: row.created_at,
         decidedLabel: formatMoment(row.reviewed_at),
         decisionNote: row.decision_note,
@@ -110,13 +102,6 @@ export default async function AccessRequestsPage() {
 
   return (
     <>
-      <PageHeader
-        description={
-          access.administeredOrganizations.length === 1
-            ? access.administeredOrganizations[0].organizationName
-            : `${access.administeredOrganizations.length} organizations`
-        }
-      />
       <AccessReviewTable
         canReviewAlumni={access.isPortalAdmin}
         organizations={access.administeredOrganizations.map((organization) => ({
