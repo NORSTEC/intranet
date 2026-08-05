@@ -43,6 +43,7 @@ const accessLevelOptions: RegistryAccessLevel[] = [
   "portal_admin",
   "organization_admin",
   "member",
+  "none",
   "suspended",
 ];
 

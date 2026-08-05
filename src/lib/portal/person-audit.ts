@@ -249,6 +249,8 @@ function describe(action: string, details: Record<string, unknown> | null) {
       return "Person restored";
     case "person.purged":
       return "Data purged";
+    case "person.abandoned_discarded":
+      return "Abandoned profile discarded";
     default:
       return action
         .replace(/[._]/g, " ")
@@ -492,6 +494,18 @@ function buildFields(
         accessStatusLabel(text(details, "restored_access_status")),
       );
       break;
+
+    case "person.abandoned_discarded": {
+      const discardedId = number(details, "discarded_person_id");
+      // No name and no address: the job removes people the portal had no
+      // reason to hold, and its own record must not hold them either.
+      add(
+        "Discarded profile",
+        discardedId === null ? null : `Person #${discardedId}`,
+      );
+      add("Triggered by", sourceLabel(text(details, "source")));
+      break;
+    }
 
     case "person.purged": {
       const purged = snapshot(details, "purged_person");

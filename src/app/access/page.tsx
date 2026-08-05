@@ -10,11 +10,9 @@ import { createClient } from "@/lib/supabase/server";
 type Organization = { id: number; name: string };
 type AccessRequest = {
   created_at: string;
-  decision_note: string | null;
   id: number;
   message: string | null;
   request_type: "organization" | "alumni";
-  reviewed_at: string | null;
   status: "pending" | "approved" | "rejected" | "cancelled";
   organizations: { name: string } | { name: string }[] | null;
 };
@@ -82,7 +80,7 @@ export default async function AccessPage({
     supabase
       .from("access_requests")
       .select(
-        "id, created_at, decision_note, message, request_type, reviewed_at, status, organizations (name)",
+        "id, created_at, message, request_type, status, organizations (name)",
       )
       .eq("person_id", access.profile.personId)
       .order("created_at", { ascending: false })
@@ -96,10 +94,13 @@ export default async function AccessPage({
 
   const organizations = (organizationsResult.data ?? []) as Organization[];
   const latestRequest = requestsResult.data as AccessRequest | null;
+  // Only a pending request is ever read here. A declined one cannot reach this
+  // page: the decision discards the applicant's profile, and the request row
+  // goes with it, so the decline is told by email instead. The card that used
+  // to say it here is kept, layout and copy, in
+  // docs/access-decision-notification.md for the sender to be built from.
   const pendingRequest =
     latestRequest?.status === "pending" ? latestRequest : null;
-  const declinedRequest =
-    latestRequest?.status === "rejected" ? latestRequest : null;
 
   return (
     <PortalEntryShell>
@@ -159,37 +160,6 @@ export default async function AccessPage({
           </section>
         ) : (
           <>
-            {declinedRequest && (
-              <section className="portal-surface mt-8 max-w-4xl p-6 sm:p-8">
-                <h2 className="text-h2">Your request was declined</h2>
-                <p className="mt-4 max-w-[65ch] leading-relaxed opacity-65">
-                  {scopeLabel(declinedRequest)} did not approve the request you
-                  sent on {formatMoment(declinedRequest.created_at)}.
-                </p>
-                <dl className="mt-7 grid gap-5 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="section-label opacity-45">Decided</dt>
-                    <dd className="mt-1.5">
-                      {formatMoment(declinedRequest.reviewed_at) ?? "—"}
-                    </dd>
-                  </div>
-                  {declinedRequest.decision_note && (
-                    <div className="sm:col-span-2">
-                      <dt className="section-label opacity-45">
-                        Note from the reviewer
-                      </dt>
-                      <dd className="mt-1.5 max-w-[60ch] leading-relaxed">
-                        {declinedRequest.decision_note}
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-                <p className="mt-5 text-sm opacity-55">
-                  You can send a new request below.
-                </p>
-              </section>
-            )}
-
             {withdrawn === "true" && (
               <Toast
                 clearParams={["withdrawn"]}

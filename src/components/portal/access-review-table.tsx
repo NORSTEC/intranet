@@ -202,9 +202,9 @@ function DecisionDialog({
       <p className="mt-4 leading-relaxed opacity-65">
         {approving
           ? request.requestType === "alumni"
-            ? `${request.requesterName} gets alumni access to the portal. No organization membership is created.`
-            : `${request.requesterName} becomes an active member of ${accessLabel(request)}.`
-          : `${request.requesterName} keeps no access and sees your note the next time they sign in. They can send a new request afterwards.`}
+            ? `${request.requesterName} gets alumni access to the portal. No organization membership is created, and they get an email telling them they are in.`
+            : `${request.requesterName} becomes an active member of ${accessLabel(request)}, and gets an email telling them they are in.`
+          : `${request.requesterName} keeps no access and can send a new request whenever they like. They get an email with your note.`}
       </p>
 
       <label className="mt-6 grid gap-2">

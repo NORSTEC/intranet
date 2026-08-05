@@ -1,7 +1,10 @@
 import "server-only";
 
 import type { RegistryPerson } from "@/components/portal/portal-people-registry";
-import { derivePersonStatus } from "@/lib/portal/access-labels";
+import {
+  deriveAccessLevel,
+  derivePersonStatus,
+} from "@/lib/portal/access-labels";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
@@ -80,13 +83,13 @@ export async function loadRegistryPeople(): Promise<RegistryPerson[]> {
       .at(-1);
 
     return {
-      accessLevel: isBlocked
-        ? "suspended"
-        : row.portal_administrators
-          ? "portal_admin"
-          : isOrganizationAdmin
-            ? "organization_admin"
-            : "member",
+      accessLevel: deriveAccessLevel({
+        hasActiveMembership: activeMemberships.length > 0,
+        hasAlumniAccess: Boolean(row.alumni_access_granted_at),
+        isOrganizationAdmin,
+        isPortalAdmin: Boolean(row.portal_administrators),
+        isSuspended: isBlocked,
+      }),
       avatarUrl: row.avatar_path ? avatarUrls.get(row.avatar_path) : undefined,
       deletedAt: row.deleted_at,
       email: emails[0]?.email ?? null,

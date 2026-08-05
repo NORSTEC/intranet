@@ -13,6 +13,7 @@ import { PortalBreadcrumbData } from "@/components/portal/portal-breadcrumb-data
 import { requirePortalAdminAccess } from "@/lib/auth/access";
 import {
   accessLevelLabels,
+  deriveAccessLevel,
   derivePersonStatus,
   personStatusLabels,
 } from "@/lib/portal/access-labels";
@@ -228,15 +229,15 @@ export default async function PortalPersonPage({
     ];
   const derivedAccessLevel =
     accessLevelLabels[
-      person.portal_access_status === "suspended"
-        ? "suspended"
-        : person.portal_administrators
-          ? "portal_admin"
-          : activeMemberships.some(
-                (membership) => membership.role === "organization_admin",
-              )
-            ? "organization_admin"
-            : "member"
+      deriveAccessLevel({
+        hasActiveMembership: activeMemberships.length > 0,
+        hasAlumniAccess: Boolean(person.alumni_access_granted_at),
+        isOrganizationAdmin: activeMemberships.some(
+          (membership) => membership.role === "organization_admin",
+        ),
+        isPortalAdmin: Boolean(person.portal_administrators),
+        isSuspended: person.portal_access_status === "suspended",
+      })
     ];
 
   const memberships: PersonMembership[] = activeMemberships.map(
