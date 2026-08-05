@@ -56,10 +56,22 @@ export type PortalPulse = {
   joinedLastMonth: number;
 };
 
+/**
+ * The approval that let this person in, still unread. It is shown once, on the
+ * dashboard, because that is where an approved request lands them — /access
+ * redirects straight through the moment access exists.
+ */
+export type DashboardWelcome = {
+  note: string | null;
+  organizationName: string | null;
+  requestId: number;
+};
+
 export type DashboardData = {
   actions: DashboardActions;
   avatarUrl: string | undefined;
   memberSince: string | null;
+  welcome: DashboardWelcome | null;
   newMembers: DashboardNewMember[];
   organizations: DashboardOrganization[];
   pulse: PortalPulse;
@@ -204,6 +216,7 @@ export async function loadDashboard({
     portalMembershipsResult,
     accountsResult,
     accessRequestsResult,
+    welcomeResult,
   ] = await Promise.all([
     supabase
       .from("memberships")
@@ -233,6 +246,18 @@ export async function loadDashboard({
           .eq("status", "pending")
           .neq("person_id", profile.personId)
       : Promise.resolve({ count: 0, error: null }),
+    // The approval that granted this access, if its note has not been read
+    // away yet. Row level security already limits access_requests to the
+    // person they belong to.
+    supabase
+      .from("access_requests")
+      .select("id, decision_note, organizations (name)")
+      .eq("person_id", profile.personId)
+      .eq("status", "approved")
+      .is("decision_acknowledged_at", null)
+      .order("reviewed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (
@@ -240,10 +265,24 @@ export async function loadDashboard({
     ownTeamsResult.error ||
     portalMembershipsResult.error ||
     accountsResult.error ||
-    accessRequestsResult.error
+    accessRequestsResult.error ||
+    welcomeResult.error
   ) {
     throw new Error("Could not load dashboard");
   }
+
+  const welcomeRow = welcomeResult.data as {
+    decision_note: string | null;
+    id: number;
+    organizations: { name: string } | Array<{ name: string }> | null;
+  } | null;
+  const welcome: DashboardWelcome | null = welcomeRow
+    ? {
+        note: welcomeRow.decision_note,
+        organizationName: single(welcomeRow.organizations)?.name ?? null,
+        requestId: welcomeRow.id,
+      }
+    : null;
 
   const membershipRows = (membershipsResult.data ?? []) as MembershipRow[];
   const ownTeamRows = (ownTeamsResult.data ?? []) as OwnTeamRow[];
@@ -446,5 +485,6 @@ export async function loadDashboard({
       joinedLastMonth,
     },
     teams,
+    welcome,
   };
 }

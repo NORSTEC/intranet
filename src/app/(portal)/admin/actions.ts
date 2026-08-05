@@ -33,7 +33,7 @@ function messageFor(error: { message: string }, fallback: string) {
     return "You are not a portal administrator.";
   }
   if (error.message.includes("self_action_blocked")) {
-    return "You cannot run this on your own profile. Ask another portal administrator.";
+    return "You cannot run this on yourself. Ask another portal administrator.";
   }
   if (error.message.includes("person_not_found")) {
     return "This person no longer exists.";
@@ -48,7 +48,7 @@ function messageFor(error: { message: string }, fallback: string) {
     return "This person is deleted. Restore them first.";
   }
   if (error.message.includes("person_never_claimed")) {
-    return "This profile has never been signed in to, so there is no access to activate.";
+    return "This person has never signed in, so there is no access to activate.";
   }
   if (error.message.includes("portal_admin_role_first")) {
     return "Remove the portal administrator role first.";
@@ -75,16 +75,16 @@ function messageFor(error: { message: string }, fallback: string) {
     return "This deletion changed while the page was open. Reload and try again.";
   }
   if (error.message.includes("too_many_portal_accounts")) {
-    return "Together these profiles hold more than two sign-in accounts. Unlink one first.";
+    return "Together these two hold more than two sign-in accounts. Unlink one first.";
   }
   if (error.message.includes("primary_email_not_found")) {
-    return "The chosen primary address does not belong to either profile.";
+    return "The chosen primary address does not belong to either person.";
   }
   if (error.message.includes("same_person")) {
     return "Pick two different people.";
   }
   if (error.message.includes("source_is_portal_administrator")) {
-    return "A portal administrator cannot be folded into another profile. Merge the duplicate into their profile instead, or revoke the role first.";
+    return "A portal administrator cannot be folded into someone else. Merge the duplicate into them instead, or revoke the role first.";
   }
   return fallback;
 }
@@ -290,7 +290,6 @@ export async function purgePerson(input: {
 }
 
 export async function mergePeople(input: {
-  primaryEmail: string | null;
   sourcePersonId: number;
   targetPersonId: number;
 }): Promise<PortalManagementResult> {
@@ -300,12 +299,14 @@ export async function mergePeople(input: {
     !isValidPersonId(input.targetPersonId) ||
     !isValidPersonId(input.sourcePersonId)
   ) {
-    return { ok: false, message: "These profiles could not be merged." };
+    return { ok: false, message: "These two could not be merged." };
   }
 
   const supabase = await createClient();
+  // No primary address is passed: the person being merged into keeps their own,
+  // which is the direction the merge already runs in. Making the duplicate's
+  // address primary instead is done from that person's page.
   const { error } = await supabase.rpc("merge_people", {
-    p_primary_email: input.primaryEmail,
     p_source_person_id: input.sourcePersonId,
     p_target_person_id: input.targetPersonId,
   });
@@ -313,11 +314,11 @@ export async function mergePeople(input: {
   if (error) {
     return {
       ok: false,
-      message: messageFor(error, "These profiles could not be merged."),
+      message: messageFor(error, "These two could not be merged."),
     };
   }
 
   revalidatePersonViews(input.targetPersonId);
   revalidatePath(`/admin/people/${input.sourcePersonId}`);
-  return { ok: true, message: "Profiles merged." };
+  return { ok: true, message: "People merged." };
 }

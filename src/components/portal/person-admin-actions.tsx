@@ -10,9 +10,11 @@ import {
   type PortalManagementResult,
 } from "@/app/(portal)/admin/actions";
 import { ConfirmDialog } from "@/components/portal/confirm-dialog";
+import { MemberAvatar } from "@/components/portal/member-avatar";
 import { Toast } from "@/components/portal/toast";
 
 export type MergeCandidate = {
+  avatarUrl?: string;
   email: string | null;
   id: number;
   name: string;
@@ -87,9 +89,6 @@ export function PersonAdminActions({
   const [reason, setReason] = useState("");
   const [mergeQuery, setMergeQuery] = useState("");
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
-  const [primaryEmail, setPrimaryEmail] = useState<string>(
-    personEmails[0] ?? "",
-  );
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -113,14 +112,6 @@ export function PersonAdminActions({
       )
       .slice(0, 6);
   }, [mergeCandidates, mergeQuery]);
-
-  const primaryEmailOptions = useMemo(() => {
-    const options = [...personEmails];
-    if (mergeSource?.email && !options.includes(mergeSource.email)) {
-      options.push(mergeSource.email);
-    }
-    return options;
-  }, [mergeSource, personEmails]);
 
   function run(
     action: () => Promise<PortalManagementResult>,
@@ -163,7 +154,6 @@ export function PersonAdminActions({
       if (!mergeSource) return;
       run(() =>
         mergePeople({
-          primaryEmail: primaryEmail || null,
           sourcePersonId: mergeSource.id,
           targetPersonId: personId,
         }),
@@ -172,7 +162,7 @@ export function PersonAdminActions({
     }
     if (pendingAction.kind === "delete") {
       // This page stops existing for a deleted person, so staying on it would
-      // land on a 404. Manage users is where the decision was made from.
+      // land on a 404. Manage people is where the decision was made from.
       run(() => softDeletePerson({ personId, reason }), "/admin/people");
     }
   }
@@ -180,7 +170,7 @@ export function PersonAdminActions({
   const accessLockReason = isSelf
     ? "You cannot change your own portal access. Ask another portal administrator."
     : accessStatus === "unclaimed"
-      ? "This profile has never been signed in to. Access opens the first time they sign in."
+      ? "This person has never signed in. Access opens the first time they do."
       : isPortalAdmin
         ? "Revoke the portal administrator role before suspending this person."
         : null;
@@ -228,101 +218,105 @@ export function PersonAdminActions({
           </ActionCard>
 
           <ActionCard
-            description="Use this when the same person exists twice. The duplicate is folded into this profile and removed, so portal administrators cannot be picked as the duplicate — merge into their profile instead."
+            // The person being folded in is named right above the button, so
+            // the direction is spelled out with the surviving name rather than
+            // "this one" — which reads as whichever name is nearest.
+            description={`Use this when the same person exists twice. The duplicate is folded into ${personName} and removed.`}
             title="Merge a duplicate"
           >
             <label className="block">
-                  <span className="section-label mb-2 block opacity-50">
-                    Duplicate profile
+              <span className="section-label mb-2 block opacity-50">
+                Duplicate person
+              </span>
+              <div className="relative">
+                <input
+                  className="portal-field w-full pr-10"
+                  onChange={(event) => {
+                    setMergeQuery(event.target.value);
+                    setMergeSourceId(null);
+                  }}
+                  placeholder="Search name or email"
+                  type="text"
+                  value={mergeQuery}
+                />
+                <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
+                  search
+                </span>
+              </div>
+            </label>
+
+            {mergeSource ? (
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <MemberAvatar
+                  name={mergeSource.name}
+                  src={mergeSource.avatarUrl}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {mergeSource.name}
                   </span>
-                  <input
-                    className="portal-field"
-                    onChange={(event) => {
-                      setMergeQuery(event.target.value);
-                      setMergeSourceId(null);
-                    }}
-                    placeholder="Search name or email"
-                    type="search"
-                    value={mergeQuery}
-                  />
-                </label>
-
-                {mergeSource ? (
-                  <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-                    <span className="font-medium">{mergeSource.name}</span>
-                    <span className="opacity-55">
-                      {mergeSource.email ?? "No email"}
-                    </span>
-                    <button
-                      className="portal-pill"
-                      onClick={() => setMergeSourceId(null)}
-                      type="button"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="material-symbols-outlined text-[1rem]"
-                      >
-                        edit
-                      </span>
-                      Change
-                    </button>
-                  </p>
-                ) : (
-                  matchingCandidates.length > 0 && (
-                    <ul className="mt-3 grid gap-1">
-                      {matchingCandidates.map((candidate) => (
-                        <li key={candidate.id}>
-                          <button
-                            className="w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-moody/10"
-                            onClick={() => setMergeSourceId(candidate.id)}
-                            type="button"
-                          >
-                            <span className="block font-medium">
-                              {candidate.name}
-                            </span>
-                            <span className="block opacity-55">
-                              {candidate.email ?? "No email"}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )
-                )}
-
-                {mergeSource && primaryEmailOptions.length > 0 && (
-                  <label className="mt-5 block">
-                    <span className="section-label mb-2 block opacity-50">
-                      Primary address after the merge
-                    </span>
-                    <select
-                      className="portal-field"
-                      onChange={(event) => setPrimaryEmail(event.target.value)}
-                      value={primaryEmail}
-                    >
-                      {primaryEmailOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-
+                  <span className="block truncate text-sm opacity-55">
+                    {mergeSource.email ?? "No email"}
+                  </span>
+                </span>
                 <button
-                  className="portal-button mt-5"
-                  disabled={busy || !mergeSource}
-                  onClick={() => setPendingAction({ kind: "merge" })}
+                  className="portal-pill"
+                  onClick={() => setMergeSourceId(null)}
                   type="button"
                 >
                   <span
                     aria-hidden="true"
-                    className="material-symbols-outlined text-[1.1rem]"
+                    className="material-symbols-outlined text-[1rem]"
                   >
-                    merge
+                    edit
                   </span>
-                  Merge into this profile
+                  Change
                 </button>
+              </div>
+            ) : (
+              matchingCandidates.length > 0 && (
+                <ul className="mt-3 grid gap-1">
+                  {matchingCandidates.map((candidate) => (
+                    <li key={candidate.id}>
+                      <button
+                        className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-moody hover:text-egg focus-visible:bg-moody focus-visible:text-egg focus-visible:outline-none"
+                        onClick={() => setMergeSourceId(candidate.id)}
+                        type="button"
+                      >
+                        <MemberAvatar
+                          name={candidate.name}
+                          src={candidate.avatarUrl}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">
+                            {candidate.name}
+                          </span>
+                          <span className="block truncate text-sm opacity-55">
+                            {candidate.email ?? "No email"}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            )}
+
+            <button
+              // A long name would otherwise push the pill past the card edge.
+              className="portal-button mt-6 max-w-full"
+              disabled={busy || !mergeSource}
+              onClick={() => setPendingAction({ kind: "merge" })}
+              type="button"
+            >
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[1.1rem]"
+              >
+                merge
+              </span>
+              Merge into {personName}
+            </button>
           </ActionCard>
         </div>
       </section>
@@ -336,7 +330,7 @@ export function PersonAdminActions({
 
         <div className="mt-8 grid items-start gap-6 xl:grid-cols-2">
           <ActionCard
-            description="Portal administrators manage every organization, decide alumni access, and can delete people. Keep the group small."
+            description="Portal administrators administer every organization, decide alumni access, suspend and restore portal access, grant and revoke both administrator roles, merge duplicates, delete and purge people, and read the audit log. Keep the group small."
             title="Portal administrator"
             tone="danger"
           >
@@ -376,7 +370,7 @@ export function PersonAdminActions({
           </ActionCard>
 
           <ActionCard
-            description="Deleting ends their organization memberships and team roles. You can restore them from Deleted users within 30 days."
+            description="Deleting ends their organization memberships and team roles. You can restore them from Deleted people within 30 days."
             title="Delete this person"
             tone="danger"
           >
@@ -399,7 +393,7 @@ export function PersonAdminActions({
                     className="portal-field"
                     maxLength={500}
                     onChange={(event) => setReason(event.target.value)}
-                    placeholder="Duplicate profile, test account…"
+                    placeholder="Duplicate person, test account…"
                     type="text"
                     value={reason}
                   />
@@ -439,7 +433,7 @@ export function PersonAdminActions({
           <p>
             {isSuspended
               ? `${personName} will be able to sign in again.`
-              : `${personName} will be signed out of every device and blocked from signing in. Their profile, memberships, and history are kept.`}
+              : `${personName} will be signed out of every device and blocked from signing in. Their record, memberships, and history are kept.`}
           </p>
         </ConfirmDialog>
       )}
@@ -470,7 +464,7 @@ export function PersonAdminActions({
         >
           <p>
             {pendingAction.grant
-              ? `${personName} will administer every organization, decide alumni access, and be able to delete people.`
+              ? `${personName} will administer every organization, decide alumni access, change anyone's portal access and roles, merge duplicates, delete and purge people, and read the audit log.`
               : `${personName} keeps their portal access and memberships, but loses portal-wide administration.`}
           </p>
           {pendingAction.grant && (
@@ -496,16 +490,15 @@ export function PersonAdminActions({
           confirmLabel="Merge"
           onCancel={() => setPendingAction(null)}
           onConfirm={confirmPendingAction}
-          title="Merge these profiles?"
+          title="Merge these people?"
         >
           <p>
             Everything {mergeSource.name} owns — emails, sign-in accounts,
             memberships and their periods, team roles, requests, and audit
-            history — moves to {personName}. The duplicate profile is then
-            removed.
+            history — moves to {personName}. The duplicate is then removed.
           </p>
           <p className="mt-3">
-            {personName} stays the profile everything belongs to afterwards,
+            {personName} is the person everything belongs to afterwards,
             keeping their own fields and roles. No membership role is promoted.
           </p>
         </ConfirmDialog>
@@ -526,7 +519,7 @@ export function PersonAdminActions({
             every administrator&apos;s view, and is signed out everywhere.
           </p>
           <p className="mt-3">
-            Nothing is erased yet. Deleted users keeps them for 30 days, where
+            Nothing is erased yet. Deleted people keeps them for 30 days, where
             you can restore them or purge their data for good.
           </p>
         </ConfirmDialog>

@@ -9,7 +9,7 @@ export function PersonAuditFeed({ entries }: { entries: PersonAuditEntry[] }) {
       </h2>
       <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-55">
         Every recorded change to this person&apos;s access, roles, and
-        memberships, newest first.
+        memberships.
       </p>
 
       <AuditLogTable

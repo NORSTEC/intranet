@@ -1,3 +1,4 @@
+import { AccessWelcome } from "@/components/portal/dashboard/access-welcome";
 import { DashboardHero } from "@/components/portal/dashboard/dashboard-hero";
 import { NewMemberCard } from "@/components/portal/dashboard/new-member-card";
 import { OrganizationCard } from "@/components/portal/dashboard/organization-card";
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
   const membershipSentence = isAlumni
     ? lastEnded?.until
       ? `You hold alumni access to the portal. Your membership in ${lastEnded.name} ended ${formatMonth(lastEnded.until)}.`
-      : "You hold alumni access to the portal. The member directory and the statistics stay open to you."
+      : "You hold alumni access to the portal."
     : `Member of ${organizationNames}${
         dashboard.memberSince ? ` since ${formatMonth(dashboard.memberSince)}` : ""
       }.`;
@@ -111,6 +112,8 @@ export default async function DashboardPage() {
         name={displayName}
         subtitle={subtitle}
       />
+
+      {dashboard.welcome && <AccessWelcome welcome={dashboard.welcome} />}
 
       <RecommendedActions actions={actions} />
 

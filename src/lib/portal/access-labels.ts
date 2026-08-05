@@ -17,7 +17,7 @@ export const accessLabels: Record<PortalAccessStatusValue, string> = {
   unclaimed: "Never signed in",
 };
 
-// The vocabulary Manage users is read in. The person page describes the same
+// The vocabulary Manage people is read in. The person page describes the same
 // person, so both have to say the same words — they read these.
 export const accessLevelLabels: Record<RegistryAccessLevel, string> = {
   member: "Member",

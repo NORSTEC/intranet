@@ -28,14 +28,14 @@ function formatDate(value: string) {
 }
 
 export function PersonOrganizationRoles({
-  canGrantAdmin,
+  accessStatus,
   children,
   isSelf,
   memberships,
   personId,
   personName,
 }: {
-  canGrantAdmin: boolean;
+  accessStatus: "unclaimed" | "active" | "suspended";
   children?: ReactNode;
   isSelf: boolean;
   memberships: PersonMembership[];
@@ -43,6 +43,9 @@ export function PersonOrganizationRoles({
   personName: string;
 }) {
   const router = useRouter();
+  // Removing the role stays available whatever the person's portal access is;
+  // granting it needs an account that can actually sign in and use it.
+  const canGrantAdmin = accessStatus === "active";
   const [pendingMembership, setPendingMembership] =
     useState<PersonMembership | null>(null);
   const [toast, setToast] = useState<{
@@ -116,16 +119,14 @@ export function PersonOrganizationRoles({
                     )
                     .map((period) => (
                       <li key={`${membership.id}-${period.startsOn}`}>
-                        {formatDate(period.startsOn)} —{" "}
-                        {period.endsOn ? formatDate(period.endsOn) : "present"}
+                        {period.endsOn
+                          ? `${formatDate(period.startsOn)} to ${formatDate(period.endsOn)}`
+                          : `Member since ${formatDate(period.startsOn)}`}
                       </li>
                     ))}
                 </ul>
               </div>
 
-              {/* Removing the role stays available whatever the person's
-                  portal access is; granting it needs an account that can
-                  actually sign in and use it. */}
               {!isSelf &&
                 (membership.role === "organization_admin" || canGrantAdmin) && (
                 <button
@@ -165,8 +166,9 @@ export function PersonOrganizationRoles({
         ) : (
           !canGrantAdmin && (
             <p className="mt-5 text-sm leading-relaxed opacity-55">
-              Only someone with active portal access can administer an
-              organization.
+              {accessStatus === "unclaimed"
+                ? "This person has never signed in. They can be made an organization administrator once they do."
+                : "Portal access is suspended. Activate it again before making this person an organization administrator."}
             </p>
           )
         ))}

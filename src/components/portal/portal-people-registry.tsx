@@ -281,7 +281,7 @@ export function PortalPeopleRegistry({
             className="portal-field w-full pr-10"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search name, email or organization"
-            type="search"
+            type="text"
             value={query}
           />
           <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">

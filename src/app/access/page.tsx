@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { withdrawAccessRequest } from "@/app/access/actions";
 import { AccessRequestForm } from "@/components/portal/access-request-form";
 import { PortalEntryShell } from "@/components/portal/portal-entry-shell";
+import { Toast } from "@/components/portal/toast";
 import { getPortalAccess } from "@/lib/auth/access";
+import { NORSTEC_ORGANIZATION_SLUG } from "@/lib/portal/norstec";
 import { createClient } from "@/lib/supabase/server";
 
 type Organization = { id: number; name: string };
@@ -75,6 +77,7 @@ export default async function AccessPage({
       .from("organizations")
       .select("id, name")
       .eq("status", "active")
+      .neq("slug", NORSTEC_ORGANIZATION_SLUG)
       .order("name"),
     supabase
       .from("access_requests")
@@ -116,15 +119,10 @@ export default async function AccessPage({
           <section className="portal-surface mt-8 max-w-4xl p-6 sm:p-8">
             <h2 className="flex items-center gap-2 text-h2">
               Waiting for approval
-              <span
-                aria-hidden="true"
-                className="entry-heading-star inline-block shrink-0"
-              />
             </h2>
             <p className="mt-4 max-w-[65ch] leading-relaxed opacity-65">
-              {pendingRequest.request_type === "alumni"
-                ? "A portal administrator decides alumni requests. You keep this page until then, and you will land in the portal the moment the request is approved."
-                : `An administrator at ${scopeLabel(pendingRequest)} decides your request. You keep this page until then, and you will land in the portal the moment the request is approved.`}
+              An administrator must approve your request. You get an email at{" "}
+              {access.profile.email} when it is approved or declined.
             </p>
 
             <dl className="mt-7 grid gap-5 text-sm sm:grid-cols-2">
@@ -157,10 +155,6 @@ export default async function AccessPage({
                 </span>
                 Withdraw request
               </button>
-              <p className="mt-3 text-sm opacity-55">
-                Withdrawing lets you send a different request — for another
-                organization, or as an alumnus.
-              </p>
             </form>
           </section>
         ) : (
@@ -197,9 +191,11 @@ export default async function AccessPage({
             )}
 
             {withdrawn === "true" && (
-              <p className="mt-8 text-sm opacity-60" role="status">
-                Request withdrawn. You can send a new one below.
-              </p>
+              <Toast
+                clearParams={["withdrawn"]}
+                message="Request withdrawn."
+                status="success"
+              />
             )}
             <AccessRequestForm
               errorMessage={error ? errorMessages[error] : undefined}

@@ -74,7 +74,13 @@ Settings/profile-style pages follow one pattern, don't reinvent it:
 
 ## UI conventions
 
-Two rules that cut across most portal components:
+Four rules that cut across most portal components:
+
+- **Portal management calls them *people*, never *users* or *profiles*.**
+  "Manage people", "Deleted people", "Delete this person", "No deleted people
+  match these filters". The three words used to be mixed within a single card.
+  *Profile* survives in one place only, and means something different there:
+  `/profile`, the page where someone edits their own details.
 
 - **Every button carries a Material Symbols icon.** A `portal-button` (or
   `portal-button-danger`) renders
@@ -91,6 +97,13 @@ Two rules that cut across most portal components:
   `portal-people-registry.tsx`, `members-directory.tsx` and
   `member-status-manager.tsx` — any new people-listing table should do the
   same.
+- **Search boxes are `type="text"`, never `type="search"`.** A search input
+  draws the browser's own clear button — a second, unstyled "×" sitting on top
+  of the magnifier icon every portal search box already places at
+  `absolute right-3`. Filtering is live, so there is nothing to clear that
+  selecting the text does not. Copy the pattern in `members-directory.tsx`:
+  a `relative` label, `className="portal-field w-full pr-10"`, a `sr-only`
+  span for the label, and the trailing `material-symbols-outlined` magnifier.
 
 ## Menu active state
 

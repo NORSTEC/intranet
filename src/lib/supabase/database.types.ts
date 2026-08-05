@@ -37,6 +37,7 @@ export type Database = {
       access_requests: {
         Row: {
           created_at: string
+          decision_acknowledged_at: string | null
           decision_note: string | null
           field_of_study: string | null
           id: number
@@ -52,6 +53,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          decision_acknowledged_at?: string | null
           decision_note?: string | null
           field_of_study?: string | null
           id?: never
@@ -67,6 +69,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          decision_acknowledged_at?: string | null
           decision_note?: string | null
           field_of_study?: string | null
           id?: never
@@ -863,6 +866,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acknowledge_own_access_decision: {
+        Args: { p_request_id: number }
+        Returns: undefined
+      }
       cancel_own_access_request: {
         Args: { p_request_id: number }
         Returns: undefined

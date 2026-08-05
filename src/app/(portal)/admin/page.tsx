@@ -4,21 +4,21 @@ import { requirePortalAdminAccess } from "@/lib/auth/access";
 const sections = [
   {
     description:
-      "Every profile in the portal, including applicants and people who belong to no organization. Access, the administrator role, merges, and deletion happen here.",
+      "Everyone who holds a membership or alumni access. Portal access, roles, merges, and deletion happen here.",
     href: "/admin/people",
     icon: "person_edit",
-    title: "Manage users",
+    title: "Manage people",
   },
   {
     description:
       "People who have been deleted but not yet purged. Restore them, or remove their data for good.",
     href: "/admin/deleted",
     icon: "person_remove",
-    title: "Deleted users",
+    title: "Deleted people",
   },
   {
     description:
-      "Administrative decisions across the portal — access changes, membership changes, and role changes.",
+      "Every administrative decision in the portal, with who made it and when.",
     href: "/admin/audit-log",
     icon: "history",
     title: "Audit log",

@@ -120,7 +120,7 @@ export default async function PortalPersonPage({
     supabase
       .from("people")
       .select(
-        "id, full_name, person_emails (email, is_primary), portal_administrators!portal_administrators_person_id_fkey (person_id)",
+        "id, full_name, avatar_path, person_emails (email, is_primary), portal_administrators!portal_administrators_person_id_fkey (person_id)",
       )
       .is("deleted_at", null)
       .neq("id", personId)
@@ -134,7 +134,7 @@ export default async function PortalPersonPage({
 
   const person = personResult.data as unknown as PersonRow;
 
-  // A deleted person is administered from Deleted users, where the only two
+  // A deleted person is administered from Deleted people, where the only two
   // decisions left — restore or purge — live. Nothing on this page applies to
   // them, so the route stops existing the moment they are deleted.
   if (person.deleted_at) notFound();
@@ -166,7 +166,19 @@ export default async function PortalPersonPage({
     periodsByMembership.set(period.membership_id, existing);
   }
 
-  const avatarUrls = await getMemberAvatarUrls([person.avatar_path]);
+  const candidateRows = candidatesResult.data as Array<{
+    avatar_path: string | null;
+    full_name: string | null;
+    id: number;
+    person_emails: Array<{ email: string; is_primary: boolean }>;
+    portal_administrators: { person_id: number } | null;
+  }>;
+  // One signing round covers this person and everyone the merge search can
+  // offer, so picking a duplicate shows a face rather than initials.
+  const avatarUrls = await getMemberAvatarUrls([
+    person.avatar_path,
+    ...candidateRows.map((candidate) => candidate.avatar_path),
+  ]);
   const avatarUrl = person.avatar_path
     ? avatarUrls.get(person.avatar_path)
     : undefined;
@@ -201,7 +213,7 @@ export default async function PortalPersonPage({
     .map((account) => account.last_seen_at)
     .sort()
     .at(-1);
-  // Both derived exactly as Manage users derives them, so a person reads the
+  // Both derived exactly as Manage people derives them, so a person reads the
   // same in the table and on their own page.
   const derivedStatus = personStatusLabels[
     person.deleted_at
@@ -239,14 +251,7 @@ export default async function PortalPersonPage({
     }),
   );
 
-  const mergeCandidates: MergeCandidate[] = (
-    candidatesResult.data as Array<{
-      full_name: string | null;
-      id: number;
-      person_emails: Array<{ email: string; is_primary: boolean }>;
-      portal_administrators: { person_id: number } | null;
-    }>
-  )
+  const mergeCandidates: MergeCandidate[] = candidateRows
     // A portal administrator is never the profile that gets folded in and
     // removed — `merge_people` refuses it — so they are not offered as a
     // duplicate. Merging into an administrator is done from their own page.
@@ -256,6 +261,9 @@ export default async function PortalPersonPage({
         (left, right) => Number(right.is_primary) - Number(left.is_primary),
       );
       return {
+        avatarUrl: candidate.avatar_path
+          ? avatarUrls.get(candidate.avatar_path)
+          : undefined,
         email: candidateEmails[0]?.email ?? null,
         id: candidate.id,
         name: candidate.full_name ?? "Unnamed person",
@@ -303,7 +311,7 @@ export default async function PortalPersonPage({
           </Fact>
           <Fact term="Field of study">{person.field_of_study ?? "—"}</Fact>
           <Fact term="Study year">{person.study_year ?? "—"}</Fact>
-          <Fact term="Profile created">{formatDate(person.created_at)}</Fact>
+          <Fact term="Added to the portal">{formatDate(person.created_at)}</Fact>
           <Fact term="Last sign-in">
             {lastSignInAt ? formatDate(lastSignInAt) : "Never signed in"}
           </Fact>
@@ -311,7 +319,7 @@ export default async function PortalPersonPage({
       </section>
 
       <PersonOrganizationRoles
-        canGrantAdmin={person.portal_access_status === "active"}
+        accessStatus={person.portal_access_status}
         isSelf={isSelf}
         memberships={memberships}
         personId={person.id}

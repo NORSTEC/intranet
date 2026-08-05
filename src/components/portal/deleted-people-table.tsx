@@ -207,12 +207,12 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
         </div>
 
         <label className="relative min-w-0 flex-1 xl:w-80 xl:flex-none">
-          <span className="sr-only">Search deleted users</span>
+          <span className="sr-only">Search deleted people</span>
           <input
             className="portal-field w-full pr-10"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search name or email"
-            type="search"
+            type="text"
             value={query}
           />
           <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
@@ -225,7 +225,7 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
         <div className="mt-8 overflow-x-auto">
           <table className="w-full min-w-[58rem] border-collapse">
             <caption className="sr-only">
-              Deleted users, with the date they were deleted and how long is
+              Deleted people, with the date they were deleted and how long is
               left before their data is erased permanently
             </caption>
             <thead>
@@ -316,7 +316,7 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
         <p className="mt-8 text-sm opacity-55">
           {people.length === 0
             ? "No one has been deleted."
-            : "No deleted users match these filters."}
+            : "No deleted people match these filters."}
         </p>
       )}
 
@@ -356,9 +356,9 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
           title="Delete this person permanently?"
         >
           <p>
-            This deletes {pendingAction.person.name}&apos;s profile, email
-            addresses, sign-in accounts, memberships, team roles, and profile
-            picture. It cannot be undone.
+            This deletes {pendingAction.person.name}&apos;s name, email
+            addresses, sign-in accounts, memberships, team roles, and picture.
+            It cannot be undone.
           </p>
           <p className="mt-3">
             Audit events are kept as a record of administrative decisions, with

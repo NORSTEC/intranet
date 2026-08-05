@@ -5,7 +5,7 @@ import {
 import { requirePortalAdminAccess } from "@/lib/auth/access";
 import { loadRegistryPeople } from "@/lib/portal/people-registry";
 
-export default async function DeletedUsersPage() {
+export default async function DeletedPeoplePage() {
   await requirePortalAdminAccess();
   const people = await loadRegistryPeople();
   const deletedPeople = people.flatMap((person) =>
@@ -26,8 +26,8 @@ export default async function DeletedUsersPage() {
   return (
     <>
       <p className="max-w-2xl text-sm opacity-55">
-        Deleted users are hidden from everyone except portal administrators.
-        Their data is erased permanently 30 days after the deletion.
+        Restore people, or remove their data for good. Anyone still here is
+        erased permanently 30 days after the deletion.
       </p>
 
       <DeletedPeopleTable people={deletedPeople} />

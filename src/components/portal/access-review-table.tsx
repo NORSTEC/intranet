@@ -13,16 +13,8 @@ import {
 } from "@/components/portal/sortable-table-header";
 import { Toast } from "@/components/portal/toast";
 
-export type AccessReviewStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "cancelled";
-
 export type AccessReviewRequest = {
   createdAt: string;
-  decidedLabel: string | null;
-  decisionNote: string | null;
   email: string | null;
   fieldOfStudy: string | null;
   id: number;
@@ -31,28 +23,12 @@ export type AccessReviewRequest = {
   organizationName: string | null;
   requesterName: string;
   requestType: "organization" | "alumni";
-  reviewerName: string | null;
-  status: AccessReviewStatus;
   studyYear: number | null;
   submittedLabel: string;
 };
 
 type ReviewScope = number | "alumni";
-type SortKey = "requester" | "email" | "type" | "organization" | "submitted";
-
-const statusLabels: Record<AccessReviewStatus, string> = {
-  pending: "Pending",
-  approved: "Approved",
-  rejected: "Declined",
-  cancelled: "Withdrawn",
-};
-
-const statusOrder: AccessReviewStatus[] = [
-  "pending",
-  "approved",
-  "rejected",
-  "cancelled",
-];
+type SortKey = "requester" | "type" | "organization" | "submitted";
 
 /** What the person asked to become, independent of which organization. */
 function typeLabel(request: AccessReviewRequest) {
@@ -151,11 +127,6 @@ function DetailsDialog({
       <h2 className="text-2xl font-medium" id="access-request-details-title">
         {request.requesterName}
       </h2>
-      <p className="mt-3 leading-relaxed opacity-65">
-        {request.requestType === "alumni"
-          ? "Asked for alumni access to the portal. Approving creates no organization membership."
-          : `Asked to join ${accessLabel(request)}. Approving makes them an active member, able to sign in right away.`}
-      </p>
 
       <dl className="mt-7 grid gap-5 text-sm sm:grid-cols-2">
         <DetailItem label="Email">{request.email ?? "Not provided"}</DetailItem>
@@ -175,20 +146,6 @@ function DetailsDialog({
             {request.message ?? "No message was added."}
           </span>
         </DetailItem>
-        {request.status !== "pending" && (
-          <DetailItem label="Decision" wide>
-            <span className="block max-w-[70ch]">
-              {statusLabels[request.status]}
-              {request.reviewerName ? ` by ${request.reviewerName}` : ""}
-              {request.decidedLabel ? ` · ${request.decidedLabel}` : ""}
-              {request.decisionNote && (
-                <span className="mt-2 block opacity-65">
-                  “{request.decisionNote}”
-                </span>
-              )}
-            </span>
-          </DetailItem>
-        )}
       </dl>
 
       <div className="mt-7">
@@ -246,7 +203,7 @@ function DecisionDialog({
         {approving
           ? request.requestType === "alumni"
             ? `${request.requesterName} gets alumni access to the portal. No organization membership is created.`
-            : `${request.requesterName} becomes an active member of ${accessLabel(request)} and can sign in right away.`
+            : `${request.requesterName} becomes an active member of ${accessLabel(request)}.`
           : `${request.requesterName} keeps no access and sees your note the next time they sign in. They can send a new request afterwards.`}
       </p>
 
@@ -313,9 +270,6 @@ export function AccessReviewTable({
   requests: AccessReviewRequest[];
 }) {
   const router = useRouter();
-  const [selectedStatuses, setSelectedStatuses] = useState<AccessReviewStatus[]>(
-    ["pending"],
-  );
   const [selectedScopes, setSelectedScopes] = useState<ReviewScope[]>([]);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -351,7 +305,6 @@ export function AccessReviewTable({
     const normalizedQuery = query.trim().toLocaleLowerCase("en");
     return requests
       .filter((request) => {
-        if (!selectedStatuses.includes(request.status)) return false;
         if (
           selectedScopes.length > 0 &&
           !selectedScopes.includes(scopeOf(request))
@@ -378,7 +331,6 @@ export function AccessReviewTable({
           return sortDirection === "ascending" ? comparison : -comparison;
         }
         const value = (request: AccessReviewRequest) => {
-          if (sortKey === "email") return request.email ?? "";
           if (sortKey === "type") return typeLabel(request);
           if (sortKey === "organization") return organizationLabel(request) ?? "";
           return request.requesterName;
@@ -388,29 +340,11 @@ export function AccessReviewTable({
         });
         return sortDirection === "ascending" ? comparison : -comparison;
       });
-  }, [
-    query,
-    requests,
-    selectedScopes,
-    selectedStatuses,
-    sortDirection,
-    sortKey,
-  ]);
+  }, [query, requests, selectedScopes, sortDirection, sortKey]);
 
   const detailed = requests.find((request) => request.id === detailsId) ?? null;
   const decidingRequest =
     requests.find((request) => request.id === deciding?.requestId) ?? null;
-  const pendingCount = requests.filter(
-    (request) => request.status === "pending",
-  ).length;
-
-  function toggleStatus(status: AccessReviewStatus) {
-    setSelectedStatuses((current) =>
-      current.includes(status)
-        ? current.filter((candidate) => candidate !== status)
-        : [...current, status],
-    );
-  }
 
   function toggleScope(scope: ReviewScope) {
     setSelectedScopes((current) =>
@@ -463,14 +397,6 @@ export function AccessReviewTable({
     });
   }
 
-  const statusFilterLabel =
-    selectedStatuses.length === statusOrder.length
-      ? "Status: All"
-      : selectedStatuses.length === 1
-        ? `Status: ${statusLabels[selectedStatuses[0]]}`
-        : selectedStatuses.length === 0
-          ? "Status: None"
-          : `Status · ${selectedStatuses.length}`;
   const scopeFilterLabel =
     selectedScopes.length === 0 || selectedScopes.length === scopes.length
       ? "Requested access: All"
@@ -485,81 +411,60 @@ export function AccessReviewTable({
     <>
       {toast && <Toast key={toast.id} message={toast.message} status={toast.status} />}
 
-      <p className="mb-8 max-w-2xl text-sm opacity-55">
-        {pendingCount === 0
-          ? "Nothing is waiting for a decision."
-          : pendingCount === 1
-            ? "1 request is waiting for a decision. Details shows everything it holds."
-            : `${pendingCount} requests are waiting for a decision. Details shows everything one holds.`}
-      </p>
+      {requests.length > 0 && (
+        <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {scopes.length > 1 && (
+              <FilterMenu icon="apartment" label={scopeFilterLabel}>
+                <fieldset>
+                  <legend className="section-label mb-2 opacity-45">
+                    Requested access
+                  </legend>
+                  <div className="max-h-72 overflow-y-auto pr-2">
+                    {scopes.map((scope) => (
+                      <CheckboxOption
+                        checked={selectedScopes.includes(scope.value)}
+                        key={String(scope.value)}
+                        label={scope.label}
+                        onChange={() => toggleScope(scope.value)}
+                      />
+                    ))}
+                  </div>
+                </fieldset>
+              </FilterMenu>
+            )}
+          </div>
 
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap gap-2">
-          <FilterMenu icon="filter_alt" label={statusFilterLabel}>
-            <fieldset>
-              <legend className="section-label mb-2 opacity-45">Status</legend>
-              {statusOrder.map((status) => (
-                <CheckboxOption
-                  checked={selectedStatuses.includes(status)}
-                  key={status}
-                  label={statusLabels[status]}
-                  onChange={() => toggleStatus(status)}
-                />
-              ))}
-            </fieldset>
-          </FilterMenu>
-
-          {scopes.length > 1 && (
-            <FilterMenu icon="apartment" label={scopeFilterLabel}>
-              <fieldset>
-                <legend className="section-label mb-2 opacity-45">
-                  Requested access
-                </legend>
-                <div className="max-h-72 overflow-y-auto pr-2">
-                  {scopes.map((scope) => (
-                    <CheckboxOption
-                      checked={selectedScopes.includes(scope.value)}
-                      key={String(scope.value)}
-                      label={scope.label}
-                      onChange={() => toggleScope(scope.value)}
-                    />
-                  ))}
-                </div>
-              </fieldset>
-            </FilterMenu>
-          )}
+          <label className="relative min-w-0 flex-1 xl:w-80 xl:flex-none">
+            <span className="sr-only">Search access requests</span>
+            <input
+              className="portal-field w-full pr-10"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search name or email"
+              type="text"
+              value={query}
+            />
+            <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
+              search
+            </span>
+          </label>
         </div>
-
-        <label className="relative min-w-0 flex-1 xl:w-80 xl:flex-none">
-          <span className="sr-only">Search access requests</span>
-          <input
-            className="portal-field w-full pr-10"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name or email"
-            type="search"
-            value={query}
-          />
-          <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
-            search
-          </span>
-        </label>
-      </div>
+      )}
 
       {visibleRequests.length > 0 ? (
         <div className="mt-8 overflow-x-auto">
           {/* Three buttons in the last cell need the room; below this the
               table scrolls sideways rather than cramping them. */}
-          <table className="w-full min-w-[66rem] border-collapse">
+          <table className="w-full min-w-[60rem] border-collapse">
             <caption className="sr-only">
-              Access requests with who asked, the access they asked for, and the
-              organization it belongs to
+              Access requests waiting for a decision, with who asked, the access
+              they asked for, and the organization it belongs to
             </caption>
             <thead>
               <tr>
                 {(
                   [
                     ["requester", "Name"],
-                    ["email", "Email"],
                     ["type", "Requested access"],
                     ["organization", "Organization"],
                     ["submitted", "Submitted"],
@@ -588,9 +493,6 @@ export function AccessReviewTable({
                   <td className="py-3 pl-4 pr-5 font-medium">
                     {request.requesterName}
                   </td>
-                  <td className="py-3 pr-5">
-                    {request.email ?? "No email address"}
-                  </td>
                   <td className="py-3 pr-5">{typeLabel(request)}</td>
                   <td className="py-3 pr-5">
                     {organizationLabel(request) ?? (
@@ -615,48 +517,44 @@ export function AccessReviewTable({
                         </span>
                         Details
                       </button>
-                      {request.status === "pending" && (
-                        <>
-                          <button
-                            className="portal-button whitespace-nowrap"
-                            onClick={() => {
-                              setNote("");
-                              setDeciding({
-                                decision: "approved",
-                                requestId: request.id,
-                              });
-                            }}
-                            type="button"
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="material-symbols-outlined text-[1.1rem]"
-                            >
-                              person_check
-                            </span>
-                            Approve
-                          </button>
-                          <button
-                            className="portal-button portal-button-danger whitespace-nowrap"
-                            onClick={() => {
-                              setNote("");
-                              setDeciding({
-                                decision: "rejected",
-                                requestId: request.id,
-                              });
-                            }}
-                            type="button"
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="material-symbols-outlined text-[1.1rem]"
-                            >
-                              block
-                            </span>
-                            Decline
-                          </button>
-                        </>
-                      )}
+                      <button
+                        className="portal-button whitespace-nowrap"
+                        onClick={() => {
+                          setNote("");
+                          setDeciding({
+                            decision: "approved",
+                            requestId: request.id,
+                          });
+                        }}
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.1rem]"
+                        >
+                          person_check
+                        </span>
+                        Approve
+                      </button>
+                      <button
+                        className="portal-button portal-button-danger whitespace-nowrap"
+                        onClick={() => {
+                          setNote("");
+                          setDeciding({
+                            decision: "rejected",
+                            requestId: request.id,
+                          });
+                        }}
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.1rem]"
+                        >
+                          block
+                        </span>
+                        Decline
+                      </button>
                     </div>
                   </td>
                 </tr>

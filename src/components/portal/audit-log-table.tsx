@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { fetchAuditLogEntry } from "@/app/(portal)/admin/audit-log/actions";
+import { AuditEventFacts } from "@/components/portal/audit-event-facts";
 import {
   CheckboxOption,
   FilterMenu,
@@ -14,7 +15,10 @@ import {
   auditCategoryLabels,
   type AuditCategory,
 } from "@/lib/portal/audit-categories";
-import type { AuditLogEntry } from "@/lib/portal/person-audit";
+import type {
+  AuditLogEntry,
+  AuditLogEntryDetail,
+} from "@/lib/portal/person-audit";
 
 type SortKey = "time" | "category" | "activity" | "target" | "actor";
 
@@ -36,6 +40,72 @@ function sortValue(entry: AuditLogEntry, key: SortKey) {
   return entry.actorName ?? "";
 }
 
+/**
+ * One event, opened from its row. The log is read by scanning and dipping
+ * into single rows, so the detail arrives over the table rather than replacing
+ * it — the same move Details makes in the access review.
+ */
+function AuditEventDialog({
+  detail,
+  loading,
+  onClose,
+  title,
+}: {
+  detail: AuditLogEntryDetail | null;
+  loading: boolean;
+  onClose: () => void;
+  title: string;
+}) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  return (
+    <div
+      aria-labelledby="audit-event-dialog-title"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(15,17,24,0.72)] p-5"
+      role="dialog"
+    >
+      <div className="portal-surface max-h-[90vh] w-full max-w-2xl overflow-y-auto p-7 sm:p-8">
+        <h2 className="text-2xl font-medium" id="audit-event-dialog-title">
+          {title}
+        </h2>
+
+        {detail ? (
+          <AuditEventFacts className="mt-7 text-sm" event={detail} />
+        ) : (
+          <p className="mt-7 text-sm opacity-55">
+            {loading ? "Loading the event…" : "This event could not be loaded."}
+          </p>
+        )}
+
+        <div className="mt-7">
+          <button
+            autoFocus
+            className="portal-button"
+            onClick={onClose}
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[1.1rem]"
+            >
+              close
+            </span>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AuditLogTable({
   entries,
   emptyMessage = "No events recorded yet.",
@@ -45,7 +115,9 @@ export function AuditLogTable({
   emptyMessage?: string;
   showDateRangeFilter?: boolean;
 }) {
-  const router = useRouter();
+  const [openedEntry, setOpenedEntry] = useState<AuditLogEntry | null>(null);
+  const [detail, setDetail] = useState<AuditLogEntryDetail | null>(null);
+  const [loadingDetail, startLoadingDetail] = useTransition();
   const [query, setQuery] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -144,8 +216,17 @@ export function AuditLogTable({
     setSortDirection("ascending");
   }
 
-  function openEvent(eventId: number) {
-    router.push(`/admin/audit-log/${eventId}`);
+  function openEvent(entry: AuditLogEntry) {
+    setOpenedEntry(entry);
+    setDetail(null);
+    startLoadingDetail(async () => {
+      setDetail(await fetchAuditLogEntry(entry.id));
+    });
+  }
+
+  function closeEvent() {
+    setOpenedEntry(null);
+    setDetail(null);
   }
 
   const categoryFilterLabel =
@@ -239,7 +320,7 @@ export function AuditLogTable({
               className="portal-field w-full pr-10"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search name or email"
-              type="search"
+              type="text"
               value={query}
             />
             <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
@@ -284,14 +365,14 @@ export function AuditLogTable({
                   aria-label={`View ${entry.title}`}
                   className="cursor-pointer border-b border-moody transition-colors hover:bg-moody hover:text-egg focus-visible:bg-moody focus-visible:text-egg focus-visible:outline-none"
                   key={entry.id}
-                  onClick={() => openEvent(entry.id)}
+                  onClick={() => openEvent(entry)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      openEvent(entry.id);
+                      openEvent(entry);
                     }
                   }}
-                  role="link"
+                  role="button"
                   tabIndex={0}
                 >
                   <td className="whitespace-nowrap py-3 pl-4 pr-5">
@@ -332,6 +413,15 @@ export function AuditLogTable({
         <p className="mt-8 text-sm opacity-55">
           {entries.length === 0 ? emptyMessage : "No events match these filters."}
         </p>
+      )}
+
+      {openedEntry && (
+        <AuditEventDialog
+          detail={detail}
+          loading={loadingDetail}
+          onClose={closeEvent}
+          title={openedEntry.title}
+        />
       )}
     </>
   );

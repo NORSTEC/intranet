@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { NORSTEC_ORGANIZATION_SLUG } from "@/lib/portal/norstec";
 import { isStudyField } from "@/lib/profile/study-fields";
 import { createClient } from "@/lib/supabase/server";
 
@@ -85,6 +86,20 @@ export async function submitAccessRequest(formData: FormData) {
 
   if (userError || !user) {
     redirect("/login");
+  }
+
+  // The form never offers NORSTEC, so a request naming it was hand-made. It is
+  // refused here rather than filed for an administrator who will never look.
+  if (organizationId !== null) {
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("slug")
+      .eq("id", organizationId)
+      .maybeSingle();
+
+    if (!organization || organization.slug === NORSTEC_ORGANIZATION_SLUG) {
+      redirect("/access?error=invalid_request");
+    }
   }
 
   const { error } = await supabase.rpc("submit_access_request", {
