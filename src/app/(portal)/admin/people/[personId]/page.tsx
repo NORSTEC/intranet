@@ -17,6 +17,7 @@ import {
   derivePersonStatus,
   personStatusLabels,
 } from "@/lib/portal/access-labels";
+import { hasNorstecEmail } from "@/lib/portal/norstec";
 import { loadPersonAudit } from "@/lib/portal/person-audit";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
@@ -123,7 +124,7 @@ export default async function PortalPersonPage({
     supabase
       .from("people")
       .select(
-        "id, full_name, avatar_path, person_emails (email, is_primary), portal_administrators!portal_administrators_person_id_fkey (person_id)",
+        "id, full_name, avatar_path, person_emails (email, is_primary), portal_accounts (account_email), portal_administrators!portal_administrators_person_id_fkey (person_id)",
       )
       .is("deleted_at", null)
       .neq("id", personId)
@@ -174,6 +175,7 @@ export default async function PortalPersonPage({
     full_name: string | null;
     id: number;
     person_emails: Array<{ email: string; is_primary: boolean }>;
+    portal_accounts: Array<{ account_email: string }>;
     portal_administrators: { person_id: number } | null;
   }>;
   // One signing round covers this person and everyone the merge search can
@@ -255,10 +257,18 @@ export default async function PortalPersonPage({
   );
 
   const mergeCandidates: MergeCandidate[] = candidateRows
-    // A portal administrator is never the profile that gets folded in and
-    // removed — `merge_people` refuses it — so they are not offered as a
-    // duplicate. Merging into an administrator is done from their own page.
-    .filter((candidate) => !candidate.portal_administrators)
+    // Neither a portal administrator nor a Norstec account is ever the
+    // profile that gets folded in and removed — `merge_people` refuses both
+    // — so neither is offered as a duplicate. Merging into one of them is
+    // done from their own page.
+    .filter(
+      (candidate) =>
+        !candidate.portal_administrators &&
+        !hasNorstecEmail([
+          ...candidate.person_emails.map((email) => email.email),
+          ...candidate.portal_accounts.map((account) => account.account_email),
+        ]),
+    )
     .map((candidate) => {
       const candidateEmails = [...candidate.person_emails].sort(
         (left, right) => Number(right.is_primary) - Number(left.is_primary),

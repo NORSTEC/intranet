@@ -12,6 +12,10 @@ import {
 import { ConfirmDialog } from "@/components/portal/confirm-dialog";
 import { MemberAvatar } from "@/components/portal/member-avatar";
 import { Toast } from "@/components/portal/toast";
+import {
+  hasNorstecEmail,
+  NORSTEC_EMAIL_DOMAIN,
+} from "@/lib/portal/norstec";
 
 export type MergeCandidate = {
   avatarUrl?: string;
@@ -21,17 +25,6 @@ export type MergeCandidate = {
 };
 
 type AccessStatus = "unclaimed" | "active" | "suspended";
-
-// A UI-only hint so the button doesn't invite a request the database will
-// refuse anyway. `set_portal_administrator` is the actual gate, checking
-// both primary emails and linked Google accounts against the same domain.
-const NORSTEC_EMAIL_DOMAIN = "norstec.no";
-
-function hasNorstecEmail(emails: string[]) {
-  return emails.some(
-    (email) => email.split("@")[1]?.toLocaleLowerCase("en") === NORSTEC_EMAIL_DOMAIN,
-  );
-}
 
 function ActionCard({
   children,

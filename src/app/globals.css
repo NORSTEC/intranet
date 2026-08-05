@@ -758,7 +758,7 @@ html.theme-switching *::after {
     right: -3.5rem;
     width: 15rem;
     height: 15rem;
-    opacity: 0.13;
+    opacity: 0.22;
     rotate: 8deg;
   }
 
@@ -767,7 +767,7 @@ html.theme-switching *::after {
     bottom: -2.75rem;
     width: 7.5rem;
     height: 7.5rem;
-    opacity: 0.1;
+    opacity: 0.18;
     rotate: 14deg;
   }
 
@@ -776,7 +776,7 @@ html.theme-switching *::after {
     right: 27%;
     width: 3.5rem;
     height: 3.5rem;
-    opacity: 0.16;
+    opacity: 0.28;
     rotate: -12deg;
   }
 
@@ -785,18 +785,19 @@ html.theme-switching *::after {
     bottom: 1.25rem;
     width: 2.5rem;
     height: 2.5rem;
-    opacity: 0.22;
+    opacity: 0.36;
     rotate: 22deg;
   }
 
-  /* The two on the left sit under the greeting, so they are the faintest of
-     the set — texture behind the words, never competition for them. */
+  /* The two on the left sit under the greeting, so they stay the faintest of
+     the set — texture behind the words, never competition for them — even
+     though the rest of the constellation reads stronger now. */
   .dashboard-hero-star-5 {
     top: -1.5rem;
     left: -2rem;
     width: 6.5rem;
     height: 6.5rem;
-    opacity: 0.09;
+    opacity: 0.16;
     rotate: 18deg;
   }
 
@@ -805,39 +806,97 @@ html.theme-switching *::after {
     bottom: -1.75rem;
     width: 4rem;
     height: 4rem;
-    opacity: 0.11;
+    opacity: 0.19;
     rotate: -8deg;
   }
 
-  /* On a phone the hero is barely wider than the largest star, so the whole
-     set is scaled down and the two that would land on top of each other at
-     that width are dropped. */
+  .dashboard-hero-star-7 {
+    right: 38%;
+    top: 42%;
+    width: 2rem;
+    height: 2rem;
+    opacity: 0.14;
+    rotate: -18deg;
+  }
+
+  /* On a phone the text stacks above the avatar instead of sitting beside it,
+     so the card runs tall and narrow rather than wide, and the desktop
+     geometry — three marks bunched over the avatar's right-hand corner,
+     nothing below the middle of the card — reads as a pile in one corner
+     instead of a constellation. Mobile gets its own layout: the two large
+     marks move to opposite corners (top-right, bottom-left) so they read as
+     a diagonal rather than a stack, and the small ones are spaced down the
+     two side edges and across the bottom, so every quarter of the card
+     carries a mark instead of just the top and the right. */
   @media (max-width: 639px) {
     .dashboard-hero-star-1 {
       top: -2.5rem;
-      right: -2.25rem;
-      width: 10rem;
-      height: 10rem;
+      right: -2rem;
+      width: 8rem;
+      height: 8rem;
     }
 
     .dashboard-hero-star-2 {
-      right: 8%;
+      left: -1.5rem;
+      right: auto;
       bottom: -1.75rem;
       width: 5rem;
       height: 5rem;
     }
 
-    .dashboard-hero-star-5 {
-      top: -1rem;
-      left: -1.25rem;
-      width: 4.5rem;
-      height: 4.5rem;
+    .dashboard-hero-star-3 {
+      top: 8rem;
+      right: -0.5rem;
+      left: auto;
+      width: 2.25rem;
+      height: 2.25rem;
     }
 
-    .dashboard-hero-star-3,
-    .dashboard-hero-star-6 {
-      display: none;
+    .dashboard-hero-star-4 {
+      top: auto;
+      right: 8%;
+      bottom: 1.5rem;
+      width: 2.5rem;
+      height: 2.5rem;
     }
+
+    .dashboard-hero-star-5 {
+      top: -0.75rem;
+      left: -1rem;
+      width: 3.25rem;
+      height: 3.25rem;
+    }
+
+    .dashboard-hero-star-6 {
+      top: 15rem;
+      left: -0.5rem;
+      bottom: auto;
+      width: 2rem;
+      height: 2rem;
+    }
+
+    .dashboard-hero-star-7 {
+      top: auto;
+      right: 36%;
+      bottom: 5rem;
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+  }
+
+  /* Sized off the heading it sits next to rather than a fixed rem, so it
+     scales with `.text-h1`'s own `clamp()` instead of drifting off it at
+     extreme widths. Same inversion rule as the rest of the constellation:
+     the surface is dark in light theme and light in dark theme. */
+  .dashboard-hero-heading-star {
+    width: clamp(1.75rem, 3.2vw, 3.25rem);
+    height: clamp(1.75rem, 3.2vw, 3.25rem);
+    background: url("/images/star.svg") center / contain no-repeat;
+    filter: invert(1);
+  }
+
+  [data-theme="dark"] .dashboard-hero-heading-star {
+    filter: none;
   }
 
   .dashboard-avatar-stack > * + * {
