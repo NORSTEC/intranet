@@ -110,10 +110,21 @@ function messageFor(error: { message: string }, fallback: string) {
  * refusal — but the two failures an administrator can do something about are
  * worth saying in the portal's own words first.
  */
-function workspaceMessageFor(error: unknown, fallback: string) {
+function workspaceMessageFor(
+  error: unknown,
+  fallback: string,
+  // Reading the directory and changing one account are two different
+  // privileges, and Google answers a missing one with the same sentence either
+  // way. Only the caller knows which it was attempting, and only that tells an
+  // administrator which privilege to go and look at.
+  intent: "read" | "write" = "read",
+) {
   if (!(error instanceof WorkspaceError)) return fallback;
   if (error.message === "workspace_not_configured") {
     return "Google Workspace is not configured on this server.";
+  }
+  if (error.status === 403 && intent === "write") {
+    return `Google refused to change this account: ${error.message} Check that the portal's role in the Google Admin console holds Admin API privileges › Users › Update, and that this account is not a super administrator — a delegated role cannot change one.`;
   }
   if (error.status === 403 || error.status === 401) {
     return `Google refused the portal's service account: ${error.message}`;
@@ -554,6 +565,7 @@ async function applyWorkspaceSuspension(input: {
       message: workspaceMessageFor(
         error,
         "Google could not be reached. Nothing was changed.",
+        "write",
       ),
     };
   }
