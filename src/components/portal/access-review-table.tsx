@@ -95,167 +95,211 @@ function DetailItem({
   );
 }
 
-/**
- * Everything one request holds, and the decision itself, in one place.
- *
- * A decision is an action taken on a queue rather than a record to link to, so
- * it happens over the table instead of on a page of its own: the queue is still
- * behind the dialog, and deciding returns to it without a navigation.
- */
-function ReviewDialog({
-  note,
-  onClose,
-  onDecide,
-  onNoteChange,
-  pendingDecision,
-  request,
-}: {
-  note: string;
-  onClose: () => void;
-  onDecide: (decision: "approved" | "rejected") => void;
-  onNoteChange: (note: string) => void;
-  /** The decision being saved, so only the button that started it spins. */
-  pendingDecision: "approved" | "rejected" | null;
-  request: AccessReviewRequest;
-}) {
-  const decidable = request.status === "pending";
-  const pending = pendingDecision !== null;
-
+/** Escape closes any dialog on this page, unless a decision is being saved. */
+function useCloseOnEscape(onClose: () => void, blocked: boolean) {
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape" && !pending) onClose();
+      if (event.key === "Escape" && !blocked) onClose();
     }
 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose, pending]);
+  }, [blocked, onClose]);
+}
 
+function DialogFrame({
+  children,
+  labelledBy,
+  role = "dialog",
+}: {
+  children: React.ReactNode;
+  labelledBy: string;
+  role?: "dialog" | "alertdialog";
+}) {
   return (
     <div
-      aria-labelledby="access-review-dialog-title"
+      aria-labelledby={labelledBy}
       aria-modal="true"
       className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(15,17,24,0.72)] p-5"
-      role="dialog"
+      role={role}
     >
       <div className="portal-surface max-h-[90vh] w-full max-w-2xl overflow-y-auto p-7 sm:p-8">
-        <h2 className="text-2xl font-medium" id="access-review-dialog-title">
-          {request.requesterName}
-        </h2>
-        <p className="mt-3 leading-relaxed opacity-65">
-          {request.requestType === "alumni"
-            ? "Approving grants alumni access to the portal. No organization membership is created."
-            : `Approving makes them an active member of ${accessLabel(request)}, able to sign in right away.`}
-        </p>
-
-        <dl className="mt-7 grid gap-5 text-sm sm:grid-cols-2">
-          <DetailItem label="Email">{request.email ?? "Not provided"}</DetailItem>
-          <DetailItem label="Requested access">
-            {typeLabel(request)}
-          </DetailItem>
-          <DetailItem label="Organization">
-            {organizationLabel(request) ?? "—"}
-          </DetailItem>
-          <DetailItem label="Submitted">{request.submittedLabel}</DetailItem>
-          <DetailItem label="Field of study">
-            {request.fieldOfStudy ?? "Not provided"}
-          </DetailItem>
-          <DetailItem label="Study year">
-            {request.studyYear ?? "Not provided"}
-          </DetailItem>
-          <DetailItem label="Message" wide>
-            <span className="block max-w-[70ch]">
-              {request.message ?? "No message was added."}
-            </span>
-          </DetailItem>
-          {!decidable && (
-            <DetailItem label="Decision" wide>
-              <span className="block max-w-[70ch]">
-                {statusLabels[request.status]}
-                {request.reviewerName ? ` by ${request.reviewerName}` : ""}
-                {request.decidedLabel ? ` · ${request.decidedLabel}` : ""}
-                {request.decisionNote && (
-                  <span className="mt-2 block opacity-65">
-                    “{request.decisionNote}”
-                  </span>
-                )}
-              </span>
-            </DetailItem>
-          )}
-        </dl>
-
-        {decidable && (
-          <label className="mt-7 grid gap-2">
-            <span className="section-label opacity-45">
-              Note to the requester (optional)
-            </span>
-            <textarea
-              className="portal-field min-h-24 resize-y"
-              disabled={pending}
-              maxLength={1000}
-              onChange={(event) => onNoteChange(event.target.value)}
-              placeholder="Shown to them the next time they sign in."
-              value={note}
-            />
-          </label>
-        )}
-
-        <div className="mt-7 flex flex-wrap gap-3">
-          <button
-            autoFocus
-            className="portal-button"
-            disabled={pending}
-            onClick={onClose}
-            type="button"
-          >
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined text-[1.1rem]"
-            >
-              close
-            </span>
-            {decidable ? "Cancel" : "Close"}
-          </button>
-          {decidable && (
-            <>
-              <button
-                className="portal-button"
-                disabled={pending}
-                onClick={() => onDecide("approved")}
-                type="button"
-              >
-                <span
-                  aria-hidden="true"
-                  className={`material-symbols-outlined text-[1.1rem] ${
-                    pendingDecision === "approved" ? "animate-spin" : ""
-                  }`}
-                >
-                  {pendingDecision === "approved"
-                    ? "progress_activity"
-                    : "person_check"}
-                </span>
-                Approve
-              </button>
-              <button
-                className="portal-button portal-button-danger"
-                disabled={pending}
-                onClick={() => onDecide("rejected")}
-                type="button"
-              >
-                <span
-                  aria-hidden="true"
-                  className={`material-symbols-outlined text-[1.1rem] ${
-                    pendingDecision === "rejected" ? "animate-spin" : ""
-                  }`}
-                >
-                  {pendingDecision === "rejected" ? "progress_activity" : "block"}
-                </span>
-                Decline
-              </button>
-            </>
-          )}
-        </div>
+        {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * Everything one request holds, and nothing to do about it.
+ *
+ * Deciding lives on the row this opened from, so reading and acting stay
+ * separate: closing puts the two decision buttons back under the cursor rather
+ * than stacking a confirmation on top of a dialog.
+ */
+function DetailsDialog({
+  onClose,
+  request,
+}: {
+  onClose: () => void;
+  request: AccessReviewRequest;
+}) {
+  useCloseOnEscape(onClose, false);
+
+  return (
+    <DialogFrame labelledBy="access-request-details-title">
+      <h2 className="text-2xl font-medium" id="access-request-details-title">
+        {request.requesterName}
+      </h2>
+      <p className="mt-3 leading-relaxed opacity-65">
+        {request.requestType === "alumni"
+          ? "Asked for alumni access to the portal. Approving creates no organization membership."
+          : `Asked to join ${accessLabel(request)}. Approving makes them an active member, able to sign in right away.`}
+      </p>
+
+      <dl className="mt-7 grid gap-5 text-sm sm:grid-cols-2">
+        <DetailItem label="Email">{request.email ?? "Not provided"}</DetailItem>
+        <DetailItem label="Requested access">{typeLabel(request)}</DetailItem>
+        <DetailItem label="Organization">
+          {organizationLabel(request) ?? "—"}
+        </DetailItem>
+        <DetailItem label="Submitted">{request.submittedLabel}</DetailItem>
+        <DetailItem label="Field of study">
+          {request.fieldOfStudy ?? "Not provided"}
+        </DetailItem>
+        <DetailItem label="Study year">
+          {request.studyYear ?? "Not provided"}
+        </DetailItem>
+        <DetailItem label="Message" wide>
+          <span className="block max-w-[70ch]">
+            {request.message ?? "No message was added."}
+          </span>
+        </DetailItem>
+        {request.status !== "pending" && (
+          <DetailItem label="Decision" wide>
+            <span className="block max-w-[70ch]">
+              {statusLabels[request.status]}
+              {request.reviewerName ? ` by ${request.reviewerName}` : ""}
+              {request.decidedLabel ? ` · ${request.decidedLabel}` : ""}
+              {request.decisionNote && (
+                <span className="mt-2 block opacity-65">
+                  “{request.decisionNote}”
+                </span>
+              )}
+            </span>
+          </DetailItem>
+        )}
+      </dl>
+
+      <div className="mt-7">
+        <button
+          autoFocus
+          className="portal-button"
+          onClick={onClose}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[1.1rem]"
+          >
+            close
+          </span>
+          Close
+        </button>
+      </div>
+    </DialogFrame>
+  );
+}
+
+/**
+ * The confirmation both decisions share. Granting portal access and turning
+ * someone away are each one click away in the table, so neither goes through
+ * without a second one — and the note the requester will read is written here.
+ */
+function DecisionDialog({
+  decision,
+  note,
+  onCancel,
+  onConfirm,
+  onNoteChange,
+  pending,
+  request,
+}: {
+  decision: "approved" | "rejected";
+  note: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onNoteChange: (note: string) => void;
+  pending: boolean;
+  request: AccessReviewRequest;
+}) {
+  const approving = decision === "approved";
+
+  useCloseOnEscape(onCancel, pending);
+
+  return (
+    <DialogFrame labelledBy="access-decision-title" role="alertdialog">
+      <h2 className="text-2xl font-medium" id="access-decision-title">
+        {approving ? "Grant portal access?" : "Decline this request?"}
+      </h2>
+      <p className="mt-4 leading-relaxed opacity-65">
+        {approving
+          ? request.requestType === "alumni"
+            ? `${request.requesterName} gets alumni access to the portal. No organization membership is created.`
+            : `${request.requesterName} becomes an active member of ${accessLabel(request)} and can sign in right away.`
+          : `${request.requesterName} keeps no access and sees your note the next time they sign in. They can send a new request afterwards.`}
+      </p>
+
+      <label className="mt-6 grid gap-2">
+        <span className="section-label opacity-45">
+          Note to the requester (optional)
+        </span>
+        <textarea
+          autoFocus
+          className="portal-field min-h-24 resize-y"
+          disabled={pending}
+          maxLength={1000}
+          onChange={(event) => onNoteChange(event.target.value)}
+          placeholder={
+            approving
+              ? "Welcome aboard — you now have access."
+              : "Why the request was declined."
+          }
+          value={note}
+        />
+      </label>
+
+      <div className="mt-7 flex flex-wrap gap-3">
+        <button
+          className="portal-button"
+          disabled={pending}
+          onClick={onCancel}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[1.1rem]"
+          >
+            close
+          </span>
+          Cancel
+        </button>
+        <button
+          className={`portal-button${approving ? "" : " portal-button-danger"}`}
+          disabled={pending}
+          onClick={onConfirm}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className={`material-symbols-outlined text-[1.1rem] ${pending ? "animate-spin" : ""}`}
+          >
+            {pending ? "progress_activity" : approving ? "person_check" : "block"}
+          </span>
+          {pending ? "Saving…" : approving ? "Approve" : "Decline"}
+        </button>
+      </div>
+    </DialogFrame>
   );
 }
 
@@ -277,10 +321,11 @@ export function AccessReviewTable({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] =
     useState<TableSortDirection>("ascending");
-  const [reviewingId, setReviewingId] = useState<number | null>(null);
-  const [decidingAs, setDecidingAs] = useState<"approved" | "rejected" | null>(
-    null,
-  );
+  const [detailsId, setDetailsId] = useState<number | null>(null);
+  const [deciding, setDeciding] = useState<{
+    decision: "approved" | "rejected";
+    requestId: number;
+  } | null>(null);
   const [note, setNote] = useState("");
   const [toast, setToast] = useState<{
     id: number;
@@ -352,8 +397,9 @@ export function AccessReviewTable({
     sortKey,
   ]);
 
-  const reviewing =
-    requests.find((request) => request.id === reviewingId) ?? null;
+  const detailed = requests.find((request) => request.id === detailsId) ?? null;
+  const decidingRequest =
+    requests.find((request) => request.id === deciding?.requestId) ?? null;
   const pendingCount = requests.filter(
     (request) => request.status === "pending",
   ).length;
@@ -390,22 +436,19 @@ export function AccessReviewTable({
     setSortDirection("ascending");
   }
 
-  function closeReview() {
-    setReviewingId(null);
-    setDecidingAs(null);
+  function closeDecision() {
+    setDeciding(null);
     setNote("");
   }
 
-  function decide(decision: "approved" | "rejected") {
-    if (!reviewing) return;
-    const requestId = reviewing.id;
-    setDecidingAs(decision);
+  function confirmDecision() {
+    if (!deciding) return;
 
     startTransition(async () => {
       const result = await reviewAccessRequest({
-        decision,
+        decision: deciding.decision,
         note,
-        requestId,
+        requestId: deciding.requestId,
       });
       setToast({
         id: Date.now(),
@@ -414,11 +457,8 @@ export function AccessReviewTable({
       });
       // A refused decision leaves the dialog open with the note intact, so it
       // can be tried again without retyping it.
-      if (!result.ok) {
-        setDecidingAs(null);
-        return;
-      }
-      closeReview();
+      if (!result.ok) return;
+      closeDecision();
       router.refresh();
     });
   }
@@ -449,8 +489,8 @@ export function AccessReviewTable({
         {pendingCount === 0
           ? "Nothing is waiting for a decision."
           : pendingCount === 1
-            ? "1 request is waiting for a decision. Review it to see everything it holds."
-            : `${pendingCount} requests are waiting for a decision. Review one to see everything it holds.`}
+            ? "1 request is waiting for a decision. Details shows everything it holds."
+            : `${pendingCount} requests are waiting for a decision. Details shows everything one holds.`}
       </p>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -507,7 +547,9 @@ export function AccessReviewTable({
 
       {visibleRequests.length > 0 ? (
         <div className="mt-8 overflow-x-auto">
-          <table className="w-full min-w-[54rem] border-collapse">
+          {/* Three buttons in the last cell need the room; below this the
+              table scrolls sideways rather than cramping them. */}
+          <table className="w-full min-w-[66rem] border-collapse">
             <caption className="sr-only">
               Access requests with who asked, the access they asked for, and the
               organization it belongs to
@@ -559,23 +601,62 @@ export function AccessReviewTable({
                     {request.submittedLabel}
                   </td>
                   <td className="py-3 pr-4">
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <button
                         className="portal-button whitespace-nowrap"
-                        onClick={() => {
-                          setNote("");
-                          setReviewingId(request.id);
-                        }}
+                        onClick={() => setDetailsId(request.id)}
                         type="button"
                       >
                         <span
                           aria-hidden="true"
                           className="material-symbols-outlined text-[1.1rem]"
                         >
-                          {request.status === "pending" ? "rate_review" : "visibility"}
+                          visibility
                         </span>
-                        {request.status === "pending" ? "Review" : "Details"}
+                        Details
                       </button>
+                      {request.status === "pending" && (
+                        <>
+                          <button
+                            className="portal-button whitespace-nowrap"
+                            onClick={() => {
+                              setNote("");
+                              setDeciding({
+                                decision: "approved",
+                                requestId: request.id,
+                              });
+                            }}
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              person_check
+                            </span>
+                            Approve
+                          </button>
+                          <button
+                            className="portal-button portal-button-danger whitespace-nowrap"
+                            onClick={() => {
+                              setNote("");
+                              setDeciding({
+                                decision: "rejected",
+                                requestId: request.id,
+                              });
+                            }}
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              block
+                            </span>
+                            Decline
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -591,14 +672,19 @@ export function AccessReviewTable({
         </p>
       )}
 
-      {reviewing && (
-        <ReviewDialog
+      {detailed && (
+        <DetailsDialog onClose={() => setDetailsId(null)} request={detailed} />
+      )}
+
+      {deciding && decidingRequest && (
+        <DecisionDialog
+          decision={deciding.decision}
           note={note}
-          onClose={closeReview}
-          onDecide={decide}
+          onCancel={closeDecision}
+          onConfirm={confirmDecision}
           onNoteChange={setNote}
-          pendingDecision={pending ? decidingAs : null}
-          request={reviewing}
+          pending={pending}
+          request={decidingRequest}
         />
       )}
     </>
