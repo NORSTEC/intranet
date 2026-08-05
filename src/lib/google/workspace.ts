@@ -56,7 +56,7 @@ type WorkspaceConfig = {
 function readConfig(): WorkspaceConfig | null {
   const projectNumber = process.env.GCP_PROJECT_NUMBER;
   const poolId = process.env.GCP_WORKLOAD_IDENTITY_POOL_ID;
-  const providerId = process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID;
+  const providerId = process.env.GCP_WORKLOAD_IDENTITY_PROVIDER_ID;
   const serviceAccountEmail = process.env.GCP_SERVICE_ACCOUNT_EMAIL;
   const domain = process.env.GOOGLE_WORKSPACE_DOMAIN;
 
