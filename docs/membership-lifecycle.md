@@ -199,8 +199,15 @@ Merging keeps the target profile and folds the duplicate into it: emails,
 sign-in accounts, memberships and their periods, team roles, requests, profile
 experiences, and audit history all move, and two memberships in one organization
 become one that keeps the live state and every separate period. A merge never
-carries the portal-administrator role over and never promotes a membership role;
-roles are only ever assigned by an explicit, audited operation.
+promotes a membership role; roles are only ever assigned by an explicit,
+audited operation.
+
+A portal administrator is never the duplicate being folded in. `merge_people`
+rejects a source that holds the role, and the administrator is left out of the
+duplicate picker, because the source profile is the one that disappears — a
+portal-wide role must not end as a side effect of a duplicate repair. Merging
+in the other direction is unrestricted: a duplicate folded into a portal
+administrator leaves the administrator as the surviving profile, role intact.
 
 ## Edge-case decisions
 
@@ -217,6 +224,7 @@ roles are only ever assigned by an explicit, audited operation.
 | Linked domain membership already ended | Keep it ended; identity linking never reactivates it. |
 | Linked email belongs to another profile | Block linking and require controlled duplicate review. |
 | Duplicate profiles are confirmed | A portal admin merges them; the surviving profile keeps its own fields and role. |
+| One duplicate is a portal administrator | Only the merge that keeps the administrator is allowed; folding one in is blocked. |
 | Existing user arrives with an unknown account | Instruct them to sign in with an existing account and link it from Profile. |
 | Alumni wants a future membership | No alumni application flow in the current release. |
 | Domain user signs in after being ended | Sign-in must not reactivate the membership. |

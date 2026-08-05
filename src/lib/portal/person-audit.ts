@@ -7,12 +7,14 @@ export type { AuditCategory };
 
 export type AuditLogEntry = {
   action: string;
+  actorEmail: string | null;
   actorId: number | null;
   actorName: string | null;
   category: AuditCategory;
   createdAt: string;
   id: number;
   organizationName: string | null;
+  targetEmail: string | null;
   targetId: number | null;
   targetName: string | null;
   title: string;
@@ -28,20 +30,28 @@ export type AuditLogEntryDetail = AuditLogEntry & { fields: AuditField[] };
 
 export type PersonAuditEntry = AuditLogEntry;
 
+type PersonRef = {
+  full_name: string | null;
+  person_emails: Array<{ email: string; is_primary: boolean }>;
+};
+
 type AuditEventRow = {
   action: string;
-  actor: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  actor: PersonRef | PersonRef[] | null;
   actor_person_id: number | null;
   created_at: string;
   details: Record<string, unknown> | null;
   id: number;
   organizations: { name: string } | Array<{ name: string }> | null;
-  target: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+  target: PersonRef | PersonRef[] | null;
   target_person_id: number | null;
 };
 
-const SELECT_COLUMNS =
-  "id, action, created_at, details, actor_person_id, target_person_id, organizations (name), actor:people!audit_events_actor_person_id_fkey (full_name), target:people!audit_events_target_person_id_fkey (full_name)";
+// Addresses come along so the log can be searched by email as well as by name.
+// A person owns several; the primary one is the address they are known by.
+const PERSON_COLUMNS = "full_name, person_emails (email, is_primary)";
+
+const SELECT_COLUMNS = `id, action, created_at, details, actor_person_id, target_person_id, organizations (name), actor:people!audit_events_actor_person_id_fkey (${PERSON_COLUMNS}), target:people!audit_events_target_person_id_fkey (${PERSON_COLUMNS})`;
 
 // The number of events one person accumulates is small; a cap only exists so a
 // pathological history cannot turn the page into a scroll of hundreds of rows.
@@ -90,6 +100,26 @@ function snapshotName(details: Record<string, unknown> | null) {
     snapshot(details, "deleted_person")?.name ??
     snapshot(details, "purged_person")?.name ??
     snapshot(details, "applicant")?.name ??
+    null
+  );
+}
+
+/** The address on any snapshot this event may carry, on the same terms. */
+function snapshotEmail(details: Record<string, unknown> | null) {
+  return (
+    snapshot(details, "deleted_person")?.email ??
+    snapshot(details, "purged_person")?.email ??
+    snapshot(details, "applicant")?.email ??
+    null
+  );
+}
+
+/** The address a person is known by, falling back to any address they own. */
+function primaryEmail(person: PersonRef | null) {
+  const emails = person?.person_emails ?? [];
+  return (
+    emails.find((candidate) => candidate.is_primary)?.email ??
+    emails[0]?.email ??
     null
   );
 }
@@ -203,17 +233,25 @@ function describe(action: string, details: Record<string, unknown> | null) {
 }
 
 function mapRow(row: AuditEventRow): AuditLogEntry {
+  const actor = single(row.actor);
+  const target = single(row.target);
+
   return {
     action: row.action,
+    actorEmail: row.actor_person_id === null ? null : primaryEmail(actor),
     actorId: row.actor_person_id,
     actorName:
-      row.actor_person_id === null
-        ? null
-        : (single(row.actor)?.full_name ?? "Unnamed person"),
+      row.actor_person_id === null ? null : (actor?.full_name ?? "Unnamed person"),
     category: categoryFor(row.action),
     createdAt: row.created_at,
     id: row.id,
     organizationName: single(row.organizations)?.name ?? null,
+    // Same fallback as the name: the profile's own address while it exists,
+    // the snapshot the writing RPC left behind once it does not.
+    targetEmail:
+      row.target_person_id !== null
+        ? primaryEmail(target)
+        : snapshotEmail(row.details),
     targetId: row.target_person_id,
     // A person the event still points at is named from their row. Once the
     // profile is gone — purged, or discarded with a declined request — only
@@ -221,7 +259,7 @@ function mapRow(row: AuditEventRow): AuditLogEntry {
     // deliberately erases even that.
     targetName:
       row.target_person_id !== null
-        ? (single(row.target)?.full_name ?? "Unnamed person")
+        ? (target?.full_name ?? "Unnamed person")
         : snapshotName(row.details),
     title: describe(row.action, row.details),
   } satisfies AuditLogEntry;
@@ -395,14 +433,6 @@ function buildFields(
     case "person.merged": {
       const sourceId = number(details, "source_person_id");
       add("Folded-in profile", sourceId === null ? null : `Person #${sourceId}`);
-      add(
-        "Folded-in profile was a portal administrator",
-        yesNo(flag(details, "source_was_portal_administrator")),
-      );
-      add(
-        "Avatar taken from folded-in profile",
-        yesNo(flag(details, "source_avatar_path")),
-      );
       break;
     }
 

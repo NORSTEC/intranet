@@ -83,6 +83,9 @@ function messageFor(error: { message: string }, fallback: string) {
   if (error.message.includes("same_person")) {
     return "Pick two different people.";
   }
+  if (error.message.includes("source_is_portal_administrator")) {
+    return "A portal administrator cannot be folded into another profile. Merge the duplicate into their profile instead, or revoke the role first.";
+  }
   return fallback;
 }
 

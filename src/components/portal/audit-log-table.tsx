@@ -46,6 +46,7 @@ export function AuditLogTable({
   showDateRangeFilter?: boolean;
 }) {
   const router = useRouter();
+  const [query, setQuery] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -63,11 +64,28 @@ export function AuditLogTable({
     useState<AuditCategory[]>(categoryOptions);
 
   const visibleEntries = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("en");
+
     return entries
       .filter((entry) => {
         if (
           categoryOptions.includes(entry.category) &&
           !selectedCategories.includes(entry.category)
+        ) {
+          return false;
+        }
+        // Both people an event names are searchable, by either the name they
+        // are listed under or the address they are known by.
+        if (
+          normalizedQuery &&
+          ![
+            entry.targetName,
+            entry.targetEmail,
+            entry.actorName,
+            entry.actorEmail,
+          ].some((field) =>
+            field?.toLocaleLowerCase("en").includes(normalizedQuery),
+          )
         ) {
           return false;
         }
@@ -95,6 +113,7 @@ export function AuditLogTable({
     categoryOptions,
     selectedCategories,
     showDateRangeFilter,
+    query,
     from,
     to,
     sortKey,
@@ -143,74 +162,90 @@ export function AuditLogTable({
   return (
     <>
       {entries.length > 0 && (
-        <div className="mt-8 flex flex-wrap gap-2">
-          {showDateRangeFilter && (
-            <FilterMenu icon="calendar_month" label={dateFilterLabel}>
-              <fieldset className="grid gap-4">
-                <legend className="section-label mb-2 opacity-45">
-                  Date range
-                </legend>
-                <label className="block">
-                  <span className="section-label mb-2 block opacity-45">
-                    From
-                  </span>
-                  <input
-                    className="portal-field w-auto"
-                    max={to || undefined}
-                    onChange={(event) => setFrom(event.target.value)}
-                    type="date"
-                    value={from}
-                  />
-                </label>
-                <label className="block">
-                  <span className="section-label mb-2 block opacity-45">
-                    To
-                  </span>
-                  <input
-                    className="portal-field w-auto"
-                    min={from || undefined}
-                    onChange={(event) => setTo(event.target.value)}
-                    type="date"
-                    value={to}
-                  />
-                </label>
-                {isDateFiltered && (
-                  <button
-                    className="portal-button"
-                    onClick={() => {
-                      setFrom("");
-                      setTo("");
-                    }}
-                    type="button"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="material-symbols-outlined text-[1.1rem]"
-                    >
-                      filter_alt_off
+        <div className="mt-8 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {showDateRangeFilter && (
+              <FilterMenu icon="calendar_month" label={dateFilterLabel}>
+                <fieldset className="grid gap-4">
+                  <legend className="section-label mb-2 opacity-45">
+                    Date range
+                  </legend>
+                  <label className="block">
+                    <span className="section-label mb-2 block opacity-45">
+                      From
                     </span>
-                    Clear dates
-                  </button>
-                )}
+                    <input
+                      className="portal-field w-auto"
+                      max={to || undefined}
+                      onChange={(event) => setFrom(event.target.value)}
+                      type="date"
+                      value={from}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="section-label mb-2 block opacity-45">
+                      To
+                    </span>
+                    <input
+                      className="portal-field w-auto"
+                      min={from || undefined}
+                      onChange={(event) => setTo(event.target.value)}
+                      type="date"
+                      value={to}
+                    />
+                  </label>
+                  {isDateFiltered && (
+                    <button
+                      className="portal-button"
+                      onClick={() => {
+                        setFrom("");
+                        setTo("");
+                      }}
+                      type="button"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[1.1rem]"
+                      >
+                        filter_alt_off
+                      </span>
+                      Clear dates
+                    </button>
+                  )}
+                </fieldset>
+              </FilterMenu>
+            )}
+
+            <FilterMenu icon="filter_alt" label={categoryFilterLabel}>
+              <fieldset>
+                <legend className="section-label mb-2 opacity-45">
+                  Category
+                </legend>
+                {categoryOptions.map((category) => (
+                  <CheckboxOption
+                    checked={selectedCategories.includes(category)}
+                    key={category}
+                    label={auditCategoryLabels[category]}
+                    onChange={() => toggleCategory(category)}
+                  />
+                ))}
               </fieldset>
             </FilterMenu>
-          )}
+          </div>
 
-          <FilterMenu icon="filter_alt" label={categoryFilterLabel}>
-            <fieldset>
-              <legend className="section-label mb-2 opacity-45">
-                Category
-              </legend>
-              {categoryOptions.map((category) => (
-                <CheckboxOption
-                  checked={selectedCategories.includes(category)}
-                  key={category}
-                  label={auditCategoryLabels[category]}
-                  onChange={() => toggleCategory(category)}
-                />
-              ))}
-            </fieldset>
-          </FilterMenu>
+          <label className="relative min-w-0 flex-1 xl:w-80 xl:flex-none">
+            <span className="sr-only">Search events</span>
+            <input
+              className="portal-field w-full pr-10"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search name or email"
+              type="search"
+              value={query}
+            />
+            <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
+              search
+            </span>
+          </label>
         </div>
       )}
 
@@ -269,10 +304,24 @@ export function AuditLogTable({
                   </td>
                   <td className="py-3 pr-5">{entry.title}</td>
                   <td className="py-3 pr-5">
-                    {entry.targetName ?? "Deleted account"}
+                    <span className="block">
+                      {entry.targetName ?? "Deleted account"}
+                    </span>
+                    {entry.targetEmail && (
+                      <span className="mt-0.5 block text-sm opacity-55">
+                        {entry.targetEmail}
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 pr-4">
-                    {entry.actorName ?? "Automatic"}
+                    <span className="block">
+                      {entry.actorName ?? "Automatic"}
+                    </span>
+                    {entry.actorEmail && (
+                      <span className="mt-0.5 block text-sm opacity-55">
+                        {entry.actorEmail}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -119,7 +119,9 @@ export default async function PortalPersonPage({
       .maybeSingle(),
     supabase
       .from("people")
-      .select("id, full_name, person_emails (email, is_primary)")
+      .select(
+        "id, full_name, person_emails (email, is_primary), portal_administrators!portal_administrators_person_id_fkey (person_id)",
+      )
       .is("deleted_at", null)
       .neq("id", personId)
       .order("full_name", { ascending: true, nullsFirst: false }),
@@ -242,17 +244,23 @@ export default async function PortalPersonPage({
       full_name: string | null;
       id: number;
       person_emails: Array<{ email: string; is_primary: boolean }>;
+      portal_administrators: { person_id: number } | null;
     }>
-  ).map((candidate) => {
-    const candidateEmails = [...candidate.person_emails].sort(
-      (left, right) => Number(right.is_primary) - Number(left.is_primary),
-    );
-    return {
-      email: candidateEmails[0]?.email ?? null,
-      id: candidate.id,
-      name: candidate.full_name ?? "Unnamed person",
-    } satisfies MergeCandidate;
-  });
+  )
+    // A portal administrator is never the profile that gets folded in and
+    // removed — `merge_people` refuses it — so they are not offered as a
+    // duplicate. Merging into an administrator is done from their own page.
+    .filter((candidate) => !candidate.portal_administrators)
+    .map((candidate) => {
+      const candidateEmails = [...candidate.person_emails].sort(
+        (left, right) => Number(right.is_primary) - Number(left.is_primary),
+      );
+      return {
+        email: candidateEmails[0]?.email ?? null,
+        id: candidate.id,
+        name: candidate.full_name ?? "Unnamed person",
+      } satisfies MergeCandidate;
+    });
 
   return (
     <>

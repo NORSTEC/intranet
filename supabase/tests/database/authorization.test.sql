@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(161);
+select plan(162);
 
 insert into public.people (
   full_name,
@@ -2725,6 +2725,36 @@ select set_config(
   true
 );
 
+select throws_ok(
+  $$
+    select public.merge_people(
+      (select keeper_id from duplicate_people),
+      (select copy_id from duplicate_people),
+      null
+    )
+  $$,
+  'P0001',
+  'source_is_portal_administrator',
+  'a portal administrator cannot be the duplicate that is folded in'
+);
+
+reset role;
+
+-- The role moves to the profile that survives, which is the direction a merge
+-- involving a portal administrator is allowed to run in.
+delete from public.portal_administrators
+where person_id = (select copy_id from duplicate_people);
+
+insert into public.portal_administrators (person_id)
+select keeper_id from duplicate_people;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
 select lives_ok(
   $$
     select public.merge_people(
@@ -2733,7 +2763,7 @@ select lives_ok(
       'duplicate.copy@example.com'
     )
   $$,
-  'a portal administrator can merge a duplicate profile'
+  'a portal administrator can merge a duplicate into an administrator profile'
 );
 
 reset role;
@@ -2797,8 +2827,8 @@ select is(
     from public.portal_administrators
     where person_id = (select keeper_id from duplicate_people)
   ),
-  0::bigint,
-  'merging never carries the portal administrator role over'
+  1::bigint,
+  'merging into a portal administrator leaves the role with the survivor'
 );
 
 select * from finish();

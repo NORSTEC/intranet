@@ -228,7 +228,7 @@ export function PersonAdminActions({
           </ActionCard>
 
           <ActionCard
-            description="Use this when the same person exists twice."
+            description="Use this when the same person exists twice. The duplicate is folded into this profile and removed, so portal administrators cannot be picked as the duplicate — merge into their profile instead."
             title="Merge a duplicate"
           >
             <label className="block">
@@ -505,8 +505,8 @@ export function PersonAdminActions({
             removed.
           </p>
           <p className="mt-3">
-            The portal administrator role never carries over, and no membership
-            role is promoted.
+            {personName} stays the profile everything belongs to afterwards,
+            keeping their own fields and roles. No membership role is promoted.
           </p>
         </ConfirmDialog>
       )}
