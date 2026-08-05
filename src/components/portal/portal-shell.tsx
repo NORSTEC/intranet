@@ -17,19 +17,13 @@ type NavigationItem = {
   label: string;
   href: string;
   icon: string;
-  nested?: boolean;
   admin?: "organization" | "portal";
 };
 
 const generalNavigation: NavigationItem[] = [
   { label: "Dashboard", href: "/", icon: "dashboard" },
-  { label: "My profile", href: "/profile", icon: "person", nested: true },
-  {
-    label: "Organizations",
-    href: "/organizations",
-    icon: "domain",
-    nested: true,
-  },
+  { label: "My profile", href: "/profile", icon: "person" },
+  { label: "Organizations", href: "/organizations", icon: "domain" },
   { label: "Members", href: "/members", icon: "groups" },
   { label: "Statistics", href: "/statistics", icon: "monitoring" },
 ];
@@ -45,28 +39,24 @@ const administrationNavigation: NavigationItem[] = [
     label: "Member status",
     href: "/administration/members",
     icon: "manage_accounts",
-    nested: true,
     admin: "organization",
   },
   {
     label: "Organization settings",
     href: "/administration/organization",
     icon: "settings",
-    nested: true,
     admin: "organization",
   },
   {
     label: "Team management",
     href: "/administration/teams",
     icon: "group_work",
-    nested: true,
     admin: "organization",
   },
   {
     label: "Portal management",
     href: "/admin",
     icon: "admin_panel_settings",
-    nested: true,
     admin: "portal",
   },
 ];
@@ -86,9 +76,19 @@ const breadcrumbLabels: Record<string, string> = {
   teams: "Teams",
 };
 
-function isActiveNavigationItem(pathname: string, href: string, nested?: boolean) {
+/**
+ * A section stays lit for everything underneath it. Opening one member from
+ * Members, or one person from Portal management, is still that section — the
+ * menu says where you are, and a page nobody can navigate to from the menu
+ * would otherwise leave it showing nothing at all.
+ *
+ * Matching on `${href}/` rather than `href` keeps neighbours apart: `/admin`
+ * must not claim `/administration/...`. Dashboard owns `/` alone, since every
+ * path starts with it.
+ */
+function isActiveNavigationItem(pathname: string, href: string) {
   if (href === "/") return pathname === href;
-  return pathname === href || Boolean(nested && pathname.startsWith(`${href}/`));
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function Navigation({
@@ -122,8 +122,8 @@ function Navigation({
       return (
         <nav aria-label="Portal navigation" className="flex flex-col gap-2.5">
           {groups.flatMap((group) =>
-            group.items.map(({ label, href, icon, nested }) => {
-              const isActive = isActiveNavigationItem(pathname, href, nested);
+            group.items.map(({ label, href, icon }) => {
+              const isActive = isActiveNavigationItem(pathname, href);
 
               return (
                 <Link
@@ -152,8 +152,8 @@ function Navigation({
               <p className="portal-nav-group-title">{group.label}</p>
             )}
             <div className={`${group.label ? "mt-3" : ""} flex flex-col gap-1`}>
-              {group.items.map(({ label, href, icon, nested }) => {
-                const isActive = isActiveNavigationItem(pathname, href, nested);
+              {group.items.map(({ label, href, icon }) => {
+                const isActive = isActiveNavigationItem(pathname, href);
 
                 return (
                   <Link
@@ -186,8 +186,8 @@ function Navigation({
             </p>
           )}
           <div className={`${group.label ? "mt-3" : ""} flex flex-col gap-2.5`}>
-            {group.items.map(({ label, href, nested }) => {
-              const isActive = isActiveNavigationItem(pathname, href, nested);
+            {group.items.map(({ label, href }) => {
+              const isActive = isActiveNavigationItem(pathname, href);
 
               return (
                 <Link

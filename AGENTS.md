@@ -92,6 +92,19 @@ Two rules that cut across most portal components:
   `member-status-manager.tsx` — any new people-listing table should do the
   same.
 
+## Menu active state
+
+A menu item stays active for every page under its href, not just the exact
+match: `/members/42` keeps `Members` lit, `/admin/people/42` keeps `Portal
+management` lit. `isActiveNavigationItem` in
+`components/portal/portal-shell.tsx` is the single place this is decided, and
+it applies to every item — there is no per-item opt-in, and a new nav item
+needs no flag. Two things it relies on: the prefix test appends a slash, so
+`/admin` never claims `/administration/...`, and `/` is matched exactly
+because every path starts with it. A new route placed under an existing
+section therefore needs nothing; a new *section* whose href is a prefix of
+another one does, so avoid that.
+
 ## Breadcrumbs
 
 `components/portal/portal-shell.tsx`'s `Breadcrumbs()` builds crumbs from URL
