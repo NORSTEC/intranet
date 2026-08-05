@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { reviewAccessRequest } from "@/app/(portal)/administration/access-requests/actions";
-import { MemberAvatar } from "@/components/portal/member-avatar";
 import {
   CheckboxOption,
   FilterMenu,
@@ -21,7 +20,6 @@ export type AccessReviewStatus =
   | "cancelled";
 
 export type AccessReviewRequest = {
-  avatarUrl?: string;
   createdAt: string;
   decidedLabel: string | null;
   decisionNote: string | null;
@@ -40,16 +38,13 @@ export type AccessReviewRequest = {
 };
 
 type ReviewScope = number | "alumni";
-type SortKey = "requester" | "access" | "submitted" | "status";
+type SortKey = "requester" | "email" | "type" | "organization" | "submitted";
 
-const statusMeta: Record<
-  AccessReviewStatus,
-  { dotClassName: string; label: string }
-> = {
-  pending: { dotClassName: "bg-sun", label: "Pending" },
-  approved: { dotClassName: "bg-beachball", label: "Approved" },
-  rejected: { dotClassName: "bg-copper", label: "Declined" },
-  cancelled: { dotClassName: "bg-moody/30", label: "Withdrawn" },
+const statusLabels: Record<AccessReviewStatus, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Declined",
+  cancelled: "Withdrawn",
 };
 
 const statusOrder: AccessReviewStatus[] = [
@@ -58,6 +53,18 @@ const statusOrder: AccessReviewStatus[] = [
   "rejected",
   "cancelled",
 ];
+
+/** What the person asked to become, independent of which organization. */
+function typeLabel(request: AccessReviewRequest) {
+  return request.requestType === "alumni" ? "Alumni" : "Member";
+}
+
+// Alumni access belongs to no organization: it is decided by a portal
+// administrator and creates no membership, so the column has nothing to name.
+function organizationLabel(request: AccessReviewRequest) {
+  if (request.requestType === "alumni") return null;
+  return request.organizationName ?? "Unknown organization";
+}
 
 function accessLabel(request: AccessReviewRequest) {
   return request.requestType === "alumni"
@@ -71,33 +78,145 @@ function scopeOf(request: AccessReviewRequest): ReviewScope {
     : (request.organizationId ?? -1);
 }
 
-function StatusPill({ status }: { status: AccessReviewStatus }) {
-  const meta = statusMeta[status];
-
-  return (
-    <span className="portal-pill portal-pill-outline whitespace-nowrap">
-      <span aria-hidden="true" className={`size-2 rounded-full ${meta.dotClassName}`} />
-      {meta.label}
-    </span>
-  );
-}
-
 function DetailItem({
   children,
   label,
+  wide = false,
 }: {
   children: React.ReactNode;
   label: string;
+  wide?: boolean;
 }) {
   return (
-    <div>
+    <div className={wide ? "sm:col-span-2" : undefined}>
       <dt className="section-label opacity-45">{label}</dt>
       <dd className="mt-1.5 leading-relaxed">{children}</dd>
     </div>
   );
 }
 
-function ReviewConfirmation({
+/** Escape closes any dialog on this page, unless a decision is being saved. */
+function useCloseOnEscape(onClose: () => void, blocked: boolean) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !blocked) onClose();
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [blocked, onClose]);
+}
+
+function DialogFrame({
+  children,
+  labelledBy,
+  role = "dialog",
+}: {
+  children: React.ReactNode;
+  labelledBy: string;
+  role?: "dialog" | "alertdialog";
+}) {
+  return (
+    <div
+      aria-labelledby={labelledBy}
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(15,17,24,0.72)] p-5"
+      role={role}
+    >
+      <div className="portal-surface max-h-[90vh] w-full max-w-2xl overflow-y-auto p-7 sm:p-8">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Everything one request holds, and nothing to do about it.
+ *
+ * Deciding lives on the row this opened from, so reading and acting stay
+ * separate: closing puts the two decision buttons back under the cursor rather
+ * than stacking a confirmation on top of a dialog.
+ */
+function DetailsDialog({
+  onClose,
+  request,
+}: {
+  onClose: () => void;
+  request: AccessReviewRequest;
+}) {
+  useCloseOnEscape(onClose, false);
+
+  return (
+    <DialogFrame labelledBy="access-request-details-title">
+      <h2 className="text-2xl font-medium" id="access-request-details-title">
+        {request.requesterName}
+      </h2>
+      <p className="mt-3 leading-relaxed opacity-65">
+        {request.requestType === "alumni"
+          ? "Asked for alumni access to the portal. Approving creates no organization membership."
+          : `Asked to join ${accessLabel(request)}. Approving makes them an active member, able to sign in right away.`}
+      </p>
+
+      <dl className="mt-7 grid gap-5 text-sm sm:grid-cols-2">
+        <DetailItem label="Email">{request.email ?? "Not provided"}</DetailItem>
+        <DetailItem label="Requested access">{typeLabel(request)}</DetailItem>
+        <DetailItem label="Organization">
+          {organizationLabel(request) ?? "—"}
+        </DetailItem>
+        <DetailItem label="Submitted">{request.submittedLabel}</DetailItem>
+        <DetailItem label="Field of study">
+          {request.fieldOfStudy ?? "Not provided"}
+        </DetailItem>
+        <DetailItem label="Study year">
+          {request.studyYear ?? "Not provided"}
+        </DetailItem>
+        <DetailItem label="Message" wide>
+          <span className="block max-w-[70ch]">
+            {request.message ?? "No message was added."}
+          </span>
+        </DetailItem>
+        {request.status !== "pending" && (
+          <DetailItem label="Decision" wide>
+            <span className="block max-w-[70ch]">
+              {statusLabels[request.status]}
+              {request.reviewerName ? ` by ${request.reviewerName}` : ""}
+              {request.decidedLabel ? ` · ${request.decidedLabel}` : ""}
+              {request.decisionNote && (
+                <span className="mt-2 block opacity-65">
+                  “{request.decisionNote}”
+                </span>
+              )}
+            </span>
+          </DetailItem>
+        )}
+      </dl>
+
+      <div className="mt-7">
+        <button
+          autoFocus
+          className="portal-button"
+          onClick={onClose}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[1.1rem]"
+          >
+            close
+          </span>
+          Close
+        </button>
+      </div>
+    </DialogFrame>
+  );
+}
+
+/**
+ * The confirmation both decisions share. Granting portal access and turning
+ * someone away are each one click away in the table, so neither goes through
+ * without a second one — and the note the requester will read is written here.
+ */
+function DecisionDialog({
   decision,
   note,
   onCancel,
@@ -116,84 +235,71 @@ function ReviewConfirmation({
 }) {
   const approving = decision === "approved";
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !pending) onCancel();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel, pending]);
+  useCloseOnEscape(onCancel, pending);
 
   return (
-    <div
-      aria-labelledby="access-review-confirmation-title"
-      aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(15,17,24,0.72)] p-5"
-      role="alertdialog"
-    >
-      <div className="portal-surface w-full max-w-lg p-7 sm:p-8">
-        <h2 className="text-2xl font-medium" id="access-review-confirmation-title">
-          {approving ? "Grant portal access?" : "Decline this request?"}
-        </h2>
-        <p className="mt-4 leading-relaxed opacity-65">
-          {approving
-            ? request.requestType === "alumni"
-              ? `${request.requesterName} gets alumni access to the portal. No organization membership is created.`
-              : `${request.requesterName} becomes an active member of ${accessLabel(request)} and can sign in right away.`
-            : `${request.requesterName} keeps no access and sees your note the next time they sign in. They can send a new request afterwards.`}
-        </p>
+    <DialogFrame labelledBy="access-decision-title" role="alertdialog">
+      <h2 className="text-2xl font-medium" id="access-decision-title">
+        {approving ? "Grant portal access?" : "Decline this request?"}
+      </h2>
+      <p className="mt-4 leading-relaxed opacity-65">
+        {approving
+          ? request.requestType === "alumni"
+            ? `${request.requesterName} gets alumni access to the portal. No organization membership is created.`
+            : `${request.requesterName} becomes an active member of ${accessLabel(request)} and can sign in right away.`
+          : `${request.requesterName} keeps no access and sees your note the next time they sign in. They can send a new request afterwards.`}
+      </p>
 
-        <label className="mt-6 grid gap-2">
-          <span className="section-label opacity-45">
-            Note to the requester (optional)
+      <label className="mt-6 grid gap-2">
+        <span className="section-label opacity-45">
+          Note to the requester (optional)
+        </span>
+        <textarea
+          autoFocus
+          className="portal-field min-h-24 resize-y"
+          disabled={pending}
+          maxLength={1000}
+          onChange={(event) => onNoteChange(event.target.value)}
+          placeholder={
+            approving
+              ? "Welcome aboard — you now have access."
+              : "Why the request was declined."
+          }
+          value={note}
+        />
+      </label>
+
+      <div className="mt-7 flex flex-wrap gap-3">
+        <button
+          className="portal-button"
+          disabled={pending}
+          onClick={onCancel}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[1.1rem]"
+          >
+            close
           </span>
-          <textarea
-            autoFocus
-            className="portal-field min-h-24 resize-y"
-            disabled={pending}
-            maxLength={1000}
-            onChange={(event) => onNoteChange(event.target.value)}
-            placeholder={
-              approving
-                ? "Welcome aboard — you now have access."
-                : "Why the request was declined."
-            }
-            value={note}
-          />
-        </label>
-
-        <div className="mt-7 flex flex-wrap gap-3">
-          <button
-            className="portal-button"
-            disabled={pending}
-            onClick={onCancel}
-            type="button"
+          Cancel
+        </button>
+        <button
+          className={`portal-button${approving ? "" : " portal-button-danger"}`}
+          disabled={pending}
+          onClick={onConfirm}
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className={`material-symbols-outlined text-[1.1rem] ${pending ? "animate-spin" : ""}`}
           >
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined text-[1.1rem]"
-            >
-              close
-            </span>
-            Cancel
-          </button>
-          <button
-            className={`portal-button ${approving ? "" : "portal-button-danger"}`}
-            disabled={pending}
-            onClick={onConfirm}
-            type="button"
-          >
-            <span
-              aria-hidden="true"
-              className={`material-symbols-outlined text-[1.1rem] ${pending ? "animate-spin" : ""}`}
-            >
-              {pending ? "progress_activity" : approving ? "person_check" : "block"}
-            </span>
-            {pending ? "Saving…" : approving ? "Grant access" : "Decline"}
-          </button>
-        </div>
+            {pending ? "progress_activity" : approving ? "person_check" : "block"}
+          </span>
+          {pending ? "Saving…" : approving ? "Approve" : "Decline"}
+        </button>
       </div>
-    </div>
+    </DialogFrame>
   );
 }
 
@@ -215,10 +321,10 @@ export function AccessReviewTable({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] =
     useState<TableSortDirection>("ascending");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [review, setReview] = useState<{
+  const [detailsId, setDetailsId] = useState<number | null>(null);
+  const [deciding, setDeciding] = useState<{
     decision: "approved" | "rejected";
-    request: AccessReviewRequest;
+    requestId: number;
   } | null>(null);
   const [note, setNote] = useState("");
   const [toast, setToast] = useState<{
@@ -272,10 +378,9 @@ export function AccessReviewTable({
           return sortDirection === "ascending" ? comparison : -comparison;
         }
         const value = (request: AccessReviewRequest) => {
-          if (sortKey === "access") return accessLabel(request);
-          if (sortKey === "status") {
-            return String(statusOrder.indexOf(request.status));
-          }
+          if (sortKey === "email") return request.email ?? "";
+          if (sortKey === "type") return typeLabel(request);
+          if (sortKey === "organization") return organizationLabel(request) ?? "";
           return request.requesterName;
         };
         const comparison = value(left).localeCompare(value(right), "en", {
@@ -292,6 +397,9 @@ export function AccessReviewTable({
     sortKey,
   ]);
 
+  const detailed = requests.find((request) => request.id === detailsId) ?? null;
+  const decidingRequest =
+    requests.find((request) => request.id === deciding?.requestId) ?? null;
   const pendingCount = requests.filter(
     (request) => request.status === "pending",
   ).length;
@@ -328,35 +436,30 @@ export function AccessReviewTable({
     setSortDirection("ascending");
   }
 
-  function openReview(
-    request: AccessReviewRequest,
-    decision: "approved" | "rejected",
-  ) {
+  function closeDecision() {
+    setDeciding(null);
     setNote("");
-    setReview({ decision, request });
   }
 
-  function confirmReview() {
-    if (!review) return;
-    const { decision, request } = review;
+  function confirmDecision() {
+    if (!deciding) return;
 
     startTransition(async () => {
       const result = await reviewAccessRequest({
-        decision,
+        decision: deciding.decision,
         note,
-        requestId: request.id,
+        requestId: deciding.requestId,
       });
-      setReview(null);
-      setNote("");
       setToast({
         id: Date.now(),
         message: result.message,
         status: result.ok ? "success" : "error",
       });
-      if (result.ok) {
-        setExpandedId(null);
-        router.refresh();
-      }
+      // A refused decision leaves the dialog open with the note intact, so it
+      // can be tried again without retyping it.
+      if (!result.ok) return;
+      closeDecision();
+      router.refresh();
     });
   }
 
@@ -364,7 +467,7 @@ export function AccessReviewTable({
     selectedStatuses.length === statusOrder.length
       ? "Status: All"
       : selectedStatuses.length === 1
-        ? `Status: ${statusMeta[selectedStatuses[0]].label}`
+        ? `Status: ${statusLabels[selectedStatuses[0]]}`
         : selectedStatuses.length === 0
           ? "Status: None"
           : `Status · ${selectedStatuses.length}`;
@@ -382,12 +485,12 @@ export function AccessReviewTable({
     <>
       {toast && <Toast key={toast.id} message={toast.message} status={toast.status} />}
 
-      <p className="mb-8 text-sm opacity-55">
+      <p className="mb-8 max-w-2xl text-sm opacity-55">
         {pendingCount === 0
           ? "Nothing is waiting for a decision."
           : pendingCount === 1
-            ? "1 request is waiting for a decision."
-            : `${pendingCount} requests are waiting for a decision.`}
+            ? "1 request is waiting for a decision. Details shows everything it holds."
+            : `${pendingCount} requests are waiting for a decision. Details shows everything one holds.`}
       </p>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -399,7 +502,7 @@ export function AccessReviewTable({
                 <CheckboxOption
                   checked={selectedStatuses.includes(status)}
                   key={status}
-                  label={statusMeta[status].label}
+                  label={statusLabels[status]}
                   onChange={() => toggleStatus(status)}
                 />
               ))}
@@ -427,13 +530,13 @@ export function AccessReviewTable({
           )}
         </div>
 
-        <label className="relative min-w-0 flex-1 xl:w-72 xl:flex-none">
+        <label className="relative min-w-0 flex-1 xl:w-80 xl:flex-none">
           <span className="sr-only">Search access requests</span>
           <input
             className="portal-field w-full pr-10"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search requests"
-            type="text"
+            placeholder="Search name or email"
+            type="search"
             value={query}
           />
           <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-50">
@@ -444,15 +547,22 @@ export function AccessReviewTable({
 
       {visibleRequests.length > 0 ? (
         <div className="mt-8 overflow-x-auto">
-          <table className="w-full min-w-[52rem] border-collapse">
+          {/* Three buttons in the last cell need the room; below this the
+              table scrolls sideways rather than cramping them. */}
+          <table className="w-full min-w-[66rem] border-collapse">
+            <caption className="sr-only">
+              Access requests with who asked, the access they asked for, and the
+              organization it belongs to
+            </caption>
             <thead>
               <tr>
                 {(
                   [
-                    ["requester", "Requester"],
-                    ["access", "Requested access"],
+                    ["requester", "Name"],
+                    ["email", "Email"],
+                    ["type", "Requested access"],
+                    ["organization", "Organization"],
                     ["submitted", "Submitted"],
-                    ["status", "Status"],
                   ] as const
                 ).map(([key, heading]) => (
                   <SortableTableHeader
@@ -464,152 +574,94 @@ export function AccessReviewTable({
                     {heading}
                   </SortableTableHeader>
                 ))}
-                <th className="pb-3 pr-4 text-right font-semibold italic" scope="col">
-                  Review
+                <th
+                  className="pb-3 pr-4 text-right font-semibold italic"
+                  scope="col"
+                >
+                  Actions
                 </th>
               </tr>
             </thead>
-            {visibleRequests.map((request) => {
-              const expanded = expandedId === request.id;
-              const isPending = request.status === "pending";
-
-              return (
-                <tbody key={request.id}>
-                  <tr className={expanded ? "" : "border-b border-moody"}>
-                    <td className="py-3 pl-4 pr-5">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <MemberAvatar
-                          name={request.requesterName}
-                          src={request.avatarUrl}
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium">
-                            {request.requesterName}
-                          </span>
-                          <span className="mt-0.5 block truncate text-xs opacity-55">
-                            {request.email ?? "No email address"}
-                          </span>
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-5">{accessLabel(request)}</td>
-                    <td className="py-3 pr-5 whitespace-nowrap">
-                      {request.submittedLabel}
-                    </td>
-                    <td className="py-3 pr-5">
-                      <StatusPill status={request.status} />
-                    </td>
-                    <td className="py-3 pr-4">
-                      <div className="flex justify-end">
-                        <button
-                          aria-controls={`access-request-detail-${request.id}`}
-                          aria-expanded={expanded}
-                          className="portal-button whitespace-nowrap"
-                          onClick={() =>
-                            setExpandedId(expanded ? null : request.id)
-                          }
-                          type="button"
+            <tbody>
+              {visibleRequests.map((request) => (
+                <tr className="border-b border-moody" key={request.id}>
+                  <td className="py-3 pl-4 pr-5 font-medium">
+                    {request.requesterName}
+                  </td>
+                  <td className="py-3 pr-5">
+                    {request.email ?? "No email address"}
+                  </td>
+                  <td className="py-3 pr-5">{typeLabel(request)}</td>
+                  <td className="py-3 pr-5">
+                    {organizationLabel(request) ?? (
+                      <span aria-label="No organization">—</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap py-3 pr-5">
+                    {request.submittedLabel}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button
+                        className="portal-button whitespace-nowrap"
+                        onClick={() => setDetailsId(request.id)}
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.1rem]"
                         >
-                          {isPending ? "Review" : "Details"}
-                          <span
-                            aria-hidden="true"
-                            className={`material-symbols-outlined text-[1.05rem] transition-transform ${expanded ? "rotate-180" : ""}`}
+                          visibility
+                        </span>
+                        Details
+                      </button>
+                      {request.status === "pending" && (
+                        <>
+                          <button
+                            className="portal-button whitespace-nowrap"
+                            onClick={() => {
+                              setNote("");
+                              setDeciding({
+                                decision: "approved",
+                                requestId: request.id,
+                              });
+                            }}
+                            type="button"
                           >
-                            keyboard_arrow_down
-                          </span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expanded && (
-                    <tr
-                      className="border-b border-moody"
-                      id={`access-request-detail-${request.id}`}
-                    >
-                      <td className="pb-7 pl-4 pr-4" colSpan={5}>
-                        {/* The table scrolls sideways on narrow screens; the
-                            detail panel stays pinned to the viewport so its
-                            text never scrolls out of reach. */}
-                        <div className="portal-surface sticky left-4 w-full max-w-[calc(100vw-4.5rem)] p-5 sm:max-w-[calc(100vw-6rem)] sm:p-6 lg:max-w-none">
-                          <dl className="grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                            <DetailItem label="Field of study">
-                              {request.fieldOfStudy ?? "Not provided"}
-                            </DetailItem>
-                            <DetailItem label="Study year">
-                              {request.studyYear ?? "Not provided"}
-                            </DetailItem>
-                            <DetailItem label="Email">
-                              {request.email ?? "Not provided"}
-                            </DetailItem>
-                            <DetailItem label="Submitted">
-                              {request.submittedLabel}
-                            </DetailItem>
-                            <div className="sm:col-span-2 lg:col-span-4">
-                              <dt className="section-label opacity-45">Message</dt>
-                              <dd className="mt-1.5 max-w-[70ch] leading-relaxed">
-                                {request.message ?? "No message was added."}
-                              </dd>
-                            </div>
-                            {!isPending && (
-                              <div className="sm:col-span-2 lg:col-span-4">
-                                <dt className="section-label opacity-45">
-                                  Decision
-                                </dt>
-                                <dd className="mt-1.5 max-w-[70ch] leading-relaxed">
-                                  {statusMeta[request.status].label}
-                                  {request.reviewerName
-                                    ? ` by ${request.reviewerName}`
-                                    : ""}
-                                  {request.decidedLabel
-                                    ? ` · ${request.decidedLabel}`
-                                    : ""}
-                                  {request.decisionNote && (
-                                    <span className="mt-2 block opacity-65">
-                                      “{request.decisionNote}”
-                                    </span>
-                                  )}
-                                </dd>
-                              </div>
-                            )}
-                          </dl>
-
-                          {isPending && (
-                            <div className="mt-7 flex flex-wrap gap-3">
-                              <button
-                                className="portal-button"
-                                onClick={() => openReview(request, "approved")}
-                                type="button"
-                              >
-                                <span
-                                  aria-hidden="true"
-                                  className="material-symbols-outlined text-[1.1rem]"
-                                >
-                                  person_check
-                                </span>
-                                Grant access
-                              </button>
-                              <button
-                                className="portal-button portal-button-danger"
-                                onClick={() => openReview(request, "rejected")}
-                                type="button"
-                              >
-                                <span
-                                  aria-hidden="true"
-                                  className="material-symbols-outlined text-[1.1rem]"
-                                >
-                                  block
-                                </span>
-                                Decline
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              );
-            })}
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              person_check
+                            </span>
+                            Approve
+                          </button>
+                          <button
+                            className="portal-button portal-button-danger whitespace-nowrap"
+                            onClick={() => {
+                              setNote("");
+                              setDeciding({
+                                decision: "rejected",
+                                requestId: request.id,
+                              });
+                            }}
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              block
+                            </span>
+                            Decline
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       ) : (
@@ -620,18 +672,19 @@ export function AccessReviewTable({
         </p>
       )}
 
-      {review && (
-        <ReviewConfirmation
-          decision={review.decision}
+      {detailed && (
+        <DetailsDialog onClose={() => setDetailsId(null)} request={detailed} />
+      )}
+
+      {deciding && decidingRequest && (
+        <DecisionDialog
+          decision={deciding.decision}
           note={note}
-          onCancel={() => {
-            setReview(null);
-            setNote("");
-          }}
-          onConfirm={confirmReview}
+          onCancel={closeDecision}
+          onConfirm={confirmDecision}
           onNoteChange={setNote}
           pending={pending}
-          request={review.request}
+          request={decidingRequest}
         />
       )}
     </>

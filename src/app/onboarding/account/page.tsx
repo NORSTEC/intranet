@@ -36,7 +36,7 @@ export default async function AccountOnboardingPage({
           Do you already have a portal profile?
           <span
             aria-hidden="true"
-            className="login-heading-star inline-block shrink-0"
+            className="entry-heading-star inline-block shrink-0"
           />
         </h1>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed opacity-60">

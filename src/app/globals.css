@@ -598,6 +598,30 @@ html.theme-switching *::after {
     background: url("/images/star.svg") center / contain no-repeat;
   }
 
+  /*
+   * The same star for headings that sit on a surface which follows the theme.
+   * `.login-heading-star` cannot be used there: from 1024px up it switches
+   * back to the dark star, because the sign-in panel it belongs to is a fixed
+   * light one at that width. On a themed background that leaves a dark star on
+   * a dark surface.
+   */
+  .entry-heading-star {
+    width: 1.5rem;
+    height: 1.5rem;
+    background: url("/images/star.svg") center / contain no-repeat;
+  }
+
+  [data-theme="dark"] .entry-heading-star {
+    background-image: url("/images/star-egg.png");
+  }
+
+  @media (min-width: 768px) {
+    .entry-heading-star {
+      width: 2rem;
+      height: 2rem;
+    }
+  }
+
   [data-theme="dark"] .login-heading-star {
     background-image: url("/images/star-egg.png");
   }
