@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePortalAccess } from "@/lib/auth/access";
+import { setWorkspaceUserSuspended } from "@/lib/google/workspace";
 import { isStudyField } from "@/lib/profile/study-fields";
 import { createClient } from "@/lib/supabase/server";
 
@@ -55,6 +56,20 @@ export type DeleteOwnAccountResult = { ok: false; message: string } | never;
 export async function deleteOwnAccount(): Promise<DeleteOwnAccountResult> {
   await requirePortalAccess();
   const supabase = await createClient();
+
+  // Deleting yourself has to reach Google for the same reason an administrator
+  // deleting you does: a Norstec account left active keeps the mail, the files,
+  // and the Google sign-in this portal accepts. The id is read while the
+  // profile is still readable; the deletion itself records the suspension, and
+  // only then is it pushed to Google — a deletion that fails must not leave
+  // somebody locked out of an account they still have.
+  const { data: workspaceAccount } = await supabase
+    .from("external_accounts")
+    .select("external_id")
+    .eq("provider", "google_workspace")
+    .eq("status", "active")
+    .maybeSingle();
+
   const { error } = await supabase.rpc("delete_own_account");
 
   if (error) {
@@ -64,6 +79,16 @@ export async function deleteOwnAccount(): Promise<DeleteOwnAccountResult> {
         ? "You are the last active administrator of an organization. Appoint another administrator before deleting your account."
         : "Your account could not be deleted. Email portal@norstec.no for help.";
     return { ok: false, message };
+  }
+
+  if (workspaceAccount?.external_id) {
+    try {
+      await setWorkspaceUserSuspended(workspaceAccount.external_id, true);
+    } catch {
+      // A deletion the person asked for is not undone because Google was
+      // unreachable. The row already says suspended, which is what the next
+      // directory sync reconciles against.
+    }
   }
 
   await supabase.auth.signOut({ scope: "global" });

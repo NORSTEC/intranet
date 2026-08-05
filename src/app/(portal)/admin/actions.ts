@@ -1,7 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  isWorkspaceConfigured,
+  listWorkspaceUsers,
+  setWorkspaceUserSuspended,
+  WorkspaceError,
+} from "@/lib/google/workspace";
 import { requirePortalAdminAccess } from "@/lib/auth/access";
+import { NORSTEC_ORGANIZATION_SLUG } from "@/lib/portal/norstec";
 import { createClient } from "@/lib/supabase/server";
 
 export type PortalManagementResult =
@@ -86,7 +93,96 @@ function messageFor(error: { message: string }, fallback: string) {
   if (error.message.includes("source_is_portal_administrator")) {
     return "A portal administrator cannot be folded into someone else. Merge the duplicate into them instead, or revoke the role first.";
   }
+  if (error.message.includes("source_is_norstec_account")) {
+    return "A Norstec account cannot be folded into someone else. Merge the duplicate into them instead.";
+  }
+  if (error.message.includes("account_not_found")) {
+    return "This person has no Norstec account.";
+  }
+  if (error.message.includes("norstec_organization_missing")) {
+    return "Norstec is missing from the organizations table.";
+  }
   return fallback;
+}
+
+/**
+ * Google's own wording is the most useful thing to show — it names the actual
+ * refusal — but the two failures an administrator can do something about are
+ * worth saying in the portal's own words first.
+ */
+function workspaceMessageFor(error: unknown, fallback: string) {
+  if (!(error instanceof WorkspaceError)) return fallback;
+  if (error.message === "workspace_not_configured") {
+    return "Google Workspace is not configured on this server.";
+  }
+  if (error.status === 403 || error.status === 401) {
+    return `Google refused the portal's service account: ${error.message}`;
+  }
+  return `Google refused the request: ${error.message}`;
+}
+
+/**
+ * Reads the whole Workspace directory and hands it to the database in one
+ * call. Deliberately administrator-triggered rather than scheduled: a cron
+ * job has no signed-in user, so it would need a privileged Supabase key
+ * stored on the server — and this portal deliberately holds none. Everything
+ * it does goes through row level security with the caller's own token.
+ */
+export async function syncWorkspaceDirectory(): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isWorkspaceConfigured()) {
+    return {
+      ok: false,
+      message: "Google Workspace is not configured on this server.",
+    };
+  }
+
+  let accounts;
+  try {
+    accounts = await listWorkspaceUsers();
+  } catch (error) {
+    return {
+      ok: false,
+      message: workspaceMessageFor(
+        error,
+        "Google could not be reached. Nothing was changed.",
+      ),
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("sync_workspace_directory", {
+    p_accounts: accounts.map((account) => ({
+      accountEmail: account.primaryEmail,
+      displayName: account.displayName,
+      externalId: account.id,
+      suspended: account.suspended,
+    })),
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "The directory could not be recorded."),
+    };
+  }
+
+  revalidatePath("/admin/workspace");
+  revalidatePath("/admin/people");
+
+  const summary = data as {
+    matched: number;
+    removed: number;
+    unmatched: number;
+  } | null;
+
+  return {
+    ok: true,
+    message: summary
+      ? `Directory synced. ${summary.matched} matched, ${summary.unmatched} not in the portal.`
+      : "Directory synced.",
+  };
 }
 
 export async function changePortalAccess(input: {
@@ -103,6 +199,8 @@ export async function changePortalAccess(input: {
   }
 
   const supabase = await createClient();
+  const workspaceAccount = await loadWorkspaceAccount(input.personId);
+
   const { error } = await supabase.rpc("set_person_portal_access", {
     p_person_id: input.personId,
     p_status: input.status,
@@ -116,12 +214,46 @@ export async function changePortalAccess(input: {
   }
 
   revalidatePersonViews(input.personId);
+
+  const suspending = input.status === "suspended";
+  const baseMessage = suspending
+    ? "Portal access suspended. Open sessions were signed out."
+    : "Portal access restored.";
+
+  // Portal access and the Norstec account move together in both directions.
+  // Suspending someone who keeps their Google sign-in has not really suspended
+  // them — that is the sign-in the portal itself accepts — and activating them
+  // again without their mail and files back is only half a restoration.
+  const needsWorkspaceChange = suspending
+    ? workspaceAccount?.status === "active"
+    : workspaceAccount?.status === "suspended";
+
+  if (!needsWorkspaceChange) {
+    return { ok: true, message: baseMessage };
+  }
+
+  const change = await applyWorkspaceSuspension({
+    externalId: workspaceAccount?.externalId ?? null,
+    personId: input.personId,
+    suspended: suspending,
+  });
+
+  revalidatePersonViews(input.personId);
+
+  if (!change.ok) {
+    return {
+      ok: true,
+      message: `${baseMessage} Their Norstec account could not be ${
+        suspending ? "suspended" : "reactivated"
+      } — ${change.message}`,
+    };
+  }
+
   return {
     ok: true,
-    message:
-      input.status === "active"
-        ? "Portal access restored."
-        : "Portal access suspended. Open sessions were signed out.",
+    message: `${baseMessage} Their Norstec account is ${
+      suspending ? "suspended" : "active again"
+    }.`,
   };
 }
 
@@ -210,6 +342,11 @@ export async function softDeletePerson(input: {
   }
 
   const supabase = await createClient();
+  // Read while the person is still whole. Deleting them does not remove the
+  // row, but doing this first means a delete that then fails has changed
+  // nothing at all.
+  const workspaceAccount = await loadWorkspaceAccount(input.personId);
+
   const { error } = await supabase.rpc("soft_delete_person", {
     p_person_id: input.personId,
     p_reason: reason || null,
@@ -222,11 +359,37 @@ export async function softDeletePerson(input: {
     };
   }
 
+  const baseMessage =
+    "Person deleted. Their memberships ended, and their data is erased permanently after 30 days.";
+
   revalidatePersonViews(input.personId);
+
+  // A deleted person keeps their Norstec account, suspended. Deleting the
+  // Workspace user is never done from here: it would destroy their mail and
+  // their Drive ownership, which is a decision taken in the Admin console
+  // after the data has been transferred.
+  if (!workspaceAccount || workspaceAccount.status !== "active") {
+    return { ok: true, message: baseMessage };
+  }
+
+  const suspension = await applyWorkspaceSuspension({
+    externalId: workspaceAccount.externalId,
+    personId: input.personId,
+    suspended: true,
+  });
+
+  revalidatePersonViews(input.personId);
+
+  if (!suspension.ok) {
+    return {
+      ok: true,
+      message: `${baseMessage} Their Norstec account could not be suspended — ${suspension.message}`,
+    };
+  }
+
   return {
     ok: true,
-    message:
-      "Person deleted. Their memberships ended, and their data is erased permanently after 30 days.",
+    message: `${baseMessage} Their Norstec account is suspended.`,
   };
 }
 
@@ -240,6 +403,7 @@ export async function restorePerson(input: {
   }
 
   const supabase = await createClient();
+  const workspaceAccount = await loadWorkspaceAccount(input.personId);
   const { error } = await supabase.rpc("restore_person", {
     p_person_id: input.personId,
   });
@@ -252,7 +416,28 @@ export async function restorePerson(input: {
   }
 
   revalidatePersonViews(input.personId);
-  return { ok: true, message: "Person restored." };
+
+  // Deleting them suspended the Norstec account, so restoring them brings it
+  // back. Leaving it suspended would restore a person who still cannot reach
+  // their mail, their files, or the Google sign-in the portal accepts.
+  if (workspaceAccount?.status !== "suspended") {
+    return { ok: true, message: "Person restored." };
+  }
+
+  const change = await applyWorkspaceSuspension({
+    externalId: workspaceAccount.externalId,
+    personId: input.personId,
+    suspended: false,
+  });
+
+  revalidatePersonViews(input.personId);
+
+  return {
+    ok: true,
+    message: change.ok
+      ? "Person restored. Their Norstec account is active again."
+      : `Person restored. Their Norstec account could not be reactivated — ${change.message}`,
+  };
 }
 
 export async function purgePerson(input: {
@@ -321,4 +506,110 @@ export async function mergePeople(input: {
   revalidatePersonViews(input.targetPersonId);
   revalidatePath(`/admin/people/${input.sourcePersonId}`);
   return { ok: true, message: "People merged." };
+}
+
+type WorkspaceAccountRow = {
+  accountEmail: string | null;
+  externalId: string | null;
+  status: string;
+};
+
+async function loadWorkspaceAccount(
+  personId: number,
+): Promise<WorkspaceAccountRow | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("external_accounts")
+    .select("account_email, external_id, status, organizations!inner (slug)")
+    .eq("person_id", personId)
+    .eq("provider", "google_workspace")
+    .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  return {
+    accountEmail: data.account_email,
+    externalId: data.external_id,
+    status: data.status,
+  };
+}
+
+/**
+ * Google first, then the database. The reverse order can leave a row claiming
+ * an account is suspended while the person is still signing in, which is the
+ * one inconsistency that actually matters here; this order can only leave the
+ * portal a step behind Google, and pressing the button again catches it up.
+ */
+async function applyWorkspaceSuspension(input: {
+  externalId: string | null;
+  personId: number;
+  suspended: boolean;
+}): Promise<PortalManagementResult> {
+  if (!input.externalId) {
+    return { ok: false, message: "This person has no Norstec account." };
+  }
+
+  try {
+    await setWorkspaceUserSuspended(input.externalId, input.suspended);
+  } catch (error) {
+    return {
+      ok: false,
+      message: workspaceMessageFor(
+        error,
+        "Google could not be reached. Nothing was changed.",
+      ),
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_workspace_account_suspended", {
+    p_person_id: input.personId,
+    p_suspended: input.suspended,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(
+        error,
+        "Google was updated, but the portal could not record it. Try again.",
+      ),
+    };
+  }
+
+  return {
+    ok: true,
+    message: input.suspended
+      ? "Norstec account suspended."
+      : "Norstec account reactivated.",
+  };
+}
+
+export async function setNorstecAccountSuspension(input: {
+  personId: number;
+  suspended: boolean;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isValidPersonId(input.personId)) {
+    return { ok: false, message: "This Norstec account could not be changed." };
+  }
+
+  if (!isWorkspaceConfigured()) {
+    return {
+      ok: false,
+      message: "Google Workspace is not configured on this server.",
+    };
+  }
+
+  const account = await loadWorkspaceAccount(input.personId);
+  const result = await applyWorkspaceSuspension({
+    externalId: account?.externalId ?? null,
+    personId: input.personId,
+    suspended: input.suspended,
+  });
+
+  revalidatePersonViews(input.personId);
+  return result;
 }

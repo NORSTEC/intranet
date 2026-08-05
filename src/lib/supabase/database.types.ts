@@ -164,11 +164,13 @@ export type Database = {
           account_email: string | null
           created_at: string
           deprovisioned_at: string | null
+          display_name: string | null
           external_id: string | null
           id: number
           last_error: string | null
+          last_synced_at: string | null
           organization_id: number
-          person_id: number
+          person_id: number | null
           provider: string
           provisioned_at: string | null
           status: string
@@ -178,11 +180,13 @@ export type Database = {
           account_email?: string | null
           created_at?: string
           deprovisioned_at?: string | null
+          display_name?: string | null
           external_id?: string | null
           id?: never
           last_error?: string | null
+          last_synced_at?: string | null
           organization_id: number
-          person_id: number
+          person_id?: number | null
           provider: string
           provisioned_at?: string | null
           status?: string
@@ -192,11 +196,13 @@ export type Database = {
           account_email?: string | null
           created_at?: string
           deprovisioned_at?: string | null
+          display_name?: string | null
           external_id?: string | null
           id?: never
           last_error?: string | null
+          last_synced_at?: string | null
           organization_id?: number
-          person_id?: number
+          person_id?: number | null
           provider?: string
           provisioned_at?: string | null
           status?: string
@@ -1054,7 +1060,15 @@ export type Database = {
         Args: { p_is_administrator: boolean; p_person_id: number }
         Returns: undefined
       }
+      set_workspace_account_suspended: {
+        Args: { p_person_id: number; p_suspended: boolean }
+        Returns: undefined
+      }
       sign_in_block_reason: { Args: never; Returns: string | null }
+      sync_workspace_directory: {
+        Args: { p_accounts: Json }
+        Returns: Json
+      }
       soft_delete_person: {
         Args: { p_person_id: number; p_reason?: string | null }
         Returns: undefined

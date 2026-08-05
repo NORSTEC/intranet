@@ -21,7 +21,12 @@ export const auditCategoryLabels: Record<AuditCategory, string> = {
 // switches on, so a new action only needs to be taught to one of the two
 // functions to file correctly into both.
 export function categoryFor(action: string): AuditCategory {
-  if (action.startsWith("portal_access.") || action.startsWith("person.")) {
+  if (
+    action.startsWith("portal_access.") ||
+    action.startsWith("person.") ||
+    action.startsWith("workspace_account.") ||
+    action.startsWith("workspace_directory.")
+  ) {
     return "account";
   }
   if (

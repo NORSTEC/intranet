@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { MemberAvatar } from "@/components/portal/member-avatar";
 import {
+  NorstecAccountCard,
+  type NorstecAccount,
+} from "@/components/portal/norstec-account-card";
+import {
   PersonAdminActions,
   type MergeCandidate,
 } from "@/components/portal/person-admin-actions";
@@ -17,7 +21,14 @@ import {
   derivePersonStatus,
   personStatusLabels,
 } from "@/lib/portal/access-labels";
-import { hasNorstecEmail } from "@/lib/portal/norstec";
+import {
+  isWorkspaceConfigured,
+  workspaceAdminUrl,
+} from "@/lib/google/workspace";
+import {
+  hasNorstecEmail,
+  NORSTEC_ORGANIZATION_SLUG,
+} from "@/lib/portal/norstec";
 import { loadPersonAudit } from "@/lib/portal/person-audit";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
@@ -148,7 +159,7 @@ export default async function PortalPersonPage({
   // cache, which is exactly what was missing on the deployed project while
   // membership_periods was absent there; a plain table read cannot drift that
   // way.
-  const [periodsResult, auditEntries] = await Promise.all([
+  const [periodsResult, workspaceResult, auditEntries] = await Promise.all([
     supabase
       .from("membership_periods")
       .select("membership_id, starts_on, ends_on")
@@ -156,12 +167,34 @@ export default async function PortalPersonPage({
         "membership_id",
         person.memberships.map((membership) => membership.id),
       ),
+    supabase
+      .from("external_accounts")
+      .select(
+        "account_email, external_id, status, last_synced_at, organizations!inner (slug)",
+      )
+      .eq("person_id", personId)
+      .eq("provider", "google_workspace")
+      .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
+      .maybeSingle(),
     loadPersonAudit(personId),
   ]);
 
   if (periodsResult.error) {
     throw new Error("Could not load membership history");
   }
+
+  // A missing Norstec account is the normal case, not a failure: most people
+  // in the portal are members of other organizations and never get one.
+  const norstecAccount: NorstecAccount | null = workspaceResult.data
+    ? {
+        accountEmail: workspaceResult.data.account_email,
+        adminUrl: workspaceResult.data.external_id
+          ? workspaceAdminUrl(workspaceResult.data.external_id)
+          : null,
+        lastSyncedAt: workspaceResult.data.last_synced_at,
+        status: workspaceResult.data.status as NorstecAccount["status"],
+      }
+    : null;
 
   const periodsByMembership = new Map<number, MembershipPeriodRow[]>();
   for (const period of periodsResult.data as MembershipPeriodRow[]) {
@@ -360,6 +393,12 @@ export default async function PortalPersonPage({
 
       <PersonAdminActions
         accessStatus={person.portal_access_status}
+        norstecAccountStatus={
+          norstecAccount?.status === "active" ||
+          norstecAccount?.status === "suspended"
+            ? norstecAccount.status
+            : null
+        }
         isPortalAdmin={Boolean(person.portal_administrators)}
         isSelf={isSelf}
         mergeCandidates={mergeCandidates}
@@ -367,6 +406,12 @@ export default async function PortalPersonPage({
         personId={person.id}
         personName={name}
       >
+        <NorstecAccountCard
+          account={norstecAccount}
+          personId={person.id}
+          personName={name}
+          workspaceConfigured={isWorkspaceConfigured()}
+        />
         <PersonAuditFeed entries={auditEntries} />
       </PersonAdminActions>
     </>

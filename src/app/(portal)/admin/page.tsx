@@ -11,6 +11,13 @@ const sections = [
   },
   {
     description:
+      "Every account in the norstec.no Google Workspace, and which of them belong to nobody in the portal.",
+    href: "/admin/workspace",
+    icon: "cloud_sync",
+    title: "Workspace accounts",
+  },
+  {
+    description:
       "People who have been deleted but not yet purged. Restore them, or remove their data for good.",
     href: "/admin/deleted",
     icon: "person_remove",

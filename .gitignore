@@ -62,3 +62,5 @@ Thumbs.db
 .turbo/
 tmp/
 temp/
+.vercel
+.env*

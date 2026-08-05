@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { ActionCard } from "@/components/portal/action-card";
 import {
   changePortalAccess,
   changePortalAdministrator,
@@ -26,30 +27,6 @@ export type MergeCandidate = {
 
 type AccessStatus = "unclaimed" | "active" | "suspended";
 
-function ActionCard({
-  children,
-  description,
-  title,
-  tone = "default",
-}: {
-  children: ReactNode;
-  description: string;
-  title: string;
-  tone?: "default" | "danger";
-}) {
-  return (
-    <section
-      className={`portal-surface flex flex-col p-6 sm:p-7${
-        tone === "danger" ? " border-copper" : ""
-      }`}
-    >
-      <h3 className="text-h3">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed opacity-60">{description}</p>
-      <div className="mt-6">{children}</div>
-    </section>
-  );
-}
-
 type PendingAction =
   | { kind: "access" }
   | { kind: "administrator"; grant: boolean }
@@ -62,6 +39,7 @@ export function PersonAdminActions({
   isPortalAdmin,
   isSelf,
   mergeCandidates,
+  norstecAccountStatus,
   personEmails,
   personId,
   personName,
@@ -72,6 +50,12 @@ export function PersonAdminActions({
   isPortalAdmin: boolean;
   isSelf: boolean;
   mergeCandidates: MergeCandidate[];
+  /**
+   * Portal access and the Norstec account move together, so suspending,
+   * activating and deleting all say what they do to Google before they run.
+   * Null when there is no Norstec account to say anything about.
+   */
+  norstecAccountStatus: "active" | "suspended" | null;
   personEmails: string[];
   personId: number;
   personName: string;
@@ -183,8 +167,12 @@ export function PersonAdminActions({
           <ActionCard
             description={
               isSuspended
-                ? "Activating lets this person sign in again. Nothing else changes."
-                : "Suspending signs the person out everywhere and blocks sign-in. Nothing is deleted and the change is reversible."
+                ? norstecAccountStatus === "suspended"
+                  ? "Activating lets this person sign in again, and reactivates their Norstec account in Google Workspace."
+                  : "Activating lets this person sign in again. Nothing else changes."
+                : norstecAccountStatus === "active"
+                  ? "Suspending signs the person out everywhere, blocks sign-in, and suspends their Norstec account in Google Workspace. Nothing is deleted and the change is reversible."
+                  : "Suspending signs the person out everywhere and blocks sign-in. Nothing is deleted and the change is reversible."
             }
             title="Portal access"
           >
@@ -428,6 +416,18 @@ export function PersonAdminActions({
               ? `${personName} will be able to sign in again.`
               : `${personName} will be signed out of every device and blocked from signing in. Their record, memberships, and history are kept.`}
           </p>
+          {!isSuspended && norstecAccountStatus === "active" && (
+            <p className="mt-3">
+              Their Norstec account is suspended in Google Workspace as well, so
+              their mail and files stay in place but they cannot reach them.
+            </p>
+          )}
+          {isSuspended && norstecAccountStatus === "suspended" && (
+            <p className="mt-3">
+              Their Norstec account is reactivated in Google Workspace at the
+              same time, so their mail and files are reachable again.
+            </p>
+          )}
         </ConfirmDialog>
       )}
 
@@ -515,6 +515,13 @@ export function PersonAdminActions({
             Nothing is erased yet. Deleted people keeps them for 30 days, where
             you can restore them or purge their data for good.
           </p>
+          {norstecAccountStatus === "active" && (
+            <p className="mt-3">
+              Their Norstec account is suspended in Google Workspace, never
+              deleted. Removing it for good — and transferring their mail and
+              files first — is done in the Google Admin console.
+            </p>
+          )}
         </ConfirmDialog>
       )}
 

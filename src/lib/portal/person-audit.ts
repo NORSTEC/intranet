@@ -251,6 +251,12 @@ function describe(action: string, details: Record<string, unknown> | null) {
       return "Data purged";
     case "person.abandoned_discarded":
       return "Abandoned profile discarded";
+    case "workspace_account.suspended":
+      return "Norstec account suspended";
+    case "workspace_account.reactivated":
+      return "Norstec account reactivated";
+    case "workspace_directory.synced":
+      return "Workspace directory synced";
     default:
       return action
         .replace(/[._]/g, " ")
