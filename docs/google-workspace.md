@@ -60,6 +60,23 @@ the environment are the URL and the publishable key, both public by design.
 Scheduling it later means accepting one privileged key scoped to one route;
 that trade has not been made.
 
+### Accounts in "Not in the portal" that must not be touched
+
+The unmatched table exists to find accounts nobody uses any more, and it cannot
+tell those apart from accounts nobody *signs in as*. Some of the second kind run
+the organization's infrastructure, and suspending one breaks something that will
+not obviously point back here.
+
+**`web@norstec.no` is the one to know about.** It is the account behind the
+Vercel team that deploys this portal, and behind the Supabase token that applies
+migrations from CI. It has no portal profile and never will, so it appears in
+the unmatched table looking exactly like an abandoned account. Suspending it
+stops deployments and stops migrations.
+
+Before suspending anything from that table, open it in the Admin console and
+look at the last sign-in. A role account in active use has a recent one, and
+that is the signal that somebody — or something — still depends on it.
+
 ## Suspension
 
 Portal access and the Norstec account move together, in both directions.

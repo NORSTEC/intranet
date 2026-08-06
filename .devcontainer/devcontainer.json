@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+  "name": "Norstec Portal",
+
+  // Node 24 is what CI and Vercel run. Matching it here means "works on my
+  // machine" stops being a sentence anybody has to say.
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm",
+
+  "features": {
+    // The local Supabase stack is a set of Docker containers, and the CLI
+    // starts them itself. Docker-in-Docker gives this container its own
+    // daemon to start them in, so `localhost:54321` inside the container is
+    // the database — rather than the host's daemon, where the ports would sit
+    // one network away and need a different address.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  "forwardPorts": [3000, 54321, 54323, 54324],
+  "portsAttributes": {
+    "3000": { "label": "Portal", "onAutoForward": "notify" },
+    "54321": { "label": "Supabase API" },
+    "54323": { "label": "Supabase Studio" },
+    "54324": { "label": "Mailpit (caught email)" }
+  },
+
+  // Runs once when the container is built. Everything after this is
+  // `pnpm db:start` and `pnpm dev`, which the README explains.
+  "onCreateCommand": "corepack enable && corepack prepare --activate",
+  "postCreateCommand": "pnpm install --frozen-lockfile && cp -n .env.example .env.local || true",
+
+  // Editor-specific conveniences. Every key under `customizations` is namespaced
+  // by tool and ignored by the others, so this block costs a WebStorm or
+  // Codespaces user nothing — the container itself is the same either way, and
+  // the Dev Container spec is not a VS Code format.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  },
+
+  // The Supabase stack is not small. Below this it starts and then dies part
+  // way through migrations, which looks like a broken migration rather than a
+  // machine that ran out of room.
+  "hostRequirements": {
+    "memory": "8gb",
+    "storage": "32gb"
+  }
+}

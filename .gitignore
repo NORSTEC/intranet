@@ -62,5 +62,8 @@ Thumbs.db
 .turbo/
 tmp/
 temp/
-.vercel
-.env*
+
+# Supabase CLI state: which hosted project this checkout is linked to, and
+# local stack details. Machine-specific, and `project-ref` names the real
+# project.
+supabase/.temp/

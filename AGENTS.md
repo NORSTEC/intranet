@@ -10,10 +10,19 @@ things that aren't obvious from reading the code once.
 pnpm lint        # eslint .
 pnpm typecheck   # tsc --noEmit
 pnpm build
-pnpm exec supabase test db --local supabase/tests/database/authorization.test.sql
+pnpm check       # all three of the above, in order
+
+pnpm db:start    # local Supabase stack in Docker
+pnpm db:reset    # rebuild the local database from every migration
+pnpm db:test     # the 162-assertion pgTAP authorization suite
+pnpm db:stop
 ```
 
-Run lint + typecheck before considering a change done.
+Run lint + typecheck before considering a change done. Run `db:test` whenever
+you touch a migration, an RLS policy or an RPC — `.github/workflows/checks.yml`
+runs it on every pull request, and it has already caught a `security definer`
+function that lost three of its `delete` statements in a rewrite and broke
+access-request declines in production.
 
 ## Supabase: local CLI, remote database
 

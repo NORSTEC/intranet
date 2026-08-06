@@ -1,0 +1,90 @@
+##
+# Everything that must be true before a change reaches production.
+#
+# Vercel deploys `main` automatically, so on a push this workflow reports after
+# the fact — it is on pull requests that it actually prevents anything. Make
+# both jobs required status checks on `main` and require a pull request, and
+# the two become the same thing.
+#
+# No secrets are used, and none should be added. Both jobs run entirely against
+# local throwaway state: the build reads no environment at all, and the
+# database job boots its own Postgres. That is what makes this workflow safe on
+# pull requests from forks — the repository is public, and a stranger's branch
+# must never be able to reach the real project.
+#
+# Actions are pinned to a commit rather than a tag. A tag can be moved to point
+# at different code; a commit cannot. The comment after each is the version it
+# was, and Dependabot updates both together.
+##
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: Types, lint, tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Refuses to run if the lockfile and package.json disagree, rather than
+      # quietly resolving something newer than what was reviewed.
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm lint
+
+      # The pure rules only — who counts as an alumnus, who may be offered the
+      # administrator role. Anything that reads the database is covered by the
+      # job below, against a real Postgres.
+      - run: pnpm test
+
+      - run: pnpm build
+
+  database:
+    name: Migrations and authorization tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # Docker is already running on GitHub's Ubuntu runners, which is all the
+      # local Supabase stack needs. With no `version` given, the action installs
+      # the CLI version pinned in this repository's lockfile — so CI runs the
+      # same one developers do.
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
+
+      - name: Start the local Supabase stack
+        run: supabase start
+
+      # Applies every migration to an empty database. This is the half that
+      # catches a migration which only works against the deployed project — one
+      # that assumes a column an earlier edited migration no longer creates, or
+      # that depends on the order it happened to be applied in.
+      - name: Apply every migration from scratch
+        run: supabase db reset --local
+
+      # And this is the half that catches a migration which applies cleanly but
+      # changes what the database will let people do. Row level security and the
+      # `security definer` functions are the whole authorization model here, so
+      # a regression in them is a data breach rather than a bug.
+      - name: Run the authorization suite
+        run: supabase test db --local supabase/tests/database/authorization.test.sql

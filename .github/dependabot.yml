@@ -1,0 +1,40 @@
+##
+# Opens pull requests for dependency updates. Deliberately without auto-merge.
+#
+# A compromised package published under a version this project then installs is
+# one of the few realistic ways into the production deployment — and the
+# deployment holds an identity that can suspend Google accounts. Merging those
+# updates automatically would hand that path a schedule. Somebody reads the
+# diff, or it does not land.
+#
+# pnpm 10 already refuses to run dependency lifecycle scripts unless they are
+# explicitly allowed, which closes the most common version of this. Do not
+# turn that off to make an install work; find out why it wants to run first.
+##
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # One pull request for the routine upgrades rather than fifteen, so the
+    # ones worth reading are not buried. Anything that changes a major version
+    # is left out of the group and arrives on its own.
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 5
+
+  # Workflow actions are code too, and they run with access to this
+  # repository's secrets.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
