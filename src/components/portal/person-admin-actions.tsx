@@ -8,6 +8,7 @@ import {
   changePortalAdministrator,
   mergePeople,
   softDeletePerson,
+  unlinkPersonAccount,
   type PortalManagementResult,
 } from "@/app/(portal)/admin/actions";
 import { ConfirmDialog } from "@/components/portal/confirm-dialog";
@@ -18,7 +19,16 @@ import {
   NORSTEC_EMAIL_DOMAIN,
 } from "@/lib/portal/norstec";
 
+export type PersonSignInAccount = {
+  authUserId: string;
+  /** Why this account cannot be removed, already in the portal's words. */
+  blockedReason: string | null;
+  email: string;
+  isOnboarding: boolean;
+};
+
 export type MergeCandidate = {
+  activeOrganizations: string[];
   avatarUrl?: string;
   email: string | null;
   id: number;
@@ -31,6 +41,7 @@ type PendingAction =
   | { kind: "access" }
   | { kind: "administrator"; grant: boolean }
   | { kind: "merge" }
+  | { kind: "unlink"; authUserId: string; email: string }
   | { kind: "delete" };
 
 export function PersonAdminActions({
@@ -40,6 +51,7 @@ export function PersonAdminActions({
   isSelf,
   mergeCandidates,
   norstecAccountStatus,
+  personAccounts,
   personEmails,
   personId,
   personName,
@@ -56,6 +68,13 @@ export function PersonAdminActions({
    * Null when there is no Norstec account to say anything about.
    */
   norstecAccountStatus: "active" | "suspended" | null;
+  /**
+   * Removing one on somebody's behalf is what a duplicate holding a third
+   * sign-in account needs before it can be merged at all — `merge_people`
+   * refuses two profiles holding three between them, and until this existed
+   * the only way under that limit was for the duplicate's owner to sign in.
+   */
+  personAccounts: PersonSignInAccount[];
   personEmails: string[];
   personId: number;
   personName: string;
@@ -66,6 +85,7 @@ export function PersonAdminActions({
   const [reason, setReason] = useState("");
   const [mergeQuery, setMergeQuery] = useState("");
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
+  const [mergeContactEmail, setMergeContactEmail] = useState("");
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -74,7 +94,6 @@ export function PersonAdminActions({
   const [busy, startTransition] = useTransition();
 
   const isSuspended = accessStatus === "suspended";
-  const eligibleForPortalAdmin = isPortalAdmin || hasNorstecEmail(personEmails);
   const mergeSource =
     mergeCandidates.find((candidate) => candidate.id === mergeSourceId) ?? null;
 
@@ -107,6 +126,7 @@ export function PersonAdminActions({
       setReason("");
       setMergeQuery("");
       setMergeSourceId(null);
+      setMergeContactEmail("");
       if (redirectTo) router.push(redirectTo);
       else router.refresh();
     });
@@ -131,10 +151,16 @@ export function PersonAdminActions({
       if (!mergeSource) return;
       run(() =>
         mergePeople({
+          contactEmail: mergeContactEmail || null,
           sourcePersonId: mergeSource.id,
           targetPersonId: personId,
         }),
       );
+      return;
+    }
+    if (pendingAction.kind === "unlink") {
+      const authUserId = pendingAction.authUserId;
+      run(() => unlinkPersonAccount({ authUserId, personId }));
       return;
     }
     if (pendingAction.kind === "delete") {
@@ -152,6 +178,23 @@ export function PersonAdminActions({
         ? "Revoke the portal administrator role before suspending this person."
         : null;
 
+  // Revoking the role stays available whatever the person's portal access is;
+  // granting it needs an account that can actually sign in and use it — the
+  // same two conditions `set_portal_administrator` enforces, in the same order
+  // it checks them, so the button is never offered for a call that would come
+  // straight back as `portal_access_required` or `norstec_domain_required`.
+  const administratorLockReason = isSelf
+    ? "You cannot change your own role. Another portal administrator has to do it."
+    : isPortalAdmin
+      ? null
+      : accessStatus === "unclaimed"
+        ? "This person has never signed in. They can be made a portal administrator once they do."
+        : isSuspended
+          ? "Portal access is suspended. Activate it again before making this person a portal administrator."
+          : !hasNorstecEmail(personEmails)
+            ? `Only people with a ${NORSTEC_EMAIL_DOMAIN} Google account can become portal administrators.`
+            : null;
+
   return (
     <>
       {toast && (
@@ -163,7 +206,7 @@ export function PersonAdminActions({
           Administration
         </h2>
 
-        <div className="mt-8 grid items-start gap-6 xl:grid-cols-2">
+        <div className="mt-8 grid gap-6 xl:grid-cols-2">
           <ActionCard
             description={
               isSuspended
@@ -285,6 +328,30 @@ export function PersonAdminActions({
               )
             )}
 
+            {mergeSource && (
+              <label className="mt-5 block">
+                <span className="section-label mb-2 block opacity-50">
+                  Contact address afterwards
+                </span>
+                <select
+                  className="portal-field w-full"
+                  onChange={(event) => setMergeContactEmail(event.target.value)}
+                  value={mergeContactEmail}
+                >
+                  <option value="">
+                    {`Keep ${personName}'s current address`}
+                  </option>
+                  {[...personEmails, mergeSource.email]
+                    .filter((email): email is string => Boolean(email))
+                    .map((email) => (
+                      <option key={email} value={email}>
+                        {email}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+
             <button
               // A long name would otherwise push the pill past the card edge.
               className="portal-button mt-6 max-w-full"
@@ -301,6 +368,57 @@ export function PersonAdminActions({
               Merge into {personName}
             </button>
           </ActionCard>
+
+          <ActionCard
+            description="Which Google accounts sign in to this profile. Removing one leaves the address on the profile and ends that account's sessions, so the person keeps their history and can still be reached. A profile has to keep one account."
+            span="full"
+            title="Sign-in accounts"
+          >
+            <ul className="grid gap-3">
+              {personAccounts.map((account) => (
+                <li
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2"
+                  key={account.authUserId}
+                >
+                  <span className="break-all font-medium">{account.email}</span>
+                  {account.isOnboarding && (
+                    <span className="text-sm opacity-55">onboarding</span>
+                  )}
+                  {account.blockedReason ? (
+                    <span className="ml-auto text-sm leading-relaxed opacity-60">
+                      {account.blockedReason}
+                    </span>
+                  ) : (
+                    <button
+                      className="portal-button ml-auto"
+                      disabled={busy}
+                      onClick={() =>
+                        setPendingAction({
+                          authUserId: account.authUserId,
+                          email: account.email,
+                          kind: "unlink",
+                        })
+                      }
+                      type="button"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[1.1rem]"
+                      >
+                        link_off
+                      </span>
+                      Remove account
+                    </button>
+                  )}
+                </li>
+              ))}
+              {personAccounts.length === 0 && (
+                <li className="text-sm opacity-60">
+                  No Google account signs in to this profile.
+                </li>
+              )}
+            </ul>
+          </ActionCard>
         </div>
       </section>
 
@@ -311,20 +429,15 @@ export function PersonAdminActions({
           Danger zone
         </h2>
 
-        <div className="mt-8 grid items-start gap-6 xl:grid-cols-2">
+        <div className="mt-8 grid gap-6 xl:grid-cols-2">
           <ActionCard
             description="Portal administrators administer every organization, decide alumni access, suspend and restore portal access, grant and revoke both administrator roles, merge duplicates, delete and purge people, and read the audit log. Keep the group small."
             title="Portal administrator"
             tone="danger"
           >
-            {isSelf ? (
+            {administratorLockReason ? (
               <p className="text-sm leading-relaxed opacity-60">
-                You cannot change your own role. Another portal administrator
-                has to do it.
-              </p>
-            ) : !eligibleForPortalAdmin ? (
-              <p className="text-sm leading-relaxed opacity-60">
-                Only people with a {NORSTEC_EMAIL_DOMAIN} Google account can become portal administrators.
+                {administratorLockReason}
               </p>
             ) : (
               <button
@@ -495,6 +608,37 @@ export function PersonAdminActions({
             {personName} is the person everything belongs to afterwards,
             keeping their own fields and roles. No membership role is promoted.
           </p>
+          <p className="mt-3">
+            Contact address afterwards:{" "}
+            <span className="font-medium">
+              {mergeContactEmail || "unchanged"}
+            </span>
+            .
+          </p>
+          {mergeSource.activeOrganizations.length > 0 && (
+            <p className="mt-3 font-medium">
+              {mergeSource.name} has an active membership in{" "}
+              {mergeSource.activeOrganizations.join(", ")}. After the merge{" "}
+              {personName} is an active member there. Only continue if these
+              really are the same person.
+            </p>
+          )}
+        </ConfirmDialog>
+      )}
+
+      {pendingAction?.kind === "unlink" && (
+        <ConfirmDialog
+          busy={busy}
+          confirmIcon="link_off"
+          confirmLabel="Remove account"
+          danger
+          onCancel={() => setPendingAction(null)}
+          onConfirm={confirmPendingAction}
+          title="Remove this sign-in account?"
+        >
+          <span className="font-medium">{pendingAction.email}</span> will no
+          longer sign anybody in to {personName}&rsquo;s profile, and its
+          sessions end immediately. The address stays on the profile.
         </ConfirmDialog>
       )}
 

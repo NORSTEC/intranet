@@ -125,10 +125,8 @@ export default async function TeamDetailsPage({
             const name = membership.person.full_name ?? "Unnamed member";
             const avatarPath = membership.person.avatar_path;
             const personEmails = emailsByPerson.get(membership.person.id) ?? [];
-            const preferredEmail =
-              personEmails.find((email) => email.email_type === "organization") ??
-              personEmails.find((email) => email.is_primary) ??
-              personEmails[0];
+            // The contact address, same rule as the member directory.
+            const preferredEmail = personEmails.find((email) => email.is_primary);
 
             return (
               <TeamMemberCard

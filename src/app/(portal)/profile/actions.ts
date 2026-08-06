@@ -30,10 +30,10 @@ export async function unlinkLoginAccount(
   });
 
   if (error) {
-    const message = error.message.includes("cannot_unlink_primary_account")
-      ? "The primary sign-in account cannot be removed."
-      : error.message.includes("last_portal_account")
-        ? "You must keep at least one sign-in account."
+    const message = error.message.includes("last_portal_account")
+      ? "You must keep at least one sign-in account."
+      : error.message.includes("portal_admin_requires_norstec_account")
+        ? "Portal administrators must keep a norstec.no sign-in account. Hand over the role first."
         : error.message.includes("membership_requires_account")
           ? "An active organization membership rests on this account. Ask an organization administrator to end the membership first."
           : "That sign-in account could not be removed.";
@@ -305,6 +305,7 @@ export async function saveProfile(formData: FormData) {
   const fieldOfStudy = textValue(formData, "fieldOfStudy");
   const studyYearValue = textValue(formData, "studyYear");
   const linkedinUrl = textValue(formData, "linkedinUrl");
+  const contactEmail = textValue(formData, "contactEmail");
   const expectedProfileUpdatedAt = textValue(
     formData,
     "expectedProfileUpdatedAt",
@@ -509,6 +510,23 @@ export async function saveProfile(formData: FormData) {
     await supabase.storage
       .from("member-avatars")
       .remove([access.profile.avatarPath]);
+  }
+
+  // Saved after the profile rather than inside it: moving the contact address
+  // is its own decision, with its own audit event, and a failure here must not
+  // undo a profile that saved cleanly. It is still reported — a contact
+  // address that quietly stays where it was is indistinguishable from one the
+  // portal refused to move, and that is exactly how this went unnoticed.
+  if (contactEmail) {
+    const { error: contactEmailError } = await supabase.rpc(
+      "set_own_primary_email",
+      { p_email: contactEmail },
+    );
+
+    if (contactEmailError) {
+      revalidatePath("/", "layout");
+      editRedirect("error=contact_email_failed");
+    }
   }
 
   revalidatePath("/", "layout");

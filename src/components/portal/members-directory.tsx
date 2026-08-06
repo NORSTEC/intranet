@@ -301,7 +301,7 @@ export function MembersDirectory({
                       ["name", "Name"],
                       ["organizations", "Organizations"],
                       ["status", "Status"],
-                      ["email", "Email"],
+                      ["email", "Contact email"],
                     ] as const
                   ).map(([key, heading]) => (
                     <SortableTableHeader

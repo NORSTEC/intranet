@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(164);
+select plan(193);
 
 insert into public.people (
   full_name,
@@ -1121,6 +1121,24 @@ select is(
   'an active member can read team memberships'
 );
 
+-- A second organization address, so the assertion below distinguishes the
+-- contact address from the address type rather than passing on both readings.
+reset role;
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select id, 'precreated.alternate@norstec.no', 'organization', false, 'manual'
+from public.people
+where full_name = 'Pre-created Member';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
 select is(
   (
     select count(*)
@@ -1130,7 +1148,32 @@ select is(
     )
   ),
   1::bigint,
-  'a member can read an organization email but not a personal email'
+  'a member reads the contact address alone, not every organization address'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where person_id = (
+      select id from public.people where full_name = 'Pre-created Member'
+    )
+      and is_primary
+  ),
+  1::bigint,
+  'the address a member reads is the contact one'
+);
+
+reset role;
+
+delete from public.person_emails
+where email = 'precreated.alternate@norstec.no';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
 );
 
 select is(
@@ -2831,6 +2874,497 @@ select is(
   'merging into a portal administrator leaves the role with the survivor'
 );
 
+
+
+-- Identity, contact addresses and unlinking. Each assertion below stands for a
+-- way one of these used to go wrong: a merge moving somebody's contact
+-- address, a Workspace rename stranding it, a reassigned address inheriting
+-- the previous holder's profile, and an unlink that took the address with it.
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values
+  (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    'authenticated', 'authenticated', 'rename.subject@orbitntnu.no', now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Rename Subject","provider_id":"google-rename-subject"}'::jsonb,
+    now(), now(), false, false
+  ),
+  (
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    'authenticated', 'authenticated', 'unlink.subject@orbitntnu.no', now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Unlink Subject","provider_id":"google-unlink-subject"}'::jsonb,
+    now(), now(), false, false
+  ),
+  (
+    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    'authenticated', 'authenticated', 'unlink.subject.private@example.com', now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Unlink Subject Private","provider_id":"google-unlink-private"}'::jsonb,
+    now(), now(), false, false
+  );
+
+-- The organization account claims its membership, the way a first-time
+-- organization user does.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}',
+  true
+);
+select public.complete_own_organization_onboarding();
+reset role;
+
+-- The personal account joins the same person, which is where linking leaves it.
+update public.portal_accounts
+set person_id = (
+  select person_id from public.person_emails
+  where email = 'unlink.subject@orbitntnu.no'
+)
+where auth_user_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+update public.person_emails
+set person_id = (
+  select person_id from public.person_emails
+  where email = 'unlink.subject@orbitntnu.no'
+),
+is_primary = false
+where email = 'unlink.subject.private@example.com';
+
+delete from public.people
+where full_name = 'Unlink Subject Private';
+
+create temporary table identity_people as
+select
+  (select person_id from public.person_emails where email = 'rename.subject@orbitntnu.no')
+    as rename_person_id,
+  (select person_id from public.person_emails where email = 'unlink.subject@orbitntnu.no')
+    as unlink_person_id;
+
+grant select on identity_people to authenticated;
+
+-- A rename in the Google Admin console: same account, new address.
+update auth.users
+set email = 'renamed.subject@orbitntnu.no'
+where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where person_id = (select rename_person_id from identity_people)
+  ),
+  1::bigint,
+  'a Workspace rename moves the address rather than adding a second one'
+);
+
+select is(
+  (
+    select email
+    from public.person_emails
+    where person_id = (select rename_person_id from identity_people)
+      and is_primary
+  ),
+  'renamed.subject@orbitntnu.no',
+  'the contact address follows a Workspace rename'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where email = 'rename.subject@orbitntnu.no'
+  ),
+  0::bigint,
+  'the address a rename left behind is released rather than held forever'
+);
+
+-- The Admin console deletes that account and gives the address to somebody
+-- new. Auth allows one user per address, so the successor can only exist once
+-- the previous holder's Auth user is gone — which is what deleting the
+-- Workspace account, or unlinking it here, leaves behind. What survives is the
+-- *address row* on the previous holder's profile, still naming the Google
+-- account that proved it, and that is the whole of what the portal has to go
+-- on when the successor arrives.
+delete from auth.users where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values (
+  'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  'authenticated', 'authenticated', 'renamed.subject@orbitntnu.no', now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Address Successor","provider_id":"google-address-successor"}'::jsonb,
+  now(), now(), false, false
+);
+
+select isnt(
+  (
+    select person_id
+    from public.portal_accounts
+    where auth_user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  ),
+  (select rename_person_id from identity_people),
+  'a reassigned address does not hand its new holder the previous profile'
+);
+
+select is(
+  (
+    select person_id
+    from public.person_emails
+    where email = 'renamed.subject@orbitntnu.no'
+  ),
+  (select rename_person_id from identity_people),
+  'the address stays with the person who already held it'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'auth.account_email_reused'
+  ),
+  1::bigint,
+  'a reused address is recorded for a portal administrator to resolve'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$ select public.unlink_own_portal_account('dddddddd-dddd-4ddd-8ddd-dddddddddddd') $$,
+  'P0001',
+  'membership_requires_account',
+  'an active domain membership blocks unlinking the account that proved it'
+);
+
+-- The interface asks the same guard before offering the button, so what a page
+-- shows and what the operation does cannot drift apart.
+select is(
+  (
+    select public.portal_account_unlink_block(
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    )
+  ),
+  'membership_requires_account',
+  'the reason a removal would fail is readable before attempting it'
+);
+
+reset role;
+
+update public.memberships
+set status = 'ended', ended_at = now()
+where person_id = (select unlink_person_id from identity_people);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}',
+  true
+);
+
+select is(
+  (
+    select public.portal_account_unlink_block(
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    )
+  ),
+  null,
+  'no reason is reported once the removal would succeed'
+);
+
+select lives_ok(
+  $$ select public.unlink_own_portal_account('dddddddd-dddd-4ddd-8ddd-dddddddddddd') $$,
+  'an ended membership no longer holds the sign-in account in place'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.portal_accounts
+    where auth_user_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+  ),
+  0::bigint,
+  'unlinking removes the sign-in account'
+);
+
+select is(
+  (
+    select person_id
+    from public.person_emails
+    where email = 'unlink.subject@orbitntnu.no'
+  ),
+  (select unlink_person_id from identity_people),
+  'unlinking keeps the address on the profile'
+);
+
+-- Signing in again with the account that was unlinked. Unlinking deleted the
+-- Auth user, so this is a new one — which is what makes the provisioning
+-- trigger run at all. The address is still theirs and still names the same
+-- Google account, so this is a return rather than a new person, and the ended
+-- membership is still what governs.
+select is(
+  (select count(*) from auth.users where id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'),
+  0::bigint,
+  'unlinking releases the Auth user rather than stranding it'
+);
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values (
+  'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+  'authenticated', 'authenticated', 'unlink.subject@orbitntnu.no', now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Unlink Subject","provider_id":"google-unlink-subject"}'::jsonb,
+  now(), now(), false, false
+);
+
+select is(
+  (
+    select person_id
+    from public.portal_accounts
+    where auth_user_id = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+  ),
+  (select unlink_person_id from identity_people),
+  'signing in again after an unlink returns to the same profile'
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships
+    where person_id = (select unlink_person_id from identity_people)
+      and status = 'active'
+  ),
+  0::bigint,
+  'signing in again does not replace an ended membership with a fresh one'
+);
+
+-- A portal administrator repairing a profile its owner cannot reach.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.unlink_portal_account('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') $$,
+  'a portal administrator can unlink a sign-in account on somebody behalf'
+);
+
+select throws_ok(
+  $$ select public.remove_person_email(
+       (select unlink_person_id from identity_people),
+       'unlink.subject@orbitntnu.no'
+     ) $$,
+  'P0001',
+  'email_has_sign_in_account',
+  'an address a sign-in account still uses cannot be removed'
+);
+
+select lives_ok(
+  $$ select public.set_person_primary_email(
+       (select unlink_person_id from identity_people),
+       'unlink.subject.private@example.com'
+     ) $$,
+  'a portal administrator can move a contact address'
+);
+
+reset role;
+
+select is(
+  (
+    select email
+    from public.person_emails
+    where person_id = (select unlink_person_id from identity_people)
+      and is_primary
+  ),
+  'unlink.subject.private@example.com',
+  'the chosen address becomes the contact address'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.remove_person_email(
+       (select unlink_person_id from identity_people),
+       'unlink.subject.private@example.com'
+     ) $$,
+  'an address with no sign-in account behind it can be released'
+);
+
+reset role;
+
+select is(
+  (
+    select email
+    from public.person_emails
+    where person_id = (select unlink_person_id from identity_people)
+      and is_primary
+  ),
+  'unlink.subject@orbitntnu.no',
+  'removing the contact address promotes another rather than leaving none'
+);
+
+-- A membership answers the request that was waiting for one.
+insert into public.access_requests (person_id, request_type, status)
+select unlink_person_id, 'alumni', 'pending' from identity_people;
+
+update public.memberships
+set status = 'active', ended_at = null
+where person_id = (select unlink_person_id from identity_people);
+
+select is(
+  (
+    select status
+    from public.access_requests
+    where person_id = (select unlink_person_id from identity_people)
+      and request_type = 'alumni'
+  ),
+  'cancelled',
+  'a membership cancels the alumni request it answers'
+);
+
+-- The contact address is an invariant rather than a convention. It is
+-- deferred, so a merge can pass through a state with none while addresses move
+-- between people; forcing it immediate is how a test sees it.
+select throws_ok(
+  $$
+    update public.person_emails
+    set is_primary = false
+    where person_id = (select unlink_person_id from identity_people);
+    set constraints all immediate;
+  $$,
+  '23514',
+  'person_primary_email_invariant',
+  'a person holding addresses cannot be left without a contact one'
+);
+
+-- Merging keeps the surviving person's own contact address, including when
+-- the duplicate's address is the older of the two.
+insert into public.people (full_name, portal_access_status, source)
+values ('Contact Keeper', 'active', 'manual');
+
+insert into public.people (full_name, portal_access_status, source)
+values ('Contact Duplicate', 'active', 'manual');
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source, created_at
+)
+select id, 'contact.keeper@example.com', 'personal', true, 'manual', now()
+from public.people
+where full_name = 'Contact Keeper';
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source, created_at
+)
+select id, 'contact.duplicate@example.com', 'personal', true, 'manual',
+  now() - interval '5 years'
+from public.people
+where full_name = 'Contact Duplicate';
+
+create temporary table contact_people as
+select
+  (select id from public.people where full_name = 'Contact Keeper') as keeper_id,
+  (select id from public.people where full_name = 'Contact Duplicate') as duplicate_id;
+
+grant select on contact_people to authenticated;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.merge_people(
+      (select keeper_id from contact_people),
+      (select duplicate_id from contact_people),
+      null
+    )
+  $$,
+  'a duplicate holding an older address can still be merged in'
+);
+
+reset role;
+
+select is(
+  (
+    select email
+    from public.person_emails
+    where person_id = (select keeper_id from contact_people)
+      and is_primary
+  ),
+  'contact.keeper@example.com',
+  'a merge keeps the surviving contact address even when the duplicate is older'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where person_id = (select keeper_id from contact_people)
+  ),
+  2::bigint,
+  'both addresses survive a merge'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.set_person_primary_email(
+      (select keeper_id from contact_people),
+      'contact.duplicate@example.com'
+    )
+  $$,
+  'the duplicate address can still be chosen deliberately afterwards'
+);
+
+reset role;
+
+select is(
+  (
+    select email
+    from public.person_emails
+    where person_id = (select keeper_id from contact_people)
+      and is_primary
+  ),
+  'contact.duplicate@example.com',
+  'choosing the duplicate address afterwards is what makes it the contact one'
+);
+
+
 -- The Slack sync rewrites the whole inventory for the organization and deletes
 -- whatever the snapshot leaves out, so the caller check is the only thing
 -- standing between an ordinary member and the contents of that table.
@@ -2860,6 +3394,5 @@ select throws_ok(
 );
 
 reset role;
-
 select * from finish();
 rollback;

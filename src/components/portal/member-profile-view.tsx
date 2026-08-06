@@ -154,7 +154,7 @@ export function MemberProfileView({
               </dd>
             </div>
             <div>
-              <dt className="section-label opacity-45">Email</dt>
+              <dt className="section-label opacity-45">Contact email</dt>
               <dd className="profile-value mt-2 font-medium break-words">
                 {email ? (
                   <a

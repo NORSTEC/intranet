@@ -2,11 +2,16 @@ import { notFound } from "next/navigation";
 import { MemberProfileView } from "@/components/portal/member-profile-view";
 import { PortalBreadcrumbData } from "@/components/portal/portal-breadcrumb-data";
 import { requirePortalAccess } from "@/lib/auth/access";
+import {
+  derivePersonStatus,
+  personStatusLabels,
+} from "@/lib/portal/access-labels";
 import { createClient } from "@/lib/supabase/server";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 
 type Person = {
   id: number;
+  alumni_access_granted_at: string | null;
   full_name: string | null;
   avatar_path: string | null;
   avatar_alt: string | null;
@@ -78,7 +83,7 @@ export default async function TeamMemberDetailsPage({
   const currentMembershipResult = await supabase
     .from("team_memberships")
     .select(
-      "people!team_memberships_person_id_fkey (id, full_name, avatar_path, avatar_alt, field_of_study, study_year, linkedin_url, phone_number)",
+      "people!team_memberships_person_id_fkey (id, full_name, avatar_path, avatar_alt, field_of_study, study_year, linkedin_url, phone_number, alumni_access_granted_at)",
     )
     .eq("team_id", teamResult.data.id)
     .eq("person_id", personId)
@@ -135,13 +140,21 @@ export default async function TeamMemberDetailsPage({
     : undefined;
   const organizationMemberships =
     organizationMembershipsResult.data as OrganizationMembership[];
-  const status = organizationMemberships.some(
-    (membership) => membership.status === "active",
-  )
-    ? "Active"
-    : organizationMemberships.some((membership) => membership.status === "ended")
-      ? "Alumni"
-      : "Pending";
+  // Read from the one place person status is decided, so this page and
+  // Manage people describe the same person the same way.
+  const status =
+    personStatusLabels[
+      derivePersonStatus({
+        activeMembershipCount: organizationMemberships.filter(
+          (membership) => membership.status === "active",
+        ).length,
+        deletedAt: null,
+        endedMembershipCount: organizationMemberships.filter(
+          (membership) => membership.status === "ended",
+        ).length,
+        hasAlumniAccess: Boolean(person.alumni_access_granted_at),
+      })
+    ];
   const experience = (experiencesResult.data as ProfileExperience[]).map((entry) => {
     const organization = Array.isArray(entry.organizations)
       ? entry.organizations[0]
