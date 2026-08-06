@@ -7,6 +7,11 @@ import {
 import { MemberProfileView } from "@/components/portal/member-profile-view";
 import { Toast } from "@/components/portal/toast";
 import { requirePortalAccess } from "@/lib/auth/access";
+import { unlinkBlockMessage } from "@/lib/portal/unlink-blocks";
+import {
+  derivePersonStatus,
+  personStatusLabels,
+} from "@/lib/portal/access-labels";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
@@ -85,11 +90,26 @@ export default async function ProfilePage({
   const emailsByAddress = new Map(
     emailsResult.data.map((email) => [email.email, email]),
   );
+  // Asked per account rather than guessed: the rule reads organization domains
+  // in the private schema, which a page cannot see. At most two calls.
+  const unlinkBlocks = await Promise.all(
+    accountsResult.data.map(async (account) => {
+      const { data } = await supabase.rpc("portal_account_unlink_block", {
+        p_auth_user_id: account.auth_user_id,
+      });
+      return [account.auth_user_id, data ?? null] as const;
+    }),
+  );
+  const unlinkBlockByAccount = new Map(unlinkBlocks);
   const loginAccounts: LinkedLoginAccount[] = accountsResult.data
     .map((account) => {
       const email = account.account_email.toLocaleLowerCase("en");
       const emailRecord = emailsByAddress.get(email);
       return {
+        blockedReason: unlinkBlockMessage(
+          unlinkBlockByAccount.get(account.auth_user_id) ?? null,
+          "self",
+        ),
         email,
         emailType:
           emailRecord?.email_type === "organization" ||
@@ -98,20 +118,31 @@ export default async function ProfilePage({
             : "unknown",
         id: account.auth_user_id,
         isCurrentSession: account.auth_user_id === access.profile.userId,
-        isPrimary: emailRecord?.is_primary ?? false,
       } satisfies LinkedLoginAccount;
     })
-    .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
+    // The account in use comes first. Neither account is the contact address
+    // any more — that is a property of an address, not of a sign-in.
+    .sort(
+      (left, right) =>
+        Number(right.isCurrentSession) - Number(left.isCurrentSession) ||
+        left.email.localeCompare(right.email),
+    );
   const primaryEmail =
     emailsResult.data.find((personEmail) => personEmail.is_primary)?.email ??
     null;
-
-  const status = access.memberships.some((membership) => membership.status === "active")
-    ? "Active"
-    : access.memberships.some((membership) => membership.status === "ended") ||
-        access.hasAlumniAccess
-      ? "Alumni"
-      : "Pending";
+  const status =
+    personStatusLabels[
+      derivePersonStatus({
+        activeMembershipCount: access.memberships.filter(
+          (membership) => membership.status === "active",
+        ).length,
+        deletedAt: null,
+        endedMembershipCount: access.memberships.filter(
+          (membership) => membership.status === "ended",
+        ).length,
+        hasAlumniAccess: access.hasAlumniAccess,
+      })
+    ];
   const organizationName =
     access.memberships
       .filter((membership) => membership.status === "active")

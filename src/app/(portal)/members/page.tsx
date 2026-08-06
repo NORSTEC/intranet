@@ -134,10 +134,11 @@ export default async function MembersPage() {
   const members: DirectoryMember[] = [...membersById.values()]
     .map((member) => {
       const personEmails = emailsByPerson.get(member.id) ?? [];
-      const preferredEmail =
-        personEmails.find((email) => email.email_type === "organization") ??
-        personEmails.find((email) => email.is_primary) ??
-        personEmails[0];
+      // The contact address, and only that. Preferring an organization address
+      // over it meant an alumnus who moved their contact address to a private
+      // one still appeared here at the organization address they had lost
+      // access to — the setting existed and did nothing where it mattered most.
+      const preferredEmail = personEmails.find((email) => email.is_primary);
 
       return {
         id: member.id,

@@ -7,6 +7,7 @@ import {
 import {
   PersonAdminActions,
   type MergeCandidate,
+  type PersonSignInAccount,
 } from "@/components/portal/person-admin-actions";
 import { PersonAuditFeed } from "@/components/portal/person-audit-feed";
 import {
@@ -30,6 +31,7 @@ import {
   NORSTEC_ORGANIZATION_SLUG,
 } from "@/lib/portal/norstec";
 import { loadPersonAudit } from "@/lib/portal/person-audit";
+import { unlinkBlockMessage } from "@/lib/portal/unlink-blocks";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
@@ -77,6 +79,7 @@ type PersonRow = {
   portal_access_status: "unclaimed" | "active" | "suspended";
   portal_accounts: Array<{
     account_email: string;
+    auth_user_id: string;
     last_seen_at: string;
     linked_at: string;
     onboarding_status: string;
@@ -131,14 +134,14 @@ export default async function PortalPersonPage({
     supabase
       .from("people")
       .select(
-        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, alumni_access_granted_at, person_emails (email, email_type, is_primary), portal_accounts (account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name, slug)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
+        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, alumni_access_granted_at, person_emails (email, email_type, is_primary), portal_accounts (auth_user_id, account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name, slug)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
       )
       .eq("id", personId)
       .maybeSingle(),
     supabase
       .from("people")
       .select(
-        "id, full_name, avatar_path, person_emails (email, is_primary), portal_accounts (account_email), portal_administrators!portal_administrators_person_id_fkey (person_id)",
+        "id, full_name, avatar_path, person_emails (email, is_primary), portal_accounts (account_email), portal_administrators!portal_administrators_person_id_fkey (person_id), memberships (status, organizations (name))",
       )
       .is("deleted_at", null)
       .neq("id", personId)
@@ -210,6 +213,10 @@ export default async function PortalPersonPage({
     avatar_path: string | null;
     full_name: string | null;
     id: number;
+    memberships: Array<{
+      organizations: { name: string } | Array<{ name: string }> | null;
+      status: string;
+    }>;
     person_emails: Array<{ email: string; is_primary: boolean }>;
     portal_accounts: Array<{ account_email: string }>;
     portal_administrators: { person_id: number } | null;
@@ -243,12 +250,27 @@ export default async function PortalPersonPage({
     .filter((organizationName): organizationName is string =>
       Boolean(organizationName),
     );
-  // A Google account that already is the person's primary address is the same
-  // fact twice; only the extra sign-in accounts belong under Linked accounts.
-  const linkedAccounts = person.portal_accounts.filter(
-    (account) =>
-      account.account_email.toLocaleLowerCase("en") !==
-      primaryEmail?.toLocaleLowerCase("en"),
+  // The same guard the removal runs, asked ahead of time. A page cannot work
+  // it out for itself: it reads organization domains, which live in `private`.
+  const unlinkBlocks = await Promise.all(
+    person.portal_accounts.map(async (account) => {
+      const { data } = await supabase.rpc("portal_account_unlink_block", {
+        p_auth_user_id: account.auth_user_id,
+      });
+      return [account.auth_user_id, data ?? null] as const;
+    }),
+  );
+  const unlinkBlockByAccount = new Map(unlinkBlocks);
+  const personAccounts: PersonSignInAccount[] = person.portal_accounts.map(
+    (account) => ({
+      authUserId: account.auth_user_id,
+      blockedReason: unlinkBlockMessage(
+        unlinkBlockByAccount.get(account.auth_user_id) ?? null,
+        "admin",
+      ),
+      email: account.account_email,
+      isOnboarding: account.onboarding_status === "pending",
+    }),
   );
   const lastSignInAt = person.portal_accounts
     .map((account) => account.last_seen_at)
@@ -325,6 +347,13 @@ export default async function PortalPersonPage({
         (left, right) => Number(right.is_primary) - Number(left.is_primary),
       );
       return {
+        // Named rather than counted: a merge that brings an active membership
+        // onto the surviving profile makes them a member of an organization
+        // nobody decided to admit them to, and the dialog has to say which.
+        activeOrganizations: candidate.memberships
+          .filter((membership) => membership.status === "active")
+          .map((membership) => single(membership.organizations)?.name)
+          .filter((name): name is string => Boolean(name)),
         avatarUrl: candidate.avatar_path
           ? avatarUrls.get(candidate.avatar_path)
           : undefined,
@@ -354,25 +383,7 @@ export default async function PortalPersonPage({
           <Fact term="Organization">
             {organizationNames.length > 0 ? organizationNames.join(", ") : "—"}
           </Fact>
-          <Fact term="Primary email">{primaryEmail ?? "—"}</Fact>
-          <Fact term="Linked accounts">
-            {linkedAccounts.length > 0 ? (
-              <ul className="grid gap-1">
-                {linkedAccounts.map((account) => (
-                  <li key={account.account_email}>
-                    {account.account_email}
-                    {account.onboarding_status === "pending" && (
-                      <span className="font-normal opacity-55">
-                        {" · onboarding"}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              "—"
-            )}
-          </Fact>
+          <Fact term="Contact email">{primaryEmail ?? "—"}</Fact>
           <Fact term="Field of study">{person.field_of_study ?? "—"}</Fact>
           <Fact term="Study year">{person.study_year ?? "—"}</Fact>
           <Fact term="Added to the portal">{formatDate(person.created_at)}</Fact>
@@ -420,6 +431,7 @@ export default async function PortalPersonPage({
         isPortalAdmin={Boolean(person.portal_administrators)}
         isSelf={isSelf}
         mergeCandidates={mergeCandidates}
+        personAccounts={personAccounts}
         personEmails={emails.map((email) => email.email)}
         personId={person.id}
         personName={name}
