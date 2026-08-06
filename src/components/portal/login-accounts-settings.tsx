@@ -85,7 +85,9 @@ export function LoginAccountsSettings({
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         {accounts.map((account) => {
-          const canUnlink = !account.isPrimary && accounts.length > 1;
+          // The contact address survives an unlink now, so the account it
+          // came from is no longer the one account nobody may remove.
+          const canUnlink = accounts.length > 1;
           return (
             <article
               className="portal-surface flex flex-col px-6 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-8"
@@ -95,35 +97,29 @@ export function LoginAccountsSettings({
               <div className="min-h-8">
                 {account.isPrimary && (
                   <span className="portal-pill w-fit border-beachball bg-beachball text-moody-static">
-                    Primary
+                    Contact address
                   </span>
                 )}
               </div>
               <p className="mt-6 text-xl font-medium break-all">{account.email}</p>
               <p className="mt-2 text-sm opacity-55">{accountTypeLabel(account)}</p>
 
-              {accounts.length > 1 && (
+              {canUnlink && (
                 <div className="mt-7">
-                  {canUnlink ? (
-                    <button
-                      className="portal-button"
-                      disabled={unlinkPending}
-                      onClick={() => setUnlinkTarget(account)}
-                      type="button"
+                  <button
+                    className="portal-button"
+                    disabled={unlinkPending}
+                    onClick={() => setUnlinkTarget(account)}
+                    type="button"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="material-symbols-outlined text-[1.1rem]"
                     >
-                      <span
-                        aria-hidden="true"
-                        className="material-symbols-outlined text-[1.1rem]"
-                      >
-                        link_off
-                      </span>
-                      Remove account
-                    </button>
-                  ) : (
-                    <p className="text-sm leading-relaxed opacity-65">
-                      The primary account cannot be removed.
-                    </p>
-                  )}
+                      link_off
+                    </span>
+                    Remove account
+                  </button>
                 </div>
               )}
             </article>
@@ -158,7 +154,7 @@ export function LoginAccountsSettings({
               Remove this sign-in account?
             </h2>
             <p className="mt-4 leading-relaxed opacity-65">
-              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile, and the address is removed from your profile. An active organization membership that rests on this address has to be ended by an organization administrator first.
+              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile. The address stays on your profile, so people can still reach you there and the portal still recognises you by it. An active organization membership that rests on this address has to be ended by an organization administrator first.
             </p>
             {unlinkTarget.isCurrentSession && (
               <p className="mt-3 leading-relaxed opacity-65">

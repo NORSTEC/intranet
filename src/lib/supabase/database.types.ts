@@ -530,6 +530,7 @@ export type Database = {
           id: number
           is_primary: boolean
           person_id: number
+          provider_id: string | null
           source: string
           updated_at: string
         }
@@ -540,6 +541,7 @@ export type Database = {
           id?: never
           is_primary?: boolean
           person_id: number
+          provider_id?: string | null
           source?: string
           updated_at?: string
         }
@@ -550,6 +552,7 @@ export type Database = {
           id?: never
           is_primary?: boolean
           person_id?: number
+          provider_id?: string | null
           source?: string
           updated_at?: string
         }
@@ -572,6 +575,7 @@ export type Database = {
           onboarding_status: string
           person_id: number
           provider: string
+          provider_id: string | null
         }
         Insert: {
           account_email: string
@@ -581,6 +585,7 @@ export type Database = {
           onboarding_status?: string
           person_id: number
           provider?: string
+          provider_id?: string | null
         }
         Update: {
           account_email?: string
@@ -590,6 +595,7 @@ export type Database = {
           onboarding_status?: string
           person_id?: number
           provider?: string
+          provider_id?: string | null
         }
         Relationships: [
           {
@@ -938,6 +944,10 @@ export type Database = {
         Returns: string
       }
       restore_person: { Args: { p_person_id: number }; Returns: undefined }
+      remove_person_email: {
+        Args: { p_email: string; p_person_id: number }
+        Returns: Json
+      }
       review_access_request: {
         Args: {
           p_decision: string
@@ -1056,6 +1066,14 @@ export type Database = {
         Args: { p_person_id: number; p_status: string }
         Returns: undefined
       }
+      set_own_primary_email: {
+        Args: { p_email: string }
+        Returns: Json
+      }
+      set_person_primary_email: {
+        Args: { p_email: string; p_person_id: number }
+        Returns: Json
+      }
       set_portal_administrator: {
         Args: { p_is_administrator: boolean; p_person_id: number }
         Returns: undefined
@@ -1101,6 +1119,10 @@ export type Database = {
         Returns: number
       }
       unlink_own_portal_account: {
+        Args: { p_auth_user_id: string }
+        Returns: Json
+      }
+      unlink_portal_account: {
         Args: { p_auth_user_id: string }
         Returns: Json
       }

@@ -61,6 +61,7 @@ criteria for the migrations in the next section.
 | I5 | An active domain-provisioned membership has a linked account on that organization's domain | `membership_requires_account`, but only for `provisioning_method = 'domain'`, and approval overwrites that column |
 | I6 | A portal administrator holds a norstec.no address or account | Checked when the role is granted, never again |
 | I7 | An address the portal knows identifies at most one human over time | Not enforced. Matching is by address alone, so a recycled Workspace address inherits the previous holder's profile |
+| I8 | An address the portal has released is releasable only deliberately, and an unlinked account can start over | Not enforced. Unlinking deleted the address and stranded the Auth user |
 
 ## Findings
 
@@ -132,6 +133,33 @@ What is already closed, and should stay closed: `sync_linked_google_identities`
 was dropped, so a browser-side `auth.linkIdentity` call can no longer be cashed
 in for a membership.
 
+## What was built
+
+The seven migrations below are the plan as written; what landed differs in
+three places, each for a reason worth keeping.
+
+**I4 was relaxed.** The invariant as first stated — every `account_email` is an
+address on the same person — cannot hold when a Workspace rename lands on an
+address another profile already holds. `account_email` describes the Google
+account, and the norstec.no check for portal administrators reads it, so a
+stale value there is worse than an inconsistent one. It always records the
+truth about the account; what is never done is moving an address row between
+people behind somebody's back. The inconsistency is audited
+(`auth.account_email_conflict`) rather than silently resolved.
+
+**I5 stayed a boundary guard rather than a post-condition.** Asserting it after
+a merge would discover pre-existing violations at the worst possible moment and
+block repairs that have nothing to do with it. It is checked where it is
+actionable: when an account is about to be unlinked.
+
+**Unlinking releases the Auth user.** This was not in the plan. The
+provisioning trigger fires on inserts and on changes to the email, its
+confirmation, or the app metadata — an ordinary repeat sign-in changes none of
+them. Leaving the Auth user behind therefore produced a person who could
+authenticate, had no portal account, and had no way to get one. Deleting it
+means the next sign-in is an insert, which the trigger does see, and the
+retained address carries them back to their own profile.
+
 ## Migrations
 
 Append-only, one theme each. Order is by risk, not by number.
@@ -156,9 +184,14 @@ Append-only, one theme each. Order is by risk, not by number.
   an existing row; widen `membership_requires_account` to any membership in an
   organization with a domain match; add the portal-admin norstec.no unlink
   guard from decision 4. Closes findings 8 and 9, establishes I5 and I6.
-- **M6 `merge_invariants`** — post-conditions inside `merge_people` (I1, I3,
-  I5), cancel pending alumni requests when a membership arrives, revoke moved
-  accounts' sessions. Closes finding 12.
+- **M6 `membership_cancels_pending_requests`** — a trigger on `memberships`
+  cancels the requests a membership answers, which covers linking, first
+  sign-in and merging at once rather than in the three functions that create
+  one. Closes finding 12. Session revocation on a moved account was dropped:
+  an account moving to another person during a merge or a link is the same
+  human consolidating, and cutting the session would sign them out of the flow
+  that just succeeded. The session that genuinely must end is the unlinked
+  one, which M4 handles by releasing the Auth user.
 - **M7 `contact_email_visibility`** — narrow `person_emails_authorized_read` to
   the primary address for ordinary members, now that primary means contact
   address. Completes finding 11.
@@ -185,9 +218,8 @@ Append-only, one theme each. Order is by risk, not by number.
 
 ## Tests
 
-Each finding gets a pgTAP case that fails before its migration. The scenarios
-worth naming, because they are the ones that were reasoned about rather than
-observed:
+26 pgTAP assertions were added to `supabase/tests/database/authorization.test.sql`
+(162 → 188). The scenarios, all of which fail against the previous behaviour:
 
 - Merge preserves the target's contact address; merge with an explicit primary
   honours it; merge of two profiles holding three accounts is refused and an

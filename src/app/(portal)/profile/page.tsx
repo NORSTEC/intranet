@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ContactEmailSettings, type ProfileEmailAddress } from "@/components/portal/contact-email-settings";
 import { DeleteAccountSettings } from "@/components/portal/delete-account-settings";
 import {
   LoginAccountsSettings,
@@ -7,6 +8,10 @@ import {
 import { MemberProfileView } from "@/components/portal/member-profile-view";
 import { Toast } from "@/components/portal/toast";
 import { requirePortalAccess } from "@/lib/auth/access";
+import {
+  derivePersonStatus,
+  personStatusLabels,
+} from "@/lib/portal/access-labels";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
@@ -105,13 +110,46 @@ export default async function ProfilePage({
   const primaryEmail =
     emailsResult.data.find((personEmail) => personEmail.is_primary)?.email ??
     null;
+  const signInAddresses = new Set(
+    accountsResult.data.map((account) =>
+      account.account_email.toLocaleLowerCase("en"),
+    ),
+  );
+  const emailAddresses: ProfileEmailAddress[] = emailsResult.data.map(
+    (personEmail) => ({
+      email: personEmail.email,
+      emailType:
+        personEmail.email_type === "organization" ||
+        personEmail.email_type === "personal"
+          ? personEmail.email_type
+          : "unknown",
+      hasSignInAccount: signInAddresses.has(personEmail.email),
+      isPrimary: personEmail.is_primary,
+    }),
+  );
+  // Only worth saying to somebody who still has an organization to leave.
+  const warnAboutOrganizationAddress =
+    access.memberships.some((membership) => membership.status === "active") &&
+    emailAddresses.some(
+      (address) => address.isPrimary && address.emailType === "organization",
+    );
 
-  const status = access.memberships.some((membership) => membership.status === "active")
-    ? "Active"
-    : access.memberships.some((membership) => membership.status === "ended") ||
-        access.hasAlumniAccess
-      ? "Alumni"
-      : "Pending";
+  // Same derivation Manage people reads, rather than a third copy of the
+  // rules: this page had already drifted to saying "Pending" where the rest of
+  // the portal says "No membership".
+  const status =
+    personStatusLabels[
+      derivePersonStatus({
+        activeMembershipCount: access.memberships.filter(
+          (membership) => membership.status === "active",
+        ).length,
+        deletedAt: null,
+        endedMembershipCount: access.memberships.filter(
+          (membership) => membership.status === "ended",
+        ).length,
+        hasAlumniAccess: access.hasAlumniAccess,
+      })
+    ];
   const organizationName =
     access.memberships
       .filter((membership) => membership.status === "active")
@@ -167,7 +205,15 @@ export default async function ProfilePage({
         />
       )}
       <MemberProfileView
-        accountSettings={<LoginAccountsSettings accounts={loginAccounts} />}
+        accountSettings={
+          <>
+            <ContactEmailSettings
+              addresses={emailAddresses}
+              warnAboutOrganizationAddress={warnAboutOrganizationAddress}
+            />
+            <LoginAccountsSettings accounts={loginAccounts} />
+          </>
+        }
         action={
           <Link className="portal-button" href="/profile/edit">
             <span className="material-symbols-outlined text-[1.1rem]">edit</span>

@@ -23,6 +23,9 @@ const membershipRoles = ["member", "organization_admin"] as const;
 
 export type MembershipRole = (typeof membershipRoles)[number];
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function isValidPersonId(personId: number) {
   return Number.isSafeInteger(personId) && personId > 0;
 }
@@ -85,7 +88,28 @@ function messageFor(error: { message: string }, fallback: string) {
     return "Together these two hold more than two sign-in accounts. Unlink one first.";
   }
   if (error.message.includes("primary_email_not_found")) {
-    return "The chosen primary address does not belong to either person.";
+    return "The chosen contact address does not belong to this person.";
+  }
+  if (error.message.includes("person_email_not_found")) {
+    return "This address is not registered on this person.";
+  }
+  if (error.message.includes("email_has_sign_in_account")) {
+    return "A Google account still signs in with this address. Remove the sign-in account first.";
+  }
+  if (error.message.includes("member_must_keep_email")) {
+    return "An active member must keep at least one address.";
+  }
+  if (error.message.includes("last_portal_account")) {
+    return "This is their only sign-in account. Removing it would lock them out.";
+  }
+  if (error.message.includes("portal_admin_requires_norstec_account")) {
+    return "Portal administrators must keep a norstec.no sign-in account. Revoke the role first.";
+  }
+  if (error.message.includes("membership_requires_account")) {
+    return "An active organization membership rests on this account. End the membership first.";
+  }
+  if (error.message.includes("person_primary_email_invariant")) {
+    return "This would leave the person without a contact address.";
   }
   if (error.message.includes("same_person")) {
     return "Pick two different people.";
@@ -483,6 +507,7 @@ export async function purgePerson(input: {
 }
 
 export async function mergePeople(input: {
+  contactEmail?: string | null;
   sourcePersonId: number;
   targetPersonId: number;
 }): Promise<PortalManagementResult> {
@@ -496,10 +521,11 @@ export async function mergePeople(input: {
   }
 
   const supabase = await createClient();
-  // No primary address is passed: the person being merged into keeps their own,
-  // which is the direction the merge already runs in. Making the duplicate's
-  // address primary instead is done from that person's page.
+  // Passed explicitly, chosen in the merge dialog. Left null the surviving
+  // person keeps the address they already answered on; the duplicate's address
+  // only wins when somebody says so.
   const { error } = await supabase.rpc("merge_people", {
+    p_primary_email: input.contactEmail ?? undefined,
     p_source_person_id: input.sourcePersonId,
     p_target_person_id: input.targetPersonId,
   });
@@ -514,6 +540,97 @@ export async function mergePeople(input: {
   revalidatePersonViews(input.targetPersonId);
   revalidatePath(`/admin/people/${input.sourcePersonId}`);
   return { ok: true, message: "People merged." };
+}
+
+export async function changeContactEmail(input: {
+  email: string;
+  personId: number;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isValidPersonId(input.personId) || !input.email.includes("@")) {
+    return { ok: false, message: "The contact address could not be changed." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_person_primary_email", {
+    p_email: input.email,
+    p_person_id: input.personId,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "The contact address could not be changed."),
+    };
+  }
+
+  revalidatePersonViews(input.personId);
+  return { ok: true, message: "Contact address updated." };
+}
+
+/**
+ * The repair for an address the Google Admin console has handed to somebody
+ * new. Until it is removed, the portal still recognises the previous holder by
+ * it, and nobody else can register it.
+ */
+export async function removePersonEmail(input: {
+  email: string;
+  personId: number;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isValidPersonId(input.personId) || !input.email.includes("@")) {
+    return { ok: false, message: "The address could not be removed." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("remove_person_email", {
+    p_email: input.email,
+    p_person_id: input.personId,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "The address could not be removed."),
+    };
+  }
+
+  revalidatePersonViews(input.personId);
+  return { ok: true, message: "Address removed." };
+}
+
+/**
+ * Unlinking on somebody's behalf. Two profiles holding three sign-in accounts
+ * between them cannot be merged, and before this the only way to get under
+ * that limit was for the duplicate's owner to sign in — which, for a duplicate
+ * nobody can sign in to, never happened.
+ */
+export async function unlinkPersonAccount(input: {
+  authUserId: string;
+  personId: number;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isValidPersonId(input.personId) || !uuidPattern.test(input.authUserId)) {
+    return { ok: false, message: "That sign-in account could not be removed." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("unlink_portal_account", {
+    p_auth_user_id: input.authUserId,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "That sign-in account could not be removed."),
+    };
+  }
+
+  revalidatePersonViews(input.personId);
+  return { ok: true, message: "Sign-in account removed." };
 }
 
 type WorkspaceAccountRow = {

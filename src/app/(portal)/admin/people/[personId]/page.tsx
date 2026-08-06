@@ -8,6 +8,11 @@ import {
   PersonAdminActions,
   type MergeCandidate,
 } from "@/components/portal/person-admin-actions";
+import {
+  PersonAddressesCard,
+  type PersonAddress,
+  type PersonSignInAccount,
+} from "@/components/portal/person-addresses-card";
 import { PersonAuditFeed } from "@/components/portal/person-audit-feed";
 import {
   PersonOrganizationRoles,
@@ -77,6 +82,7 @@ type PersonRow = {
   portal_access_status: "unclaimed" | "active" | "suspended";
   portal_accounts: Array<{
     account_email: string;
+    auth_user_id: string;
     last_seen_at: string;
     linked_at: string;
     onboarding_status: string;
@@ -131,14 +137,14 @@ export default async function PortalPersonPage({
     supabase
       .from("people")
       .select(
-        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, alumni_access_granted_at, person_emails (email, email_type, is_primary), portal_accounts (account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name, slug)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
+        "id, full_name, field_of_study, study_year, avatar_path, portal_access_status, created_at, deleted_at, deletion_reason, alumni_access_granted_at, person_emails (email, email_type, is_primary), portal_accounts (auth_user_id, account_email, linked_at, last_seen_at, onboarding_status), portal_administrators!portal_administrators_person_id_fkey (granted_at), memberships (id, role, status, joined_at, ended_at, organizations (name, slug)), access_requests!access_requests_person_id_fkey (status, request_type, created_at, organizations (name))",
       )
       .eq("id", personId)
       .maybeSingle(),
     supabase
       .from("people")
       .select(
-        "id, full_name, avatar_path, person_emails (email, is_primary), portal_accounts (account_email), portal_administrators!portal_administrators_person_id_fkey (person_id)",
+        "id, full_name, avatar_path, person_emails (email, is_primary), portal_accounts (account_email), portal_administrators!portal_administrators_person_id_fkey (person_id), memberships (status, organizations (name))",
       )
       .is("deleted_at", null)
       .neq("id", personId)
@@ -210,6 +216,10 @@ export default async function PortalPersonPage({
     avatar_path: string | null;
     full_name: string | null;
     id: number;
+    memberships: Array<{
+      organizations: { name: string } | Array<{ name: string }> | null;
+      status: string;
+    }>;
     person_emails: Array<{ email: string; is_primary: boolean }>;
     portal_accounts: Array<{ account_email: string }>;
     portal_administrators: { person_id: number } | null;
@@ -249,6 +259,24 @@ export default async function PortalPersonPage({
     (account) =>
       account.account_email.toLocaleLowerCase("en") !==
       primaryEmail?.toLocaleLowerCase("en"),
+  );
+  const signInAddresses = new Set(
+    person.portal_accounts.map((account) =>
+      account.account_email.toLocaleLowerCase("en"),
+    ),
+  );
+  const personAddresses: PersonAddress[] = emails.map((email) => ({
+    email: email.email,
+    emailType: email.email_type,
+    hasSignInAccount: signInAddresses.has(email.email),
+    isPrimary: email.is_primary,
+  }));
+  const personAccounts: PersonSignInAccount[] = person.portal_accounts.map(
+    (account) => ({
+      authUserId: account.auth_user_id,
+      email: account.account_email,
+      isOnboarding: account.onboarding_status === "pending",
+    }),
   );
   const lastSignInAt = person.portal_accounts
     .map((account) => account.last_seen_at)
@@ -325,6 +353,13 @@ export default async function PortalPersonPage({
         (left, right) => Number(right.is_primary) - Number(left.is_primary),
       );
       return {
+        // Named rather than counted: a merge that brings an active membership
+        // onto the surviving profile makes them a member of an organization
+        // nobody decided to admit them to, and the dialog has to say which.
+        activeOrganizations: candidate.memberships
+          .filter((membership) => membership.status === "active")
+          .map((membership) => single(membership.organizations)?.name)
+          .filter((name): name is string => Boolean(name)),
         avatarUrl: candidate.avatar_path
           ? avatarUrls.get(candidate.avatar_path)
           : undefined,
@@ -354,7 +389,7 @@ export default async function PortalPersonPage({
           <Fact term="Organization">
             {organizationNames.length > 0 ? organizationNames.join(", ") : "—"}
           </Fact>
-          <Fact term="Primary email">{primaryEmail ?? "—"}</Fact>
+          <Fact term="Contact email">{primaryEmail ?? "—"}</Fact>
           <Fact term="Linked accounts">
             {linkedAccounts.length > 0 ? (
               <ul className="grid gap-1">
@@ -424,6 +459,12 @@ export default async function PortalPersonPage({
         personId={person.id}
         personName={name}
       >
+        <PersonAddressesCard
+          accounts={personAccounts}
+          addresses={personAddresses}
+          personId={person.id}
+          personName={name}
+        />
         {belongsToNorstec && (
           <NorstecAccountCard
             account={norstecAccount}

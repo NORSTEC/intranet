@@ -115,6 +115,15 @@ while the organization account still works is the recommended offboarding
 preparation. A personal account is authentication only and never grants an
 organization membership.
 
+Unlinking removes the sign-in account and releases the Google user, so the
+account can start over somewhere else. The **address stays on the profile**: it
+is a fact about the person, not a lease held open by a Google account, and it
+is how the portal recognises them if they sign in with that account again —
+which is why doing so returns them to their own profile rather than minting a
+new one with a fresh membership. Deleting an address is a separate
+portal-administrator action, for when the address has genuinely been handed to
+somebody else.
+
 An unknown account must not be matched by name or email similarity. The sign-in
 page tells existing users to sign in with an already linked account first and
 then link the new account from their profile. Duplicate people that already
@@ -124,6 +133,36 @@ For every deployed Supabase environment, manual identity linking and the
 `/auth/link-callback` redirect must be enabled. During the test phase, the
 `identity linked` and `identity unlinked` security notification templates must
 remain disabled so the flow sends no email.
+
+## Contact address
+
+Every person has exactly one contact address: the address the member directory
+shows, and the only address the portal presents to other members. It is
+presentation, not authorization — nothing is granted or withdrawn by moving it,
+because authorization reads memberships and sign-in accounts — so the person
+sets it themselves, choosing among the addresses already registered on their
+profile. A portal administrator can set it for somebody who cannot.
+
+This matters most to alumni. An organization address usually stops working
+shortly after the membership ends, and before it could be moved, the directory
+went on showing an address nobody could reach.
+
+A person holding any address always has exactly one contact address. Removing
+the current one promotes another rather than leaving the person unreachable,
+and the database enforces it rather than trusting each writer to remember.
+
+## Identity and Google accounts
+
+A Google account is identified by its subject identifier, not by its address.
+Addresses change: renaming somebody in the Admin console moves the address on
+their profile rather than adding a second one, so the contact address follows
+the rename and the old address is released instead of being held forever.
+
+An address that has been proved by a Google account records which one. A
+*different* Google account presenting the same address is therefore not treated
+as the same person — that is an address the Admin console has reassigned, and
+matching on it would hand the new holder the previous holder's profile. They
+get their own profile and the reuse is recorded for a portal administrator.
 
 ## Deleting your own account
 
@@ -158,8 +197,10 @@ removed.
 
 ## Portal management
 
-Suspending access, deleting a person, purging their data, and merging duplicate
-profiles exist only in Portal management and only for portal administrators.
+Suspending access, deleting a person, purging their data, merging duplicate
+profiles, moving somebody's contact address, releasing a reassigned address,
+and unlinking a sign-in account on somebody's behalf exist only in Portal
+management and only for portal administrators.
 Organization administration stops at membership state.
 
 ```mermaid
@@ -195,7 +236,10 @@ table states one access level per person: portal admin, organization admin,
 member, or suspended. `Deleted users` is the separate list of people inside
 the 30-day recovery window.
 
-Merging keeps the target profile and folds the duplicate into it: emails,
+Merging keeps the target profile and folds the duplicate into it, including its
+contact address: the surviving person keeps the address they already answered
+on unless the administrator chooses otherwise in the merge dialog. Everything
+else moves — emails,
 sign-in accounts, memberships and their periods, team roles, requests, profile
 experiences, and audit history all move, and two memberships in one organization
 become one that keeps the live state and every separate period. A merge never
@@ -237,3 +281,11 @@ administrator leaves the administrator as the surviving profile, role intact.
 | Person requests GDPR erasure | Use Portal management: delete, then purge; never treat membership deletion as erasure. |
 | Deleted person is still needed | Restore returns the access state held before the deletion, until the data is purged. |
 | Purged person appears in the audit log | The event stays; its person references are null and personal fields are stripped. |
+| Alumnus keeps an organization contact address | They set a personal address as their contact address themselves; the directory follows it everywhere. |
+| Merge would change the survivor's contact address | It never does by default; the administrator chooses explicitly in the merge dialog. |
+| Workspace renames somebody | The address moves on the profile, the contact address follows, and the old address is released. |
+| Reassigned address is used by a new employee | They get their own profile; the address stays with its holder and the reuse is recorded. |
+| Unlinked account signs in again | It returns to the same profile; an ended membership stays ended. |
+| Duplicate holds a third sign-in account | A portal administrator unlinks one on their behalf, then merges. |
+| Portal administrator loses their Norstec account | They cannot unlink the last one themselves; Portal management lists any who no longer hold one. |
+| Membership arrives while a request is pending | The request it answers is cancelled rather than left in the queue. |

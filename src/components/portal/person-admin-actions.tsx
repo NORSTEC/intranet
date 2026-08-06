@@ -19,6 +19,7 @@ import {
 } from "@/lib/portal/norstec";
 
 export type MergeCandidate = {
+  activeOrganizations: string[];
   avatarUrl?: string;
   email: string | null;
   id: number;
@@ -66,6 +67,7 @@ export function PersonAdminActions({
   const [reason, setReason] = useState("");
   const [mergeQuery, setMergeQuery] = useState("");
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
+  const [mergeContactEmail, setMergeContactEmail] = useState("");
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -107,6 +109,7 @@ export function PersonAdminActions({
       setReason("");
       setMergeQuery("");
       setMergeSourceId(null);
+      setMergeContactEmail("");
       if (redirectTo) router.push(redirectTo);
       else router.refresh();
     });
@@ -131,6 +134,7 @@ export function PersonAdminActions({
       if (!mergeSource) return;
       run(() =>
         mergePeople({
+          contactEmail: mergeContactEmail || null,
           sourcePersonId: mergeSource.id,
           targetPersonId: personId,
         }),
@@ -283,6 +287,30 @@ export function PersonAdminActions({
                   ))}
                 </ul>
               )
+            )}
+
+            {mergeSource && (
+              <label className="mt-5 block">
+                <span className="section-label mb-2 block opacity-50">
+                  Contact address afterwards
+                </span>
+                <select
+                  className="portal-field w-full"
+                  onChange={(event) => setMergeContactEmail(event.target.value)}
+                  value={mergeContactEmail}
+                >
+                  <option value="">
+                    {`Keep ${personName}'s current address`}
+                  </option>
+                  {[...personEmails, mergeSource.email]
+                    .filter((email): email is string => Boolean(email))
+                    .map((email) => (
+                      <option key={email} value={email}>
+                        {email}
+                      </option>
+                    ))}
+                </select>
+              </label>
             )}
 
             <button
@@ -495,6 +523,21 @@ export function PersonAdminActions({
             {personName} is the person everything belongs to afterwards,
             keeping their own fields and roles. No membership role is promoted.
           </p>
+          <p className="mt-3">
+            Contact address afterwards:{" "}
+            <span className="font-medium">
+              {mergeContactEmail || "unchanged"}
+            </span>
+            .
+          </p>
+          {mergeSource.activeOrganizations.length > 0 && (
+            <p className="mt-3 font-medium">
+              {mergeSource.name} has an active membership in{" "}
+              {mergeSource.activeOrganizations.join(", ")}. After the merge{" "}
+              {personName} is an active member there. Only continue if these
+              really are the same person.
+            </p>
+          )}
         </ConfirmDialog>
       )}
 

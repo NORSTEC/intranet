@@ -30,10 +30,10 @@ export async function unlinkLoginAccount(
   });
 
   if (error) {
-    const message = error.message.includes("cannot_unlink_primary_account")
-      ? "The primary sign-in account cannot be removed."
-      : error.message.includes("last_portal_account")
-        ? "You must keep at least one sign-in account."
+    const message = error.message.includes("last_portal_account")
+      ? "You must keep at least one sign-in account."
+      : error.message.includes("portal_admin_requires_norstec_account")
+        ? "Portal administrators must keep a norstec.no sign-in account. Hand over the role first."
         : error.message.includes("membership_requires_account")
           ? "An active organization membership rests on this account. Ask an organization administrator to end the membership first."
           : "That sign-in account could not be removed.";
@@ -48,6 +48,42 @@ export async function unlinkLoginAccount(
   }
 
   revalidatePath("/profile");
+  return { ok: true };
+}
+
+export type SetContactEmailResult = { ok: true } | { ok: false; message: string };
+
+/**
+ * The contact address is presentation, not authorization — nothing is granted
+ * or withdrawn by moving it — so it is the person's own to set. It matters
+ * most to alumni, whose organization address stops working long before anyone
+ * gets around to updating the directory.
+ */
+export async function setContactEmail(
+  email: string,
+): Promise<SetContactEmailResult> {
+  await requirePortalAccess();
+
+  if (typeof email !== "string" || !email.includes("@") || email.length > 320) {
+    return { ok: false, message: "That address could not be selected." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_own_primary_email", {
+    p_email: email,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: error.message.includes("primary_email_not_found")
+        ? "That address is not registered on your profile."
+        : "That address could not be selected.",
+    };
+  }
+
+  revalidatePath("/profile");
+  revalidatePath("/members");
   return { ok: true };
 }
 
