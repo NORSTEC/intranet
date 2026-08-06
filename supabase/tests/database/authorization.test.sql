@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(188);
+select plan(189);
 
 insert into public.people (
   full_name,
@@ -1121,6 +1121,24 @@ select is(
   'an active member can read team memberships'
 );
 
+-- A second organization address, so the assertion below distinguishes the
+-- contact address from the address type rather than passing on both readings.
+reset role;
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select id, 'precreated.alternate@norstec.no', 'organization', false, 'manual'
+from public.people
+where full_name = 'Pre-created Member';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
 select is(
   (
     select count(*)
@@ -1130,7 +1148,32 @@ select is(
     )
   ),
   1::bigint,
-  'a member can read an organization email but not a personal email'
+  'a member reads the contact address alone, not every organization address'
+);
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where person_id = (
+      select id from public.people where full_name = 'Pre-created Member'
+    )
+      and is_primary
+  ),
+  1::bigint,
+  'the address a member reads is the contact one'
+);
+
+reset role;
+
+delete from public.person_emails
+where email = 'precreated.alternate@norstec.no';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
 );
 
 select is(
