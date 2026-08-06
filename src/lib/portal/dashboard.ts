@@ -49,6 +49,7 @@ export type DashboardActions = {
   canLinkBackupAccount: boolean;
   pendingAccessRequests: number;
   unmatchedWorkspaceAccounts: number;
+  unmatchedSlackAccounts: number;
 };
 
 export type PortalPulse = {
@@ -73,7 +74,6 @@ export type DashboardWelcome = {
 export type DashboardData = {
   actions: DashboardActions;
   avatarUrl: string | undefined;
-  memberSince: string | null;
   welcome: DashboardWelcome | null;
   newMembers: DashboardNewMember[];
   organizations: DashboardOrganization[];
@@ -229,6 +229,7 @@ export async function loadDashboard({
     accessRequestsResult,
     welcomeResult,
     unmatchedWorkspaceResult,
+    unmatchedSlackResult,
   ] = await Promise.all([
     supabase
       .from("memberships")
@@ -286,6 +287,19 @@ export async function loadDashboard({
           .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
           .is("person_id", null)
       : Promise.resolve({ count: 0, error: null }),
+    // The same question asked of the Slack workspace. Bots never reach
+    // external_accounts, so every row here is a human nobody has claimed.
+    isPortalAdmin
+      ? supabase
+          .from("external_accounts")
+          .select("id, organizations!inner (slug)", {
+            count: "exact",
+            head: true,
+          })
+          .eq("provider", "slack")
+          .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
+          .is("person_id", null)
+      : Promise.resolve({ count: 0, error: null }),
   ]);
 
   if (
@@ -295,7 +309,8 @@ export async function loadDashboard({
     accountsResult.error ||
     accessRequestsResult.error ||
     welcomeResult.error ||
-    unmatchedWorkspaceResult.error
+    unmatchedWorkspaceResult.error ||
+    unmatchedSlackResult.error
   ) {
     throw new Error("Could not load dashboard");
   }
@@ -497,7 +512,6 @@ export async function loadDashboard({
       .map((row) => row.person_id),
   ).size;
 
-  const ownStartDates = membershipRows.map(startDate).sort();
   const { missing, total } = missingProfileFields(profile);
 
   return {
@@ -509,9 +523,9 @@ export async function loadDashboard({
         ? (accessRequestsResult.count ?? 0)
         : 0,
       unmatchedWorkspaceAccounts: unmatchedWorkspaceResult.count ?? 0,
+      unmatchedSlackAccounts: unmatchedSlackResult.count ?? 0,
     },
     avatarUrl: profile.avatarPath ? avatarUrls.get(profile.avatarPath) : undefined,
-    memberSince: ownStartDates[0] ?? null,
     newMembers,
     organizations,
     pulse: {

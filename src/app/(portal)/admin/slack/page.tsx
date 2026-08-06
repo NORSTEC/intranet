@@ -24,8 +24,31 @@ type DirectoryRow = {
   last_synced_at: string | null;
   people: DirectoryPerson | DirectoryPerson[] | null;
   person_id: number | null;
+  provider_details: unknown;
   status: string;
 };
+
+/**
+ * `provider_details` is whatever the last sync wrote, so every read of it is a
+ * guess until proven otherwise. Reading it defensively here means a row written
+ * by an older version of the sync renders with the keys it has rather than
+ * throwing on the ones it does not.
+ */
+function detailOf(details: unknown, key: string) {
+  if (!details || typeof details !== "object") return null;
+  const value = (details as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function guestTypeOf(details: unknown): SlackDirectoryRow["guestType"] {
+  const value = detailOf(details, "guestType");
+  return value === "single_channel" || value === "multi_channel" ? value : null;
+}
+
+function workspaceRoleOf(details: unknown): SlackDirectoryRow["workspaceRole"] {
+  const value = detailOf(details, "workspaceRole");
+  return value === "owner" || value === "admin" ? value : "member";
+}
 
 function single<Row>(value: Row | Row[] | null): Row | null {
   if (!value) return null;
@@ -59,7 +82,7 @@ export default async function SlackAccountsPage() {
     supabase
       .from("external_accounts")
       .select(
-        "person_id, external_id, account_email, display_name, status, last_synced_at, organizations!inner (slug), people (full_name, avatar_path)",
+        "person_id, external_id, account_email, display_name, status, last_synced_at, provider_details, organizations!inner (slug), people (full_name, avatar_path)",
       )
       .eq("provider", "slack")
       .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
@@ -95,9 +118,12 @@ export default async function SlackAccountsPage() {
         deactivated: row.status === "suspended",
         displayName: row.display_name,
         externalId: row.external_id,
+        guestType: guestTypeOf(row.provider_details),
+        handle: detailOf(row.provider_details, "handle"),
         personId: row.person_id,
         personName: person?.full_name ?? null,
         profileUrl: buildProfileUrl(row.external_id),
+        workspaceRole: workspaceRoleOf(row.provider_details),
       } satisfies SlackDirectoryRow,
     ];
   });

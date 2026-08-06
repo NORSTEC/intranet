@@ -45,6 +45,17 @@ export class SlackError extends Error {
   }
 }
 
+/**
+ * Single-channel guests are free on Slack Pro; multi-channel guests take a
+ * paid seat like a full member. Alumni are the obvious future population of
+ * both, so which kind somebody is has a cost attached and is worth reporting
+ * rather than flattening into one "guest" flag.
+ */
+export type SlackGuestType = "multi_channel" | "single_channel";
+
+/** Who can administer the workspace. Owners can do everything admins can. */
+export type SlackWorkspaceRole = "admin" | "member" | "owner";
+
 export type SlackUser = {
   /**
    * Null when Slack has no address for the account. That is a real state — a
@@ -56,10 +67,12 @@ export type SlackUser = {
   /** Slack's `deleted`, which means deactivated. The account still exists. */
   deactivated: boolean;
   displayName: string | null;
+  guestType: SlackGuestType | null;
+  /** The `@name` people refer to each other by, which is not the address. */
+  handle: string | null;
   /** Slack's immutable user id, `U…`. Display names and addresses change. */
   id: string;
-  /** Single- or multi-channel guest. Not a full member of the workspace. */
-  guest: boolean;
+  workspaceRole: SlackWorkspaceRole;
 };
 
 function readConnector() {
@@ -232,14 +245,15 @@ function toSlackUser(payload: unknown): SlackUser | null {
       ? profile.email.toLocaleLowerCase("en")
       : null;
 
+  // Deliberately not falling back to `record.name`: that is the @handle, which
+  // is now reported on its own. Falling back would print it twice on a row
+  // whose owner never set a real name.
   const realName =
     typeof profile.real_name === "string" && profile.real_name.length > 0
       ? profile.real_name
       : typeof record.real_name === "string" && record.real_name.length > 0
         ? record.real_name
-        : typeof record.name === "string" && record.name.length > 0
-          ? record.name
-          : null;
+        : null;
 
   return {
     accountEmail: email,
@@ -248,8 +262,28 @@ function toSlackUser(payload: unknown): SlackUser | null {
     // has to a suspended Workspace account.
     deactivated: record.deleted === true,
     displayName: realName,
-    guest: record.is_restricted === true || record.is_ultra_restricted === true,
+    // Checked in this order because `is_ultra_restricted` implies
+    // `is_restricted` — a single-channel guest is a restricted account too, so
+    // testing the broader flag first would report every one of them as
+    // multi-channel.
+    guestType:
+      record.is_ultra_restricted === true
+        ? "single_channel"
+        : record.is_restricted === true
+          ? "multi_channel"
+          : null,
+    handle: typeof record.name === "string" && record.name.length > 0
+      ? record.name
+      : null,
     id,
+    // The primary owner is an owner with one extra power nothing here acts on,
+    // so the two are reported as the same thing.
+    workspaceRole:
+      record.is_owner === true || record.is_primary_owner === true
+        ? "owner"
+        : record.is_admin === true
+          ? "admin"
+          : "member",
   };
 }
 

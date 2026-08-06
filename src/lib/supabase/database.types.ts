@@ -172,6 +172,7 @@ export type Database = {
           organization_id: number
           person_id: number | null
           provider: string
+          provider_details: Json
           provisioned_at: string | null
           status: string
           updated_at: string
@@ -188,6 +189,7 @@ export type Database = {
           organization_id: number
           person_id?: number | null
           provider: string
+          provider_details?: Json
           provisioned_at?: string | null
           status?: string
           updated_at?: string
@@ -204,6 +206,7 @@ export type Database = {
           organization_id?: number
           person_id?: number | null
           provider?: string
+          provider_details?: Json
           provisioned_at?: string | null
           status?: string
           updated_at?: string
