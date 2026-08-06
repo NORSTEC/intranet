@@ -944,6 +944,10 @@ export type Database = {
         Returns: string
       }
       restore_person: { Args: { p_person_id: number }; Returns: undefined }
+      portal_account_unlink_block: {
+        Args: { p_auth_user_id: string }
+        Returns: string
+      }
       remove_person_email: {
         Args: { p_email: string; p_person_id: number }
         Returns: Json

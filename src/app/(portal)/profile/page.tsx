@@ -7,6 +7,7 @@ import {
 import { MemberProfileView } from "@/components/portal/member-profile-view";
 import { Toast } from "@/components/portal/toast";
 import { requirePortalAccess } from "@/lib/auth/access";
+import { unlinkBlockMessage } from "@/lib/portal/unlink-blocks";
 import {
   derivePersonStatus,
   personStatusLabels,
@@ -89,11 +90,26 @@ export default async function ProfilePage({
   const emailsByAddress = new Map(
     emailsResult.data.map((email) => [email.email, email]),
   );
+  // Asked per account rather than guessed: the rule reads organization domains
+  // in the private schema, which a page cannot see. At most two calls.
+  const unlinkBlocks = await Promise.all(
+    accountsResult.data.map(async (account) => {
+      const { data } = await supabase.rpc("portal_account_unlink_block", {
+        p_auth_user_id: account.auth_user_id,
+      });
+      return [account.auth_user_id, data ?? null] as const;
+    }),
+  );
+  const unlinkBlockByAccount = new Map(unlinkBlocks);
   const loginAccounts: LinkedLoginAccount[] = accountsResult.data
     .map((account) => {
       const email = account.account_email.toLocaleLowerCase("en");
       const emailRecord = emailsByAddress.get(email);
       return {
+        blockedReason: unlinkBlockMessage(
+          unlinkBlockByAccount.get(account.auth_user_id) ?? null,
+          "self",
+        ),
         email,
         emailType:
           emailRecord?.email_type === "organization" ||

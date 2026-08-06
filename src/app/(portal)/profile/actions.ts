@@ -513,12 +513,20 @@ export async function saveProfile(formData: FormData) {
   }
 
   // Saved after the profile rather than inside it: moving the contact address
-  // is its own decision, with its own audit event, and it must not be able to
-  // fail the profile save it happens to travel with. Choosing an address that
-  // is not the person's is the only way this errors, and the select cannot
-  // offer one.
+  // is its own decision, with its own audit event, and a failure here must not
+  // undo a profile that saved cleanly. It is still reported — a contact
+  // address that quietly stays where it was is indistinguishable from one the
+  // portal refused to move, and that is exactly how this went unnoticed.
   if (contactEmail) {
-    await supabase.rpc("set_own_primary_email", { p_email: contactEmail });
+    const { error: contactEmailError } = await supabase.rpc(
+      "set_own_primary_email",
+      { p_email: contactEmail },
+    );
+
+    if (contactEmailError) {
+      revalidatePath("/", "layout");
+      editRedirect("error=contact_email_failed");
+    }
   }
 
   revalidatePath("/", "layout");

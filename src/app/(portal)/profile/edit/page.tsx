@@ -45,6 +45,8 @@ const errorMessages: Record<string, string> = {
   profile_conflict:
     "Your profile changed after this page was opened. Review the latest values and try again.",
   profile_update_failed: "The profile could not be saved.",
+  contact_email_failed:
+    "Your profile was saved, but the contact email could not be changed.",
 };
 
 export default async function EditProfilePage({

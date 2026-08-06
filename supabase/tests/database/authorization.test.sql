@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(189);
+select plan(191);
 
 insert into public.people (
   full_name,
@@ -3042,6 +3042,18 @@ select throws_ok(
   'an active domain membership blocks unlinking the account that proved it'
 );
 
+-- The interface asks the same guard before offering the button, so what a page
+-- shows and what the operation does cannot drift apart.
+select is(
+  (
+    select public.portal_account_unlink_block(
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    )
+  ),
+  'membership_requires_account',
+  'the reason a removal would fail is readable before attempting it'
+);
+
 reset role;
 
 update public.memberships
@@ -3053,6 +3065,16 @@ select set_config(
   'request.jwt.claims',
   '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}',
   true
+);
+
+select is(
+  (
+    select public.portal_account_unlink_block(
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    )
+  ),
+  null,
+  'no reason is reported once the removal would succeed'
 );
 
 select lives_ok(

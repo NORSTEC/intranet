@@ -31,6 +31,7 @@ import {
   NORSTEC_ORGANIZATION_SLUG,
 } from "@/lib/portal/norstec";
 import { loadPersonAudit } from "@/lib/portal/person-audit";
+import { unlinkBlockMessage } from "@/lib/portal/unlink-blocks";
 import { getMemberAvatarUrls } from "@/lib/storage/member-avatars";
 import { createClient } from "@/lib/supabase/server";
 
@@ -249,16 +250,24 @@ export default async function PortalPersonPage({
     .filter((organizationName): organizationName is string =>
       Boolean(organizationName),
     );
-  // A Google account that already is the person's primary address is the same
-  // fact twice; only the extra sign-in accounts belong under Linked accounts.
-  const linkedAccounts = person.portal_accounts.filter(
-    (account) =>
-      account.account_email.toLocaleLowerCase("en") !==
-      primaryEmail?.toLocaleLowerCase("en"),
+  // The same guard the removal runs, asked ahead of time. A page cannot work
+  // it out for itself: it reads organization domains, which live in `private`.
+  const unlinkBlocks = await Promise.all(
+    person.portal_accounts.map(async (account) => {
+      const { data } = await supabase.rpc("portal_account_unlink_block", {
+        p_auth_user_id: account.auth_user_id,
+      });
+      return [account.auth_user_id, data ?? null] as const;
+    }),
   );
+  const unlinkBlockByAccount = new Map(unlinkBlocks);
   const personAccounts: PersonSignInAccount[] = person.portal_accounts.map(
     (account) => ({
       authUserId: account.auth_user_id,
+      blockedReason: unlinkBlockMessage(
+        unlinkBlockByAccount.get(account.auth_user_id) ?? null,
+        "admin",
+      ),
       email: account.account_email,
       isOnboarding: account.onboarding_status === "pending",
     }),
@@ -375,24 +384,6 @@ export default async function PortalPersonPage({
             {organizationNames.length > 0 ? organizationNames.join(", ") : "—"}
           </Fact>
           <Fact term="Contact email">{primaryEmail ?? "—"}</Fact>
-          <Fact term="Linked accounts">
-            {linkedAccounts.length > 0 ? (
-              <ul className="grid gap-1">
-                {linkedAccounts.map((account) => (
-                  <li key={account.account_email}>
-                    {account.account_email}
-                    {account.onboarding_status === "pending" && (
-                      <span className="font-normal opacity-55">
-                        {" · onboarding"}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              "—"
-            )}
-          </Fact>
           <Fact term="Field of study">{person.field_of_study ?? "—"}</Fact>
           <Fact term="Study year">{person.study_year ?? "—"}</Fact>
           <Fact term="Added to the portal">{formatDate(person.created_at)}</Fact>

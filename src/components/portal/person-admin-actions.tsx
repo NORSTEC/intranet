@@ -21,6 +21,8 @@ import {
 
 export type PersonSignInAccount = {
   authUserId: string;
+  /** Why this account cannot be removed, already in the portal's words. */
+  blockedReason: string | null;
   email: string;
   isOnboarding: boolean;
 };
@@ -366,7 +368,11 @@ export function PersonAdminActions({
                   {account.isOnboarding && (
                     <span className="text-sm opacity-55">onboarding</span>
                   )}
-                  {personAccounts.length > 1 && (
+                  {account.blockedReason ? (
+                    <span className="ml-auto text-sm leading-relaxed opacity-60">
+                      {account.blockedReason}
+                    </span>
+                  ) : (
                     <button
                       className="portal-button ml-auto"
                       disabled={busy}
