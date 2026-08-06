@@ -36,5 +36,14 @@ updates:
       interval: weekly
     groups:
       actions:
+        # Same split as npm above: routine upgrades travel together, and a
+        # major version arrives on its own so somebody reads it. A major bump
+        # of an action is usually its runtime changing underneath — and every
+        # action here is pinned to a commit, so the diff is a hash nobody can
+        # eyeball. Four of them in one pull request is four things nobody
+        # checked.
+        update-types:
+          - minor
+          - patch
         patterns:
           - "*"
