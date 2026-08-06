@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { requirePortalAdminAccess } from "@/lib/auth/access";
 import { NORSTEC_EMAIL_DOMAIN } from "@/lib/portal/norstec";
+import { SlackIcon } from "@/components/portal/slack-icon";
 import { createClient } from "@/lib/supabase/server";
+
+// A sentinel rather than a real Material Symbols name: Slack has no glyph in
+// that font, so its card renders an SVG mark instead of the icon span every
+// other section uses.
+const SLACK_ICON = "slack-brand";
 
 const sections = [
   {
@@ -22,7 +28,7 @@ const sections = [
     description:
       "Everyone in the Norstec Slack workspace, and which of them belong to nobody in the portal.",
     href: "/admin/slack",
-    icon: "forum",
+    icon: SLACK_ICON,
     title: "Slack accounts",
   },
   {
@@ -121,15 +127,22 @@ export default async function PortalManagementPage() {
             href={section.href}
             key={section.href}
           >
-            <span
-              aria-hidden="true"
-              // Google's own `.material-symbols-outlined` rule is unlayered and
-              // therefore beats Tailwind's layered utilities, so the size has to
-              // be marked important to apply at all.
-              className="material-symbols-outlined text-[5.5rem]! leading-none"
-            >
-              {section.icon}
-            </span>
+            {section.icon === SLACK_ICON ? (
+              // Sized to the cap height of the Material Symbols glyphs beside
+              // it rather than to their font size, which includes leading the
+              // mark does not have.
+              <SlackIcon className="size-[4.25rem]" />
+            ) : (
+              <span
+                aria-hidden="true"
+                // Google's own `.material-symbols-outlined` rule is unlayered
+                // and therefore beats Tailwind's layered utilities, so the size
+                // has to be marked important to apply at all.
+                className="material-symbols-outlined text-[5.5rem]! leading-none"
+              >
+                {section.icon}
+              </span>
+            )}
             <h2 className="mt-7 text-2xl font-medium">{section.title}</h2>
             <p className="mt-3 text-sm opacity-55">{section.description}</p>
             <span className="mt-auto flex items-center justify-end pt-8">

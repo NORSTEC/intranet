@@ -5,8 +5,10 @@ import { useMemo, useState, useTransition } from "react";
 import { syncSlackDirectory } from "@/app/(portal)/admin/actions";
 import {
   formatDateTime,
+  Pagination,
   SearchField,
   sortRows,
+  usePagination,
   useTableSort,
 } from "@/components/portal/directory-table";
 import { MemberAvatar } from "@/components/portal/member-avatar";
@@ -213,6 +215,9 @@ export function SlackDirectory({
     matchedSort.sortKey,
   ]);
 
+  const unmatchedPage = usePagination(unmatched);
+  const matchedPage = usePagination(matched);
+
   function sync() {
     startTransition(async () => {
       const result = await syncSlackDirectory();
@@ -260,9 +265,7 @@ export function SlackDirectory({
           Not in the portal
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Slack accounts no portal profile claims. Somebody whose Slack address
-          differs from every address the portal knows for them lands here
-          too — check who it is in Slack before treating it as abandoned.
+          Slack accounts no portal profile claims. Check who it is in Slack before treating it as abandoned.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -313,7 +316,7 @@ export function SlackDirectory({
                 </tr>
               </thead>
               <tbody>
-                {unmatched.map((account) => (
+                {unmatchedPage.pageRows.map((account) => (
                   <tr className="border-b border-moody" key={account.externalId}>
                     <td className="py-3 pl-4 pr-5">
                       <span className="block font-medium break-words">
@@ -348,6 +351,8 @@ export function SlackDirectory({
                 : "Every Slack account belongs to somebody in the portal."}
           </p>
         )}
+
+        <Pagination {...unmatchedPage} label="Unmatched Slack accounts" />
       </section>
 
       <section aria-labelledby="slack-matched-heading" className="mt-16">
@@ -406,7 +411,7 @@ export function SlackDirectory({
                 </tr>
               </thead>
               <tbody>
-                {matched.map((account) => (
+                {matchedPage.pageRows.map((account) => (
                   <tr className="border-b border-moody" key={account.externalId}>
                     <td className="py-3 pl-4 pr-5">
                       <div className="flex min-w-0 items-center gap-3">
@@ -461,6 +466,8 @@ export function SlackDirectory({
                 : "No Slack account is linked to anybody in the portal."}
           </p>
         )}
+
+        <Pagination {...matchedPage} label="Linked Slack accounts" />
       </section>
     </>
   );

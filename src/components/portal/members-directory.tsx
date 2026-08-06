@@ -2,6 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import {
+  Pagination,
+  usePagination,
+} from "@/components/portal/directory-table";
 import { MemberAvatar } from "@/components/portal/member-avatar";
 import {
   SortableTableHeader,
@@ -162,6 +166,8 @@ export function MembersDirectory({
     sortKey,
   ]);
 
+  const membersPage = usePagination(filteredMembers);
+
   function toggleStatus(status: DirectoryStatus) {
     setSelectedStatuses((current) =>
       current.includes(status)
@@ -316,7 +322,7 @@ export function MembersDirectory({
                 </tr>
               </thead>
               <tbody>
-                {filteredMembers.map((member) => (
+                {membersPage.pageRows.map((member) => (
                   <tr
                     aria-label={`View ${member.name}`}
                     className="cursor-pointer border-b border-moody transition-colors hover:bg-moody hover:text-egg focus-visible:bg-moody focus-visible:text-egg focus-visible:outline-none"
@@ -358,7 +364,7 @@ export function MembersDirectory({
           </div>
         ) : (
           <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {filteredMembers.map((member) => (
+            {membersPage.pageRows.map((member) => (
               <TeamMemberCard
                 avatarUrl={member.avatarUrl}
                 badges={member.organizations.map(
@@ -379,6 +385,8 @@ export function MembersDirectory({
       ) : (
         <p className="mt-8 text-sm opacity-55">No members match these filters.</p>
       )}
+
+      <Pagination {...membersPage} label="Members" />
     </>
   );
 }

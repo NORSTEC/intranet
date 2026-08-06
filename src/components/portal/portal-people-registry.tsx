@@ -2,6 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import {
+  Pagination,
+  usePagination,
+} from "@/components/portal/directory-table";
 import { MemberAvatar } from "@/components/portal/member-avatar";
 import {
   CheckboxOption,
@@ -151,6 +155,8 @@ export function PortalPeopleRegistry({
     sortKey,
     statusOptions,
   ]);
+
+  const peoplePage = usePagination(visiblePeople);
 
   function toggleStatus(status: RegistryPersonStatus) {
     setSelectedStatuses((current) =>
@@ -321,7 +327,7 @@ export function PortalPeopleRegistry({
               </tr>
             </thead>
             <tbody>
-              {visiblePeople.map((person) => (
+              {peoplePage.pageRows.map((person) => (
                 <tr
                   aria-label={`Manage ${person.name}`}
                   className="cursor-pointer border-b border-moody transition-colors hover:bg-moody hover:text-egg focus-visible:bg-moody focus-visible:text-egg focus-visible:outline-none"
@@ -380,6 +386,8 @@ export function PortalPeopleRegistry({
           {people.length === 0 ? emptyMessage : "No people match these filters."}
         </p>
       )}
+
+      <Pagination {...peoplePage} label="People" />
     </>
   );
 }

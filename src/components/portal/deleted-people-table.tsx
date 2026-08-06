@@ -8,6 +8,10 @@ import {
   type PortalManagementResult,
 } from "@/app/(portal)/admin/actions";
 import { ConfirmDialog } from "@/components/portal/confirm-dialog";
+import {
+  Pagination,
+  usePagination,
+} from "@/components/portal/directory-table";
 import { MemberAvatar } from "@/components/portal/member-avatar";
 import {
   CheckboxOption,
@@ -121,6 +125,8 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
         return sortDirection === "ascending" ? comparison : -comparison;
       });
   }, [people, query, selectedOrganizations, sortDirection, sortKey]);
+
+  const peoplePage = usePagination(visiblePeople);
 
   function toggleOrganization(organization: string) {
     setSelectedOrganizations((current) =>
@@ -256,7 +262,7 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
               </tr>
             </thead>
             <tbody>
-              {visiblePeople.map((person) => (
+              {peoplePage.pageRows.map((person) => (
                 <tr className="border-b border-moody" key={person.id}>
                   <td className="py-3 pl-4 pr-5">
                     <div className="flex min-w-0 items-center gap-3 font-medium">
@@ -319,6 +325,8 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
             : "No deleted people match these filters."}
         </p>
       )}
+
+      <Pagination {...peoplePage} label="Deleted people" />
 
       {pendingAction?.kind === "restore" && (
         <ConfirmDialog

@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { changeMemberStatus } from "@/app/(portal)/administration/members/actions";
+import {
+  Pagination,
+  usePagination,
+} from "@/components/portal/directory-table";
 import { MemberAvatar } from "@/components/portal/member-avatar";
 import {
   CheckboxOption,
@@ -165,6 +169,8 @@ export function MemberStatusManager({
       });
   }, [members, query, selectedStatuses, sortDirection, sortKey]);
 
+  const membersPage = usePagination(visibleMembers);
+
   function toggleStatus(status: StatusFilter) {
     setSelectedStatuses((current) =>
       current.includes(status)
@@ -286,7 +292,7 @@ export function MemberStatusManager({
               </tr>
             </thead>
             <tbody>
-              {visibleMembers.map((member) => (
+              {membersPage.pageRows.map((member) => (
                 <tr className="border-b border-moody" key={member.membershipId}>
                   <td className="py-3 pl-4 pr-5">
                     <div className="flex min-w-0 items-center gap-3 font-medium">
@@ -328,6 +334,8 @@ export function MemberStatusManager({
       ) : (
         <p className="mt-8 text-sm opacity-55">No members match these filters.</p>
       )}
+
+      <Pagination {...membersPage} label="Members" />
 
       {selectedMember && (
         <MemberConfirmation

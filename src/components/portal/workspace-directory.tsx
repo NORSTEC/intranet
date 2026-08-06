@@ -9,8 +9,10 @@ import {
 import { ConfirmDialog } from "@/components/portal/confirm-dialog";
 import {
   formatDateTime,
+  Pagination,
   SearchField,
   sortRows,
+  usePagination,
   useTableSort,
 } from "@/components/portal/directory-table";
 import { MemberAvatar } from "@/components/portal/member-avatar";
@@ -246,6 +248,9 @@ export function WorkspaceDirectory({
     matchedSuspension,
   ]);
 
+  const unmatchedPage = usePagination(unmatched);
+  const matchedPage = usePagination(matched);
+
   function sync() {
     startTransition(async () => {
       const result = await syncWorkspaceDirectory();
@@ -364,7 +369,7 @@ export function WorkspaceDirectory({
                 </tr>
               </thead>
               <tbody>
-                {unmatched.map((account) => (
+                {unmatchedPage.pageRows.map((account) => (
                   <tr className="border-b border-moody" key={account.externalId}>
                     <td className="py-3 pl-4 pr-5">
                       <span className="block font-medium break-words">
@@ -403,6 +408,8 @@ export function WorkspaceDirectory({
                 : "Every Workspace account belongs to somebody in the portal."}
           </p>
         )}
+
+        <Pagination {...unmatchedPage} label="Unmatched Workspace accounts" />
       </section>
 
       <section aria-labelledby="workspace-matched-heading" className="mt-16">
@@ -461,7 +468,7 @@ export function WorkspaceDirectory({
                 </tr>
               </thead>
               <tbody>
-                {matched.map((account) => (
+                {matchedPage.pageRows.map((account) => (
                   <tr className="border-b border-moody" key={account.externalId}>
                     <td className="py-3 pl-4 pr-5">
                       <div className="flex min-w-0 items-center gap-3">
@@ -521,6 +528,8 @@ export function WorkspaceDirectory({
                 : "No Workspace account is linked to anybody in the portal."}
           </p>
         )}
+
+        <Pagination {...matchedPage} label="Linked Workspace accounts" />
       </section>
 
       {pendingAccount && (
