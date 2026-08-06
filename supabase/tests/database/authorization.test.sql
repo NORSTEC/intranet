@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(193);
+select plan(196);
 
 insert into public.people (
   full_name,
@@ -3362,6 +3362,59 @@ select is(
   ),
   'contact.duplicate@example.com',
   'choosing the duplicate address afterwards is what makes it the contact one'
+);
+
+-- A name is one fact in three columns. Merging a profile whose parts are
+-- filled in — an access request fills them, a Google sign-in does not — used to
+-- leave the survivor answering to one name and greeted by another.
+insert into public.people (
+  full_name, first_name, last_name, portal_access_status, source
+)
+values ('Named Duplicate', 'Bjorn', 'Duplicate', 'active', 'manual');
+
+insert into public.person_emails (person_id, email, email_type, is_primary, source)
+select id, 'named.duplicate@example.com', 'personal', true, 'manual'
+from public.people
+where full_name = 'Named Duplicate';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.merge_people(
+      (select keeper_id from contact_people),
+      (select id from public.people where full_name = 'Named Duplicate'),
+      null
+    )
+  $$,
+  'a duplicate carrying a full set of name parts can be merged in'
+);
+
+reset role;
+
+select is(
+  (
+    select first_name
+    from public.people
+    where id = (select keeper_id from contact_people)
+  ),
+  null,
+  'a merge does not fill the survivor first name from the duplicate'
+);
+
+select is(
+  (
+    select full_name
+    from public.people
+    where id = (select keeper_id from contact_people)
+  ),
+  'Contact Keeper',
+  'the survivor keeps the name it already answered to'
 );
 
 
