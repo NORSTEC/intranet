@@ -195,8 +195,10 @@ export async function syncWorkspaceDirectory(): Promise<PortalManagementResult> 
   const { data, error } = await supabase.rpc("sync_workspace_directory", {
     p_accounts: accounts.map((account) => ({
       accountEmail: account.primaryEmail,
+      adminRole: account.adminRole,
       displayName: account.displayName,
       externalId: account.id,
+      lastLoginAt: account.lastLoginAt,
       suspended: account.suspended,
     })),
   });
@@ -807,6 +809,22 @@ export async function setWorkspaceAccountSuspension(input: {
     };
   }
 
+  // Google refuses this before the portal ever gets to try: the service account
+  // holds a delegated role, and a delegated role cannot change a super
+  // administrator. Reading the stored flag first turns a 403 whose wording
+  // blames the portal's own permissions into the actual reason, and it costs
+  // one indexed lookup on a row the page has already displayed.
+  if (input.suspended) {
+    const blocked = await isSuperAdministrator(input.externalId);
+    if (blocked) {
+      return {
+        ok: false,
+        message:
+          "This is a Google super administrator, and the portal's delegated role cannot change one. Suspend it in the Google Admin console, or remove the super administrator role there first.",
+      };
+    }
+  }
+
   const result = await applyWorkspaceSuspension({
     externalId: input.externalId,
     suspended: input.suspended,
@@ -815,4 +833,26 @@ export async function setWorkspaceAccountSuspension(input: {
   revalidatePath("/admin/workspace");
   revalidatePath("/admin/people");
   return result;
+}
+
+/**
+ * Read from the portal's own copy rather than from Google. The directory has
+ * already been synced to display the row being acted on, so asking Google again
+ * would add a request that can fail for its own reasons — and a stale answer
+ * here fails safe: it refuses a suspension Google would have refused anyway.
+ */
+async function isSuperAdministrator(externalId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("external_accounts")
+    .select("provider_details")
+    .eq("provider", "google_workspace")
+    .eq("external_id", externalId)
+    .maybeSingle();
+
+  const details = data?.provider_details;
+  if (!details || typeof details !== "object") return false;
+  return (
+    (details as Record<string, unknown>).adminRole === "super_admin"
+  );
 }

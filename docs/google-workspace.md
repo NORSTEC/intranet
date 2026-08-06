@@ -73,9 +73,60 @@ migrations from CI. It has no portal profile and never will, so it appears in
 the unmatched table looking exactly like an abandoned account. Suspending it
 stops deployments and stops migrations.
 
-Before suspending anything from that table, open it in the Admin console and
-look at the last sign-in. A role account in active use has a recent one, and
-that is the signal that somebody — or something — still depends on it.
+The last sign-in is what tells the two apart, and the portal now reads it from
+the directory rather than sending somebody to the Admin console for it: a role
+account in active use has a recent one, and that is the signal that somebody —
+or something — still depends on it. It appears in the suspension confirmation
+rather than as a column, because the table has no room for it and that is the
+moment it changes what somebody should do. `web@norstec.no` also shows up as a
+delegated administrator, which is the other half of the same warning.
+
+Google reports an account nobody has ever signed in to as the Unix epoch rather
+than by omitting the field. Read literally that is a sign-in in 1970, which
+would sort to the top of any least-recently-used list and read as the most
+abandoned account in the directory — when it is usually the newest. The client
+turns it into "Never".
+
+## Administrators, and what the portal may do to them
+
+The directory reports two kinds: super administrators and delegated ones. Both
+appear in the Account type column, and the difference decides what the portal
+is allowed to do.
+
+**A super administrator cannot be suspended from the portal.** The service
+account holds a delegated role, and Google refuses a delegated role any change
+to a super administrator. That refusal exists with or without this portal, so
+the button is disabled and says why, rather than being left to fail with a 403
+whose wording blames the portal's own permissions. The server action checks the
+same flag, because a disabled button is a hint and not a guard.
+
+**A delegated administrator can be**, and the confirmation says so. Suspending
+one takes the Admin console away from whatever that role was being used for,
+which is not something an address reveals.
+
+### The privilege the portal creates
+
+Being a portal administrator is enough to suspend a Workspace account. Holding
+a Google administrator role is not required, and the portal does not check for
+one. That is deliberate — the design point of the whole integration is that the
+*portal* holds the Google role and no person has to — but it has two
+consequences worth stating plainly rather than discovering later:
+
+- Portal administrator is granted in this application by another portal
+  administrator. A Google admin role is granted in the Admin console, usually by
+  fewer people and with more ceremony. So the portal is the lower-ceremony door
+  to a subset of the same power.
+- **Google's audit log records the service account, not the person.** Every
+  suspension the portal performs looks identical there. Answering "who suspended
+  this account" requires the portal's own audit log, where
+  `workspace_account.suspended` names the actor. Anyone investigating an
+  incident from the Google side alone will not find a human.
+
+Neither is a defect of the current design so much as its cost. Narrowing it
+would mean requiring the acting portal administrator to hold a Workspace admin
+role themselves — checkable, since the sync already knows which accounts do —
+at the price of the portal being unable to suspend anybody on a day when no
+portal administrator holds one. That trade has not been made.
 
 ## Suspension
 

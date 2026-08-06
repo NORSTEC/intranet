@@ -52,8 +52,17 @@ Two things differ from the Google sync:
   The screen deliberately does not repeat the stored word. "Suspended" already
   means *portal access* in this codebase, and the two are unrelated — a
   deactivated Slack account says nothing about whether somebody can sign in
-  here, and the portal cannot change the Slack one at all. The column is
-  headed "Slack account" and reads Active or Deactivated.
+  here, and the portal cannot change the Slack one at all. The column is headed
+  **Account status** and reads Active or Deactivated, which is what Slack's own
+  member admin calls it.
+
+  The sibling column is **Account type**: Owner, Workspace admin,
+  Multi-channel guest, Single-channel guest, Member. Same reasoning — those are
+  Slack's words, so an administrator with both screens open is reading one
+  vocabulary. The single departure is Workspace admin, because Slack's plain
+  "Admin" already means two other things here. Both columns filter and sort,
+  and account type sorts by rank rather than alphabetically so owners and
+  admins group together instead of scattering into the middle.
 
 Bots, app users and Slackbot are filtered out in the client rather than stored.
 They never match anybody, and leaving them in would fill the unmatched table —

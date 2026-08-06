@@ -201,6 +201,129 @@ export function Pagination({
   );
 }
 
+
+export function CheckboxOption({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: () => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 py-2 text-sm font-medium">
+      <input
+        checked={checked}
+        className="sr-only"
+        onChange={onChange}
+        type="checkbox"
+      />
+      <span
+        aria-hidden="true"
+        className={`flex size-5 shrink-0 items-center justify-center rounded-[0.35rem] border-2 border-moody ${checked ? "bg-moody text-egg" : "bg-transparent text-transparent"}`}
+      >
+        <span className="material-symbols-outlined text-[0.9rem] font-bold">
+          check
+        </span>
+      </span>
+      <span>{label}</span>
+    </label>
+  );
+}
+
+export function FilterMenu({
+  children,
+  icon,
+  label,
+}: {
+  children: React.ReactNode;
+  icon: string;
+  label: string;
+}) {
+  return (
+    <details className="group relative">
+      <summary className="portal-button list-none [&::-webkit-details-marker]:hidden">
+        <span className="material-symbols-outlined text-[1.15rem]">{icon}</span>
+        {label}
+        <span className="material-symbols-outlined text-[1.05rem] transition-transform group-open:rotate-180">
+          keyboard_arrow_down
+        </span>
+      </summary>
+      <div className="portal-surface absolute left-0 top-[calc(100%+0.5rem)] z-30 min-w-60 p-4">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+/** All / the single choice by name / a count / None, as everywhere else. */
+export function multiSelectFilterLabel<Option extends string>(
+  name: string,
+  selected: Option[],
+  total: number,
+  labels: Record<Option, string>,
+) {
+  if (selected.length === total) return `${name}: All`;
+  if (selected.length === 0) return `${name}: None`;
+  if (selected.length === 1) return `${name}: ${labels[selected[0]]}`;
+  return `${name}: ${selected.length} selected`;
+}
+
+export function toggleSelected<Option extends string>(
+  selected: Option[],
+  value: Option,
+) {
+  return selected.includes(value)
+    ? selected.filter((candidate) => candidate !== value)
+    : [...selected, value];
+}
+
+/**
+ * A multi-select filter for one column, shaped like every other filter menu in
+ * the portal: a checkbox per option, and a label that reads "Name: All" until
+ * something is unchecked. Built once here rather than per table, so the Google
+ * Workspace and Slack reports filter the columns they share — account type,
+ * account status — in the same control instead of two that happen to look
+ * alike.
+ */
+export function CheckboxFilterMenu<Option extends string>({
+  icon,
+  labels,
+  legend,
+  name,
+  onChange,
+  options,
+  selected,
+}: {
+  icon: string;
+  labels: Record<Option, string>;
+  legend: string;
+  name: string;
+  onChange: (selected: Option[]) => void;
+  options: readonly Option[];
+  selected: Option[];
+}) {
+  return (
+    <FilterMenu
+      icon={icon}
+      label={multiSelectFilterLabel(name, selected, options.length, labels)}
+    >
+      <fieldset>
+        <legend className="section-label mb-2 opacity-45">{legend}</legend>
+        {options.map((option) => (
+          <CheckboxOption
+            checked={selected.includes(option)}
+            key={option}
+            label={labels[option]}
+            onChange={() => onChange(toggleSelected(selected, option))}
+          />
+        ))}
+      </fieldset>
+    </FilterMenu>
+  );
+}
+
 export function SearchField({
   label,
   onChange,

@@ -23,8 +23,27 @@ type DirectoryRow = {
   last_synced_at: string | null;
   people: DirectoryPerson | DirectoryPerson[] | null;
   person_id: number | null;
+  provider_details: unknown;
   status: string;
 };
+
+/**
+ * `provider_details` is whatever the last sync wrote, so every read of it is a
+ * guess until proven otherwise. A row written before this was stored renders
+ * with the keys it has rather than throwing on the ones it does not.
+ */
+function detailOf(details: unknown, key: string) {
+  if (!details || typeof details !== "object") return null;
+  const value = (details as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function adminRoleOf(details: unknown): WorkspaceDirectoryRow["adminRole"] {
+  const value = detailOf(details, "adminRole");
+  return value === "super_admin" || value === "delegated_admin"
+    ? value
+    : "member";
+}
 
 function single<Row>(value: Row | Row[] | null): Row | null {
   if (!value) return null;
@@ -38,7 +57,7 @@ export default async function WorkspaceAccountsPage() {
   const { data, error } = await supabase
     .from("external_accounts")
     .select(
-      "person_id, external_id, account_email, display_name, status, last_synced_at, organizations!inner (slug), people (full_name, avatar_path)",
+      "person_id, external_id, account_email, display_name, status, last_synced_at, provider_details, organizations!inner (slug), people (full_name, avatar_path)",
     )
     .eq("provider", "google_workspace")
     .eq("organizations.slug", NORSTEC_ORGANIZATION_SLUG)
@@ -66,12 +85,14 @@ export default async function WorkspaceAccountsPage() {
     return [
       {
         accountEmail: row.account_email,
+        adminRole: adminRoleOf(row.provider_details),
         adminUrl: workspaceAdminUrl(row.external_id),
         avatarUrl: person?.avatar_path
           ? avatarUrls.get(person.avatar_path)
           : undefined,
         displayName: row.display_name,
         externalId: row.external_id,
+        lastLoginAt: detailOf(row.provider_details, "lastLoginAt"),
         personId: row.person_id,
         personName: person?.full_name ?? null,
         suspended: row.status === "suspended",
@@ -90,7 +111,7 @@ export default async function WorkspaceAccountsPage() {
     <>
       <p className="max-w-2xl text-sm opacity-55">
         What the norstec.no Google Workspace contains, and how much of it the
-        portal recognises.
+        portal recognises. Account type and account status are both from Google Workspace, and neither says anything about portal access.
       </p>
 
       <div className="mt-10">

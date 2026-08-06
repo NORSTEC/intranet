@@ -98,7 +98,7 @@ export function NorstecAccountCard({
               <p className="text-sm leading-relaxed opacity-60">
                 Accounts are created in the Google Admin console. Once one
                 exists on this person&apos;s address, syncing the directory from
-                Workspace accounts links it here.
+                Google accounts links it here.
               </p>
             ) : (
               <div className="grid gap-5">
