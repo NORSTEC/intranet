@@ -192,9 +192,9 @@ Append-only, one theme each. Order is by risk, not by number.
   human consolidating, and cutting the session would sign them out of the flow
   that just succeeded. The session that genuinely must end is the unlinked
   one, which M4 handles by releasing the Auth user.
-- **M7 `contact_email_visibility`** — narrow `person_emails_authorized_read` to
-  the primary address for ordinary members, now that primary means contact
-  address. Completes finding 11.
+- **M7 `contact_address_visibility`** — narrows `person_emails_authorized_read`
+  to the contact address for ordinary members, now that the contact address is
+  a choice rather than a by-product. Completes finding 11.
 
 ## Application changes
 
@@ -218,8 +218,8 @@ Append-only, one theme each. Order is by risk, not by number.
 
 ## Tests
 
-26 pgTAP assertions were added to `supabase/tests/database/authorization.test.sql`
-(162 → 188). The scenarios, all of which fail against the previous behaviour:
+27 pgTAP assertions were added to `supabase/tests/database/authorization.test.sql`
+(162 → 189). The scenarios, all of which fail against the previous behaviour:
 
 - Merge preserves the target's contact address; merge with an explicit primary
   honours it; merge of two profiles holding three accounts is refused and an
