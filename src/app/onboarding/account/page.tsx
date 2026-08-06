@@ -42,6 +42,24 @@ export default async function AccountOnboardingPage({
         <p className="mt-4 max-w-3xl text-sm leading-relaxed opacity-60">
           You signed in with {access.profile.email}. Choose whether this organization account belongs to an existing profile or should create a new one.
         </p>
+        {/* Either choice writes membership data: connecting merges this
+            sign-in into an existing profile, creating one starts a new
+            member record. Article 13 asks for that to be said where the
+            choice is made. */}
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-45">
+          Both choices give you a membership in the organization that owns this
+          email domain, and put your name in its member directory.{" "}
+          <a
+            className="legal-link"
+            href="/privacy"
+            rel="noreferrer"
+            target="_blank"
+          >
+            Privacy policy
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          .
+        </p>
 
         {(accountLinkError || error) && (
           <p className="mt-6 text-sm text-[#a33b2b]" role="alert">

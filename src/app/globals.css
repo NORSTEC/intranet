@@ -659,6 +659,23 @@ html.theme-switching *::after {
     background-image: url("/images/star-egg.png");
   }
 
+  /*
+   * `.entry-heading-star` is cut for `.text-h2`; against `.text-h1` it reads
+   * as a stray mark. This is the `.text-h1` star, sized on the same clamp the
+   * dashboard hero's is — the only other place `.text-h1` is used — but
+   * themed rather than inverted, since it sits on the page background instead
+   * of on the hero's dark surface.
+   */
+  .page-heading-star {
+    width: clamp(1.75rem, 3.2vw, 3.25rem);
+    height: clamp(1.75rem, 3.2vw, 3.25rem);
+    background: url("/images/star.svg") center / contain no-repeat;
+  }
+
+  [data-theme="dark"] .page-heading-star {
+    background-image: url("/images/star-egg.png");
+  }
+
   .contrast-star {
     background: url("/images/star-egg.png") center / contain no-repeat;
   }
@@ -1018,6 +1035,132 @@ html.theme-switching *::after {
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+  }
+
+  /* Drawn from `currentColor` rather than `--color-moody`: the footer also
+     sits in the login page's right column, which pins its own foreground
+     from `lg` up and would otherwise get a themed underline under unthemed
+     text. */
+  .site-footer-link {
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+    text-underline-offset: 0.25em;
+    transition: opacity 180ms ease, text-decoration-color 180ms ease;
+  }
+
+  .site-footer-link:hover {
+    opacity: 1;
+    text-decoration-color: currentColor;
+  }
+
+  /* Long-form legal copy. Prose stays at a readable measure while the tables
+     it contains are allowed to use the full column, which is why the measure
+     lives on the paragraphs rather than on the section. */
+  .legal-section > p,
+  .legal-section > ul,
+  .legal-section > ol {
+    max-width: 68ch;
+  }
+
+  /* `currentColor` rather than `--color-moody` for the same reason the footer
+     uses it: this link also appears on the login page's right column, which
+     keeps a fixed foreground on desktop and would otherwise get a themed
+     underline under unthemed text. */
+  .legal-link {
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color 180ms ease;
+  }
+
+  .legal-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  /* Below the width the widest legal table can hold, the table stops being a
+     table and becomes stacked blocks, each cell labelled by the column header
+     it came from. Sideways-scrolling a table is a fine escape hatch for a
+     dense portal listing nobody reads end to end; it is the wrong answer for
+     a privacy policy, which has to be readable on a phone to be "easily
+     accessible" at all. The header row is hidden from sight but kept for
+     assistive technology, which still reads the real table semantics. */
+  .legal-table {
+    min-width: 42rem;
+  }
+
+  @media (max-width: 43rem) {
+    .legal-table {
+      display: block;
+      min-width: 0;
+    }
+
+    .legal-table thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .legal-table tbody,
+    .legal-table tr,
+    .legal-table td {
+      display: block;
+      width: 100%;
+    }
+
+    .legal-table tr {
+      padding-bottom: 0.75rem;
+    }
+
+    .legal-table td {
+      padding: 0.35rem 0 0;
+    }
+
+    .legal-table td::before {
+      content: attr(data-label);
+      display: block;
+      padding-bottom: 0.15rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      line-height: 1.4;
+      opacity: 0.6;
+      text-transform: uppercase;
+    }
+  }
+
+  /* The in-page contents list. The marker is a rule that grows into the
+     text colour on hover, so nothing moves when a link is pointed at. */
+  .legal-toc-link {
+    display: flex;
+    gap: 0.55rem;
+    border-left: 2px solid color-mix(in srgb, var(--color-moody) 15%, transparent);
+    padding: 0.3rem 0 0.3rem 0.85rem;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    opacity: 0.6;
+    transition: opacity 180ms ease, border-color 180ms ease;
+  }
+
+  /* Fixed gutter so a two-line entry wraps under its own text rather than
+     under its number. Wide enough for the two-digit entries. */
+  .legal-toc-number {
+    flex: none;
+    width: 1.1rem;
+    text-align: right;
+    opacity: 0.5;
+  }
+
+  .legal-toc-link:hover,
+  .legal-toc-link-active {
+    border-left-color: var(--color-moody);
+    opacity: 1;
+  }
+
+  .legal-toc-link-active {
+    font-weight: 500;
   }
 
   /* Overflowing chart lists: just a recessive scrollbar, no fade overlay. */

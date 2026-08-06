@@ -94,7 +94,6 @@ export function PersonAdminActions({
   const [busy, startTransition] = useTransition();
 
   const isSuspended = accessStatus === "suspended";
-  const eligibleForPortalAdmin = isPortalAdmin || hasNorstecEmail(personEmails);
   const mergeSource =
     mergeCandidates.find((candidate) => candidate.id === mergeSourceId) ?? null;
 
@@ -178,6 +177,23 @@ export function PersonAdminActions({
       : isPortalAdmin
         ? "Revoke the portal administrator role before suspending this person."
         : null;
+
+  // Revoking the role stays available whatever the person's portal access is;
+  // granting it needs an account that can actually sign in and use it — the
+  // same two conditions `set_portal_administrator` enforces, in the same order
+  // it checks them, so the button is never offered for a call that would come
+  // straight back as `portal_access_required` or `norstec_domain_required`.
+  const administratorLockReason = isSelf
+    ? "You cannot change your own role. Another portal administrator has to do it."
+    : isPortalAdmin
+      ? null
+      : accessStatus === "unclaimed"
+        ? "This person has never signed in. They can be made a portal administrator once they do."
+        : isSuspended
+          ? "Portal access is suspended. Activate it again before making this person a portal administrator."
+          : !hasNorstecEmail(personEmails)
+            ? `Only people with a ${NORSTEC_EMAIL_DOMAIN} Google account can become portal administrators.`
+            : null;
 
   return (
     <>
@@ -419,14 +435,9 @@ export function PersonAdminActions({
             title="Portal administrator"
             tone="danger"
           >
-            {isSelf ? (
+            {administratorLockReason ? (
               <p className="text-sm leading-relaxed opacity-60">
-                You cannot change your own role. Another portal administrator
-                has to do it.
-              </p>
-            ) : !eligibleForPortalAdmin ? (
-              <p className="text-sm leading-relaxed opacity-60">
-                Only people with a {NORSTEC_EMAIL_DOMAIN} Google account can become portal administrators.
+                {administratorLockReason}
               </p>
             ) : (
               <button
