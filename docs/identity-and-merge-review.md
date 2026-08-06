@@ -176,7 +176,10 @@ Append-only, one theme each. Order is by risk, not by number.
 - **M3 `manage_person_emails`** — `set_own_primary_email`,
   `set_person_primary_email` and `remove_person_email` (portal admin, refusing
   an address a live sign-in account rests on). A constraint trigger enforces
-  I1. Closes findings 4 and 11.
+  I1. Closes findings 4 and 11. Only `set_own_primary_email` has an interface;
+  the two administrator functions exist and are tested, but Portal management
+  deliberately shows no address list, so releasing an address the Admin console
+  has reassigned currently has no button behind it.
 - **M4 `admin_unlink_portal_account`** — a portal administrator can unlink on
   someone's behalf, same guards, audited, sessions revoked. Unlinking keeps the
   address (decision 3). Closes findings 3, 6 and 14.
@@ -202,11 +205,14 @@ Append-only, one theme each. Order is by risk, not by number.
   organization-first fallback in `/members` and the team roster.
 - `Email` becomes `Contact email` in the member profile view, the directory
   column header, and the person page.
-- `/profile` lists every address with its type, marks the contact address, and
-  lets the person change it. Active members whose contact address is an
-  organization address get the sign-in-risk warning that already exists for
-  accounts.
-- The person page gains address management and per-account unlink.
+- The contact address is chosen in Edit profile, as one field among the others
+  a person controls. A separate address-management section was built first and
+  removed: it listed the same addresses the sign-in section already showed and
+  invited the reading that an address and a sign-in account are the same thing.
+- Sign-in accounts keep their own section and no longer mark one account as
+  special; the warning about relying on a single organization account stays.
+- The person page gains per-account unlink, in the administration grid beside
+  Portal access and Merge a duplicate.
 - The merge dialog previews the result — memberships that move, addresses,
   which one becomes the contact address, chosen explicitly — and warns when the
   duplicate carries an active membership the surviving profile does not have.

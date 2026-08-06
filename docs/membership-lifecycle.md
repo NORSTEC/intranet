@@ -143,6 +143,11 @@ because authorization reads memberships and sign-in accounts — so the person
 sets it themselves, choosing among the addresses already registered on their
 profile. A portal administrator can set it for somebody who cannot.
 
+The choice lives in Edit profile, beside the other things a person controls
+about how they appear. It is deliberately not a second place to manage
+addresses: which Google accounts sign in is a separate question, answered under
+Sign-in accounts, and an address can be either, both, or neither.
+
 This matters most to alumni. An organization address usually stops working
 shortly after the membership ends, and before it could be moved, the directory
 went on showing an address nobody could reach.
@@ -198,9 +203,8 @@ removed.
 ## Portal management
 
 Suspending access, deleting a person, purging their data, merging duplicate
-profiles, moving somebody's contact address, releasing a reassigned address,
-and unlinking a sign-in account on somebody's behalf exist only in Portal
-management and only for portal administrators.
+profiles, and unlinking a sign-in account on somebody's behalf exist only in
+Portal management and only for portal administrators.
 Organization administration stops at membership state.
 
 ```mermaid

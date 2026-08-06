@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ContactEmailSettings, type ProfileEmailAddress } from "@/components/portal/contact-email-settings";
 import { DeleteAccountSettings } from "@/components/portal/delete-account-settings";
 import {
   LoginAccountsSettings,
@@ -103,40 +102,18 @@ export default async function ProfilePage({
             : "unknown",
         id: account.auth_user_id,
         isCurrentSession: account.auth_user_id === access.profile.userId,
-        isPrimary: emailRecord?.is_primary ?? false,
       } satisfies LinkedLoginAccount;
     })
-    .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
+    // The account in use comes first. Neither account is the contact address
+    // any more — that is a property of an address, not of a sign-in.
+    .sort(
+      (left, right) =>
+        Number(right.isCurrentSession) - Number(left.isCurrentSession) ||
+        left.email.localeCompare(right.email),
+    );
   const primaryEmail =
     emailsResult.data.find((personEmail) => personEmail.is_primary)?.email ??
     null;
-  const signInAddresses = new Set(
-    accountsResult.data.map((account) =>
-      account.account_email.toLocaleLowerCase("en"),
-    ),
-  );
-  const emailAddresses: ProfileEmailAddress[] = emailsResult.data.map(
-    (personEmail) => ({
-      email: personEmail.email,
-      emailType:
-        personEmail.email_type === "organization" ||
-        personEmail.email_type === "personal"
-          ? personEmail.email_type
-          : "unknown",
-      hasSignInAccount: signInAddresses.has(personEmail.email),
-      isPrimary: personEmail.is_primary,
-    }),
-  );
-  // Only worth saying to somebody who still has an organization to leave.
-  const warnAboutOrganizationAddress =
-    access.memberships.some((membership) => membership.status === "active") &&
-    emailAddresses.some(
-      (address) => address.isPrimary && address.emailType === "organization",
-    );
-
-  // Same derivation Manage people reads, rather than a third copy of the
-  // rules: this page had already drifted to saying "Pending" where the rest of
-  // the portal says "No membership".
   const status =
     personStatusLabels[
       derivePersonStatus({
@@ -205,15 +182,7 @@ export default async function ProfilePage({
         />
       )}
       <MemberProfileView
-        accountSettings={
-          <>
-            <ContactEmailSettings
-              addresses={emailAddresses}
-              warnAboutOrganizationAddress={warnAboutOrganizationAddress}
-            />
-            <LoginAccountsSettings accounts={loginAccounts} />
-          </>
-        }
+        accountSettings={<LoginAccountsSettings accounts={loginAccounts} />}
         action={
           <Link className="portal-button" href="/profile/edit">
             <span className="material-symbols-outlined text-[1.1rem]">edit</span>

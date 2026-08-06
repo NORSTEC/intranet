@@ -542,65 +542,6 @@ export async function mergePeople(input: {
   return { ok: true, message: "People merged." };
 }
 
-export async function changeContactEmail(input: {
-  email: string;
-  personId: number;
-}): Promise<PortalManagementResult> {
-  await requirePortalAdminAccess();
-
-  if (!isValidPersonId(input.personId) || !input.email.includes("@")) {
-    return { ok: false, message: "The contact address could not be changed." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("set_person_primary_email", {
-    p_email: input.email,
-    p_person_id: input.personId,
-  });
-
-  if (error) {
-    return {
-      ok: false,
-      message: messageFor(error, "The contact address could not be changed."),
-    };
-  }
-
-  revalidatePersonViews(input.personId);
-  return { ok: true, message: "Contact address updated." };
-}
-
-/**
- * The repair for an address the Google Admin console has handed to somebody
- * new. Until it is removed, the portal still recognises the previous holder by
- * it, and nobody else can register it.
- */
-export async function removePersonEmail(input: {
-  email: string;
-  personId: number;
-}): Promise<PortalManagementResult> {
-  await requirePortalAdminAccess();
-
-  if (!isValidPersonId(input.personId) || !input.email.includes("@")) {
-    return { ok: false, message: "The address could not be removed." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("remove_person_email", {
-    p_email: input.email,
-    p_person_id: input.personId,
-  });
-
-  if (error) {
-    return {
-      ok: false,
-      message: messageFor(error, "The address could not be removed."),
-    };
-  }
-
-  revalidatePersonViews(input.personId);
-  return { ok: true, message: "Address removed." };
-}
-
 /**
  * Unlinking on somebody's behalf. Two profiles holding three sign-in accounts
  * between them cannot be merged, and before this the only way to get under

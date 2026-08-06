@@ -7,12 +7,8 @@ import {
 import {
   PersonAdminActions,
   type MergeCandidate,
-} from "@/components/portal/person-admin-actions";
-import {
-  PersonAddressesCard,
-  type PersonAddress,
   type PersonSignInAccount,
-} from "@/components/portal/person-addresses-card";
+} from "@/components/portal/person-admin-actions";
 import { PersonAuditFeed } from "@/components/portal/person-audit-feed";
 import {
   PersonOrganizationRoles,
@@ -260,17 +256,6 @@ export default async function PortalPersonPage({
       account.account_email.toLocaleLowerCase("en") !==
       primaryEmail?.toLocaleLowerCase("en"),
   );
-  const signInAddresses = new Set(
-    person.portal_accounts.map((account) =>
-      account.account_email.toLocaleLowerCase("en"),
-    ),
-  );
-  const personAddresses: PersonAddress[] = emails.map((email) => ({
-    email: email.email,
-    emailType: email.email_type,
-    hasSignInAccount: signInAddresses.has(email.email),
-    isPrimary: email.is_primary,
-  }));
   const personAccounts: PersonSignInAccount[] = person.portal_accounts.map(
     (account) => ({
       authUserId: account.auth_user_id,
@@ -455,16 +440,11 @@ export default async function PortalPersonPage({
         isPortalAdmin={Boolean(person.portal_administrators)}
         isSelf={isSelf}
         mergeCandidates={mergeCandidates}
+        personAccounts={personAccounts}
         personEmails={emails.map((email) => email.email)}
         personId={person.id}
         personName={name}
       >
-        <PersonAddressesCard
-          accounts={personAccounts}
-          addresses={personAddresses}
-          personId={person.id}
-          personName={name}
-        />
         {belongsToNorstec && (
           <NorstecAccountCard
             account={norstecAccount}

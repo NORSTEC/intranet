@@ -9,7 +9,6 @@ export type LinkedLoginAccount = {
   emailType: "organization" | "personal" | "unknown";
   id: string;
   isCurrentSession: boolean;
-  isPrimary: boolean;
 };
 
 function accountTypeLabel(account: LinkedLoginAccount) {
@@ -85,19 +84,20 @@ export function LoginAccountsSettings({
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         {accounts.map((account) => {
-          // The contact address survives an unlink now, so the account it
-          // came from is no longer the one account nobody may remove.
+          // Every account is removable once a second one exists: the address
+          // survives the unlink, and no account carries the contact address
+          // with it.
           const canUnlink = accounts.length > 1;
           return (
             <article
               className="portal-surface flex flex-col px-6 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-8"
               key={account.id}
             >
-              {/* Reserved so both cards align even though only one is primary. */}
+              {/* Reserved so both cards align even though only one is in use. */}
               <div className="min-h-8">
-                {account.isPrimary && (
+                {account.isCurrentSession && (
                   <span className="portal-pill w-fit border-beachball bg-beachball text-moody-static">
-                    Contact address
+                    Signed in now
                   </span>
                 )}
               </div>

@@ -55,8 +55,14 @@ export default async function EditProfilePage({
   const access = await requirePortalAccess();
   const { error } = await searchParams;
   const supabase = await createClient();
-  const [personResult, experiencesResult, organizationsResult, teamsResult, avatarUrls] =
-    await Promise.all([
+  const [
+    personResult,
+    experiencesResult,
+    organizationsResult,
+    teamsResult,
+    emailsResult,
+    avatarUrls,
+  ] = await Promise.all([
       supabase
         .from("people")
         .select("profile_updated_at")
@@ -79,6 +85,11 @@ export default async function EditProfilePage({
         .select("id, name, organization_id")
         .eq("status", "active")
         .order("name"),
+      supabase
+        .from("person_emails")
+        .select("email, is_primary")
+        .eq("person_id", access.profile.personId)
+        .order("email"),
       getMemberAvatarUrls([access.profile.avatarPath]),
     ]);
 
@@ -86,7 +97,8 @@ export default async function EditProfilePage({
     personResult.error ||
     experiencesResult.error ||
     organizationsResult.error ||
-    teamsResult.error
+    teamsResult.error ||
+    emailsResult.error
   ) {
     throw new Error("Could not load editable profile");
   }
@@ -95,6 +107,10 @@ export default async function EditProfilePage({
   const avatarUrl = access.profile.avatarPath
     ? avatarUrls.get(access.profile.avatarPath)
     : undefined;
+  const contactEmail =
+    emailsResult.data.find((personEmail) => personEmail.is_primary)?.email ??
+    emailsResult.data[0]?.email ??
+    null;
   const hasLegacyStudyField = Boolean(
     access.profile.fieldOfStudy &&
       !(STUDY_FIELDS as readonly string[]).includes(access.profile.fieldOfStudy),
@@ -192,8 +208,24 @@ export default async function EditProfilePage({
               </dd>
             </div>
             <div>
-              <dt className="section-label opacity-45">Email</dt>
-              <dd className="profile-value mt-2 font-medium">{access.profile.email}</dd>
+              <dt className="section-label opacity-45">Contact email</dt>
+              <dd className="mt-1 font-medium">
+                {/* The address other members see. Which Google accounts sign
+                    you in is a separate question, answered under Sign-in
+                    accounts — an address can be either, both, or neither. */}
+                <select
+                  aria-label="Contact email"
+                  className="profile-edit-field"
+                  defaultValue={contactEmail ?? ""}
+                  name="contactEmail"
+                >
+                  {emailsResult.data.map((personEmail) => (
+                    <option key={personEmail.email} value={personEmail.email}>
+                      {personEmail.email}
+                    </option>
+                  ))}
+                </select>
+              </dd>
             </div>
           </dl>
           <label className="mt-8 block h-11 max-w-lg">

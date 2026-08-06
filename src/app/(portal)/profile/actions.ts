@@ -51,42 +51,6 @@ export async function unlinkLoginAccount(
   return { ok: true };
 }
 
-export type SetContactEmailResult = { ok: true } | { ok: false; message: string };
-
-/**
- * The contact address is presentation, not authorization — nothing is granted
- * or withdrawn by moving it — so it is the person's own to set. It matters
- * most to alumni, whose organization address stops working long before anyone
- * gets around to updating the directory.
- */
-export async function setContactEmail(
-  email: string,
-): Promise<SetContactEmailResult> {
-  await requirePortalAccess();
-
-  if (typeof email !== "string" || !email.includes("@") || email.length > 320) {
-    return { ok: false, message: "That address could not be selected." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("set_own_primary_email", {
-    p_email: email,
-  });
-
-  if (error) {
-    return {
-      ok: false,
-      message: error.message.includes("primary_email_not_found")
-        ? "That address is not registered on your profile."
-        : "That address could not be selected.",
-    };
-  }
-
-  revalidatePath("/profile");
-  revalidatePath("/members");
-  return { ok: true };
-}
-
 export type DeleteOwnAccountResult = { ok: false; message: string } | never;
 
 export async function deleteOwnAccount(): Promise<DeleteOwnAccountResult> {
@@ -341,6 +305,7 @@ export async function saveProfile(formData: FormData) {
   const fieldOfStudy = textValue(formData, "fieldOfStudy");
   const studyYearValue = textValue(formData, "studyYear");
   const linkedinUrl = textValue(formData, "linkedinUrl");
+  const contactEmail = textValue(formData, "contactEmail");
   const expectedProfileUpdatedAt = textValue(
     formData,
     "expectedProfileUpdatedAt",
@@ -545,6 +510,15 @@ export async function saveProfile(formData: FormData) {
     await supabase.storage
       .from("member-avatars")
       .remove([access.profile.avatarPath]);
+  }
+
+  // Saved after the profile rather than inside it: moving the contact address
+  // is its own decision, with its own audit event, and it must not be able to
+  // fail the profile save it happens to travel with. Choosing an address that
+  // is not the person's is the only way this errors, and the select cannot
+  // offer one.
+  if (contactEmail) {
+    await supabase.rpc("set_own_primary_email", { p_email: contactEmail });
   }
 
   revalidatePath("/", "layout");
