@@ -18,6 +18,13 @@ const sections = [
   },
   {
     description:
+      "Everyone in the Norstec Slack workspace, and which of them belong to nobody in the portal.",
+    href: "/admin/slack",
+    icon: "forum",
+    title: "Slack accounts",
+  },
+  {
+    description:
       "People who have been deleted but not yet purged. Restore them, or remove their data for good.",
     href: "/admin/deleted",
     icon: "person_remove",

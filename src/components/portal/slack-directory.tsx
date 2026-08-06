@@ -2,11 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import {
-  setWorkspaceAccountSuspension,
-  syncWorkspaceDirectory,
-} from "@/app/(portal)/admin/actions";
-import { ConfirmDialog } from "@/components/portal/confirm-dialog";
+import { syncSlackDirectory } from "@/app/(portal)/admin/actions";
 import {
   formatDateTime,
   SearchField,
@@ -18,89 +14,83 @@ import {
   CheckboxOption,
   FilterMenu,
 } from "@/components/portal/members-directory";
-import {
-  SortableTableHeader,
-  type TableSortDirection,
-} from "@/components/portal/sortable-table-header";
+import { SortableTableHeader } from "@/components/portal/sortable-table-header";
 import { Toast } from "@/components/portal/toast";
 
-export type WorkspaceDirectoryRow = {
-  accountEmail: string;
-  adminUrl: string;
+export type SlackDirectoryRow = {
+  /** Null when Slack holds no address for the account. */
+  accountEmail: string | null;
   avatarUrl?: string;
+  deactivated: boolean;
   displayName: string | null;
   externalId: string;
   personId: number | null;
   personName: string | null;
-  suspended: boolean;
+  /** Null when the workspace domain could not be read, so no link is shown. */
+  profileUrl: string | null;
 };
 
-type SortKey = "account" | "person" | "suspended";
+type SortKey = "account" | "deactivated" | "person";
 
-// "Status" already means something else in this portal — active or alumni, a
-// fact about membership. Google's own state is a single flag, so it is shown
-// as one rather than borrowed into a word that would then mean two things in
-// the same table.
-function suspendedLabel(suspended: boolean) {
-  return suspended ? "Yes" : "No";
+function deactivatedLabel(deactivated: boolean) {
+  return deactivated ? "Yes" : "No";
 }
 
-// Two values, so the filter is the same shape as every other one in the portal
-// rather than a checkbox that reads as an on/off switch for the whole table.
-const suspensionOptions = ["suspended", "active"] as const;
+// An account Slack holds no address for still has to say something in the
+// column an administrator scans. The Slack id is the last resort and is at
+// least searchable, which "Unknown" would not be.
+function accountLabel(account: SlackDirectoryRow) {
+  return account.accountEmail ?? account.displayName ?? account.externalId;
+}
 
-type SuspensionFilter = (typeof suspensionOptions)[number];
+const deactivationOptions = ["deactivated", "active"] as const;
 
-const suspensionLabels: Record<SuspensionFilter, string> = {
-  active: "Not suspended",
-  suspended: "Suspended",
+type DeactivationFilter = (typeof deactivationOptions)[number];
+
+const deactivationLabels: Record<DeactivationFilter, string> = {
+  active: "Not deactivated",
+  deactivated: "Deactivated",
 };
 
-function suspensionFilterLabel(selected: SuspensionFilter[]) {
-  if (selected.length === suspensionOptions.length) return "Suspended: All";
-  if (selected.length === 0) return "Suspended: None";
-  return `Suspended: ${suspensionLabels[selected[0]]}`;
+function deactivationFilterLabel(selected: DeactivationFilter[]) {
+  if (selected.length === deactivationOptions.length) return "Deactivated: All";
+  if (selected.length === 0) return "Deactivated: None";
+  return `Deactivated: ${deactivationLabels[selected[0]]}`;
 }
 
-function sortValue(account: WorkspaceDirectoryRow, key: SortKey) {
-  if (key === "person") return account.personName ?? "";
-  if (key === "suspended") return suspendedLabel(account.suspended);
-  return account.accountEmail;
-}
-
-function matchesSuspension(
-  account: WorkspaceDirectoryRow,
-  selected: SuspensionFilter[],
-) {
-  return selected.includes(account.suspended ? "suspended" : "active");
-}
-
-function toggleSuspension(
-  selected: SuspensionFilter[],
-  value: SuspensionFilter,
+function toggleDeactivation(
+  selected: DeactivationFilter[],
+  value: DeactivationFilter,
 ) {
   return selected.includes(value)
     ? selected.filter((candidate) => candidate !== value)
     : [...selected, value];
 }
 
-function SuspensionFilterMenu({
+function matchesDeactivation(
+  account: SlackDirectoryRow,
+  selected: DeactivationFilter[],
+) {
+  return selected.includes(account.deactivated ? "deactivated" : "active");
+}
+
+function DeactivationFilterMenu({
   onChange,
   selected,
 }: {
-  onChange: (selected: SuspensionFilter[]) => void;
-  selected: SuspensionFilter[];
+  onChange: (selected: DeactivationFilter[]) => void;
+  selected: DeactivationFilter[];
 }) {
   return (
-    <FilterMenu icon="filter_alt" label={suspensionFilterLabel(selected)}>
+    <FilterMenu icon="filter_alt" label={deactivationFilterLabel(selected)}>
       <fieldset>
-        <legend className="section-label mb-2 opacity-45">Suspended</legend>
-        {suspensionOptions.map((option) => (
+        <legend className="section-label mb-2 opacity-45">Deactivated</legend>
+        {deactivationOptions.map((option) => (
           <CheckboxOption
             checked={selected.includes(option)}
             key={option}
-            label={suspensionLabels[option]}
-            onChange={() => onChange(toggleSuspension(selected, option))}
+            label={deactivationLabels[option]}
+            onChange={() => onChange(toggleDeactivation(selected, option))}
           />
         ))}
       </fieldset>
@@ -108,43 +98,14 @@ function SuspensionFilterMenu({
   );
 }
 
-function sortAccounts(
-  accounts: WorkspaceDirectoryRow[],
-  sortKey: SortKey | null,
-  sortDirection: TableSortDirection,
-) {
-  return sortRows(accounts, sortKey, sortDirection, (account, key) =>
-    sortValue(account, key as SortKey),
-  );
+function sortValue(account: SlackDirectoryRow, key: SortKey) {
+  if (key === "person") return account.personName ?? "";
+  if (key === "deactivated") return deactivatedLabel(account.deactivated);
+  return accountLabel(account);
 }
 
-function SuspensionButton({
-  busy,
-  onClick,
-  suspended,
-}: {
-  busy: boolean;
-  onClick: () => void;
-  suspended: boolean;
-}) {
-  return (
-    <button
-      className={`portal-button whitespace-nowrap ${
-        suspended ? "portal-button-primary" : "portal-button-danger"
-      }`}
-      disabled={busy}
-      onClick={onClick}
-      type="button"
-    >
-      <span aria-hidden="true" className="material-symbols-outlined text-[1.1rem]">
-        {suspended ? "lock_open" : "lock"}
-      </span>
-      {suspended ? "Activate account" : "Suspend account"}
-    </button>
-  );
-}
-
-function AdminConsoleLink({ href }: { href: string }) {
+function SlackProfileLink({ href }: { href: string | null }) {
+  if (!href) return null;
   return (
     <a
       className="portal-button whitespace-nowrap"
@@ -155,41 +116,45 @@ function AdminConsoleLink({ href }: { href: string }) {
       <span aria-hidden="true" className="material-symbols-outlined text-[1.1rem]">
         open_in_new
       </span>
-      Open in Admin console
+      Open in Slack
     </a>
   );
 }
 
 /**
- * The reconciliation between the norstec.no directory and the portal. Its point
- * is the first table: accounts nobody in the portal owns. Some are people who
- * have simply never signed in, and some are accounts left behind by somebody
- * who left years ago — the portal cannot tell those apart and does not pretend
- * to. It shows them, and both decisions available on one are one click away.
+ * The reconciliation between the Slack workspace and the portal, and — unlike
+ * the Google Workspace report next to it — nothing more than that. There is no
+ * deactivate button, for two separate reasons that happen to agree:
  *
- * Syncing is a button rather than a schedule on purpose. A scheduled job has no
- * signed-in user, so it would need a privileged database key kept on the
- * server; this portal deliberately holds none, and every read here goes through
- * row level security with the administrator's own session.
+ * Slack Pro has no API for deactivating a member. `admin.users.*` and SCIM are
+ * Business+ and Enterprise Grid features, so a button here could only ever have
+ * written a row claiming something the portal had not done.
+ *
+ * And the portal is not in use yet. Until it is, the Slack app holds read
+ * scopes only, so no mistake in this screen — or in the code behind it — can
+ * reach the workspace people actually rely on.
+ *
+ * Acting on a row therefore means opening it in Slack and doing it there. That
+ * is the honest shape of the feature rather than a limitation to work around.
  */
-export function WorkspaceDirectory({
+export function SlackDirectory({
   accounts,
   lastSyncedAt,
-  workspaceConfigured,
+  slackConfigured,
 }: {
-  accounts: WorkspaceDirectoryRow[];
+  accounts: SlackDirectoryRow[];
   lastSyncedAt: string | null;
-  workspaceConfigured: boolean;
+  slackConfigured: boolean;
 }) {
   const router = useRouter();
   const [unmatchedQuery, setUnmatchedQuery] = useState("");
   const [matchedQuery, setMatchedQuery] = useState("");
-  const [unmatchedSuspension, setUnmatchedSuspension] =
-    useState<SuspensionFilter[]>([...suspensionOptions]);
-  const [matchedSuspension, setMatchedSuspension] =
-    useState<SuspensionFilter[]>([...suspensionOptions]);
-  const [pendingAccount, setPendingAccount] =
-    useState<WorkspaceDirectoryRow | null>(null);
+  const [unmatchedDeactivation, setUnmatchedDeactivation] = useState<
+    DeactivationFilter[]
+  >([...deactivationOptions]);
+  const [matchedDeactivation, setMatchedDeactivation] = useState<
+    DeactivationFilter[]
+  >([...deactivationOptions]);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -204,75 +169,59 @@ export function WorkspaceDirectory({
 
   const unmatched = useMemo(() => {
     const normalized = unmatchedQuery.trim().toLocaleLowerCase("en");
-    return sortAccounts(
+    return sortRows(
       accounts.filter(
         (account) =>
           account.personId === null &&
-          matchesSuspension(account, unmatchedSuspension) &&
+          matchesDeactivation(account, unmatchedDeactivation) &&
           (!normalized ||
-            account.accountEmail.toLocaleLowerCase("en").includes(normalized) ||
+            accountLabel(account).toLocaleLowerCase("en").includes(normalized) ||
             account.displayName?.toLocaleLowerCase("en").includes(normalized)),
       ),
       unmatchedSort.sortKey,
       unmatchedSort.sortDirection,
+      (account, key) => sortValue(account, key as SortKey),
     );
   }, [
     accounts,
+    unmatchedDeactivation,
     unmatchedQuery,
     unmatchedSort.sortDirection,
     unmatchedSort.sortKey,
-    unmatchedSuspension,
   ]);
 
   const matched = useMemo(() => {
     const normalized = matchedQuery.trim().toLocaleLowerCase("en");
-    return sortAccounts(
+    return sortRows(
       accounts.filter(
         (account) =>
           account.personId !== null &&
-          matchesSuspension(account, matchedSuspension) &&
+          matchesDeactivation(account, matchedDeactivation) &&
           (!normalized ||
-            account.accountEmail.toLocaleLowerCase("en").includes(normalized) ||
+            accountLabel(account).toLocaleLowerCase("en").includes(normalized) ||
             account.personName?.toLocaleLowerCase("en").includes(normalized)),
       ),
       matchedSort.sortKey,
       matchedSort.sortDirection,
+      (account, key) => sortValue(account, key as SortKey),
     );
   }, [
     accounts,
+    matchedDeactivation,
     matchedQuery,
     matchedSort.sortDirection,
     matchedSort.sortKey,
-    matchedSuspension,
   ]);
 
   function sync() {
     startTransition(async () => {
-      const result = await syncWorkspaceDirectory();
+      const result = await syncSlackDirectory();
       setToast({
         id: Date.now(),
         message: result.message,
         status: result.ok ? "success" : "error",
       });
       router.refresh();
-    });
-  }
-
-  function confirmSuspension() {
-    if (!pendingAccount) return;
-    const account = pendingAccount;
-    startTransition(async () => {
-      const result = await setWorkspaceAccountSuspension({
-        externalId: account.externalId,
-        suspended: !account.suspended,
-      });
-      setPendingAccount(null);
-      setToast({
-        id: Date.now(),
-        message: result.message,
-        status: result.ok ? "success" : "error",
-      });
-      if (result.ok) router.refresh();
     });
   }
 
@@ -285,7 +234,7 @@ export function WorkspaceDirectory({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
         <button
           className="portal-button"
-          disabled={busy || !workspaceConfigured}
+          disabled={busy || !slackConfigured}
           onClick={sync}
           type="button"
         >
@@ -295,36 +244,36 @@ export function WorkspaceDirectory({
           >
             {busy ? "progress_activity" : "cloud_sync"}
           </span>
-          {busy ? "Reading the directory…" : "Sync with Google"}
+          {busy ? "Reading the workspace…" : "Sync with Slack"}
         </button>
         <p className="text-sm opacity-55">
-          {!workspaceConfigured
-            ? "Google Workspace is not configured on this server."
+          {!slackConfigured
+            ? "Slack is not configured on this server."
             : lastSyncedAt
               ? `Last synced ${formatDateTime(lastSyncedAt)}`
               : "Never synced"}
         </p>
       </div>
 
-      <section aria-labelledby="workspace-unmatched-heading" className="mt-14">
-        <h2 className="text-h2" id="workspace-unmatched-heading">
+      <section aria-labelledby="slack-unmatched-heading" className="mt-14">
+        <h2 className="text-h2" id="slack-unmatched-heading">
           Not in the portal
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Google accounts no portal profile claims. A new Google account who has
-          not signed in yet looks the same as an account nobody has cleaned up,
-          so check each one in the Admin console before acting.
+          Slack accounts no portal profile claims. Somebody whose Slack address
+          differs from every address the portal knows for them lands here
+          too — check who it is in Slack before treating it as abandoned.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            <SuspensionFilterMenu
-              onChange={setUnmatchedSuspension}
-              selected={unmatchedSuspension}
+            <DeactivationFilterMenu
+              onChange={setUnmatchedDeactivation}
+              selected={unmatchedDeactivation}
             />
           </div>
           <SearchField
-            label="Search accounts not in the portal"
+            label="Search Slack accounts not in the portal"
             onChange={setUnmatchedQuery}
             placeholder="Search email or name"
             value={unmatchedQuery}
@@ -333,17 +282,17 @@ export function WorkspaceDirectory({
 
         {unmatched.length > 0 ? (
           <div className="mt-8 overflow-x-auto">
-            <table className="w-full min-w-[58rem] border-collapse">
+            <table className="w-full min-w-[52rem] border-collapse">
               <caption className="sr-only">
-                Google Workspace accounts with no matching person in the portal,
-                whether each is suspended, and the actions available on it
+                Slack accounts with no matching person in the portal, and
+                whether each is deactivated
               </caption>
               <thead>
                 <tr>
                   {(
                     [
-                      ["account", "Email"],
-                      ["suspended", "Suspended"],
+                      ["account", "Account"],
+                      ["deactivated", "Deactivated"],
                     ] as const
                   ).map(([key, heading]) => (
                     <SortableTableHeader
@@ -368,25 +317,21 @@ export function WorkspaceDirectory({
                   <tr className="border-b border-moody" key={account.externalId}>
                     <td className="py-3 pl-4 pr-5">
                       <span className="block font-medium break-words">
-                        {account.accountEmail}
+                        {accountLabel(account)}
                       </span>
-                      {account.displayName && (
-                        <span className="mt-0.5 block text-sm opacity-55">
-                          {account.displayName}
-                        </span>
-                      )}
+                      {account.displayName &&
+                        account.displayName !== accountLabel(account) && (
+                          <span className="mt-0.5 block text-sm opacity-55">
+                            {account.displayName}
+                          </span>
+                        )}
                     </td>
                     <td className="py-3 pr-5">
-                      {suspendedLabel(account.suspended)}
+                      {deactivatedLabel(account.deactivated)}
                     </td>
                     <td className="py-3 pr-4">
                       <div className="flex flex-wrap justify-end gap-3">
-                        <SuspensionButton
-                          busy={busy}
-                          onClick={() => setPendingAccount(account)}
-                          suspended={account.suspended}
-                        />
-                        <AdminConsoleLink href={account.adminUrl} />
+                        <SlackProfileLink href={account.profileUrl} />
                       </div>
                     </td>
                   </tr>
@@ -397,31 +342,31 @@ export function WorkspaceDirectory({
         ) : (
           <p className="mt-8 text-sm opacity-55">
             {!lastSyncedAt
-              ? "Nothing to show until the directory has been synced."
+              ? "Nothing to show until Slack has been synced."
               : accounts.some((account) => account.personId === null)
                 ? "No unmatched accounts match these filters."
-                : "Every Workspace account belongs to somebody in the portal."}
+                : "Every Slack account belongs to somebody in the portal."}
           </p>
         )}
       </section>
 
-      <section aria-labelledby="workspace-matched-heading" className="mt-16">
-        <h2 className="text-h2" id="workspace-matched-heading">
+      <section aria-labelledby="slack-matched-heading" className="mt-16">
+        <h2 className="text-h2" id="slack-matched-heading">
           Linked to a person
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Google accounts that belong to somebody in the portal.
+          Slack accounts that belong to somebody in the portal.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            <SuspensionFilterMenu
-              onChange={setMatchedSuspension}
-              selected={matchedSuspension}
+            <DeactivationFilterMenu
+              onChange={setMatchedDeactivation}
+              selected={matchedDeactivation}
             />
           </div>
           <SearchField
-            label="Search linked accounts"
+            label="Search linked Slack accounts"
             onChange={setMatchedQuery}
             placeholder="Search name or email"
             value={matchedQuery}
@@ -430,17 +375,17 @@ export function WorkspaceDirectory({
 
         {matched.length > 0 ? (
           <div className="mt-8 overflow-x-auto">
-            <table className="w-full min-w-[62rem] border-collapse">
+            <table className="w-full min-w-[56rem] border-collapse">
               <caption className="sr-only">
-                Google Workspace accounts linked to a person in the portal,
-                whether each is suspended, and the actions available on it
+                Slack accounts linked to a person in the portal, and whether
+                each is deactivated
               </caption>
               <thead>
                 <tr>
                   {(
                     [
                       ["person", "Name"],
-                      ["suspended", "Suspended"],
+                      ["deactivated", "Deactivated"],
                     ] as const
                   ).map(([key, heading]) => (
                     <SortableTableHeader
@@ -466,7 +411,7 @@ export function WorkspaceDirectory({
                     <td className="py-3 pl-4 pr-5">
                       <div className="flex min-w-0 items-center gap-3">
                         <MemberAvatar
-                          name={account.personName ?? account.accountEmail}
+                          name={account.personName ?? accountLabel(account)}
                           src={account.avatarUrl}
                         />
                         <span className="min-w-0">
@@ -474,22 +419,17 @@ export function WorkspaceDirectory({
                             {account.personName ?? "Unnamed person"}
                           </span>
                           <span className="mt-0.5 block truncate text-sm opacity-55">
-                            {account.accountEmail}
+                            {accountLabel(account)}
                           </span>
                         </span>
                       </div>
                     </td>
                     <td className="py-3 pr-5">
-                      {suspendedLabel(account.suspended)}
+                      {deactivatedLabel(account.deactivated)}
                     </td>
                     <td className="py-3 pr-4">
                       <div className="flex flex-wrap justify-end gap-3">
-                        <SuspensionButton
-                          busy={busy}
-                          onClick={() => setPendingAccount(account)}
-                          suspended={account.suspended}
-                        />
-                        <AdminConsoleLink href={account.adminUrl} />
+                        <SlackProfileLink href={account.profileUrl} />
                         <button
                           className="portal-button whitespace-nowrap"
                           onClick={() =>
@@ -515,35 +455,13 @@ export function WorkspaceDirectory({
         ) : (
           <p className="mt-8 text-sm opacity-55">
             {!lastSyncedAt
-              ? "Nothing to show until the directory has been synced."
+              ? "Nothing to show until Slack has been synced."
               : accounts.some((account) => account.personId !== null)
                 ? "No linked accounts match these filters."
-                : "No Workspace account is linked to anybody in the portal."}
+                : "No Slack account is linked to anybody in the portal."}
           </p>
         )}
       </section>
-
-      {pendingAccount && (
-        <ConfirmDialog
-          busy={busy}
-          confirmIcon={pendingAccount.suspended ? "lock_open" : "lock"}
-          confirmLabel={pendingAccount.suspended ? "Activate" : "Suspend"}
-          danger={!pendingAccount.suspended}
-          onCancel={() => setPendingAccount(null)}
-          onConfirm={confirmSuspension}
-          title={
-            pendingAccount.suspended
-              ? "Activate this Workspace account?"
-              : "Suspend this Workspace account?"
-          }
-        >
-          <p>
-            {pendingAccount.suspended
-              ? `${pendingAccount.accountEmail} can sign in to Google and to this portal again, and reaches their mail and files as before.`
-              : `${pendingAccount.accountEmail} is signed out of Google everywhere and cannot sign in — to Google or to this portal. Their mail and files are kept and nothing is deleted.`}
-          </p>
-        </ConfirmDialog>
-      )}
     </>
   );
 }

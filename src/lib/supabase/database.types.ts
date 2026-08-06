@@ -1065,6 +1065,10 @@ export type Database = {
         Returns: undefined
       }
       sign_in_block_reason: { Args: never; Returns: string | null }
+      sync_slack_directory: {
+        Args: { p_accounts: Json }
+        Returns: Json
+      }
       sync_workspace_directory: {
         Args: { p_accounts: Json }
         Returns: Json

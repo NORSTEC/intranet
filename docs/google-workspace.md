@@ -133,11 +133,10 @@ enforced. Nothing here needs a key, and the policy is free protection.
 
 ## Not built yet
 
-Slack is the other half of what this is for: which channels somebody is in,
-which channels alumni and members should get automatically, and the same
-unmatched report for Slack accounts that belong to nobody in the portal.
-`external_accounts.provider` already allows `slack`, and the sync has the shape
-the Slack one will take.
-
 Group membership is read-only and unused so far — no screen shows which Google
 groups an account belongs to.
+
+[Slack](slack.md) now has the unmatched report this sync's shape was written
+for. It stops there: Slack Pro has no API for deactivating a member, so the
+suspension mirror above has no Slack counterpart, and channel management is
+designed but not built.

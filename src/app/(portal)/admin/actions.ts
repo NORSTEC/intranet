@@ -9,6 +9,11 @@ import {
 } from "@/lib/google/workspace";
 import { requirePortalAdminAccess } from "@/lib/auth/access";
 import { NORSTEC_ORGANIZATION_SLUG } from "@/lib/portal/norstec";
+import {
+  isSlackConfigured,
+  listSlackUsers,
+  SlackError,
+} from "@/lib/slack/directory";
 import { createClient } from "@/lib/supabase/server";
 
 export type PortalManagementResult =
@@ -193,6 +198,103 @@ export async function syncWorkspaceDirectory(): Promise<PortalManagementResult> 
     message: summary
       ? `Directory synced. ${summary.matched} matched, ${summary.unmatched} not in the portal.`
       : "Directory synced.",
+  };
+}
+
+/**
+ * Slack's error codes are terse and name the fix precisely, which is worth
+ * translating rather than passing through: `missing_scope` means somebody has
+ * to reinstall the Slack app with another permission, and no administrator
+ * reading the raw word would know that.
+ */
+function slackMessageFor(error: unknown, fallback: string) {
+  if (!(error instanceof SlackError)) return fallback;
+  if (error.message === "slack_not_configured") {
+    return "Slack is not configured on this server.";
+  }
+  if (error.code === "missing_scope") {
+    return "The Slack app is missing a permission. It needs users:read, users:read.email and team:read, and has to be reinstalled to the workspace after they are added.";
+  }
+  if (error.code === "not_authed" || error.code === "invalid_auth") {
+    return "Slack rejected the portal's token. Check the Vercel Connect connector is still installed in the workspace.";
+  }
+  if (error.code === "ratelimited") {
+    return "Slack is rate limiting the portal. Wait a minute and sync again.";
+  }
+  if (error.code) {
+    return `Slack refused the request: ${error.code}`;
+  }
+  return error.message;
+}
+
+/**
+ * Reads the Slack member list and hands it to the database in one call, the
+ * same way the Workspace sync does — and, like it, triggered by an
+ * administrator rather than scheduled, because a cron job has no signed-in user
+ * and would need a privileged Supabase key this portal deliberately holds none
+ * of.
+ *
+ * Unlike the Workspace sync this has no counterpart that writes back. Slack Pro
+ * has no API for deactivating a member, and the portal is not in use yet, so
+ * nothing here may change the real workspace. It reads, and it reports.
+ */
+export async function syncSlackDirectory(): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isSlackConfigured()) {
+    return { ok: false, message: "Slack is not configured on this server." };
+  }
+
+  let accounts;
+  try {
+    accounts = await listSlackUsers();
+  } catch (error) {
+    return {
+      ok: false,
+      message: slackMessageFor(
+        error,
+        "Slack could not be reached. Nothing was changed.",
+      ),
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("sync_slack_directory", {
+    p_accounts: accounts.map((account) => ({
+      accountEmail: account.accountEmail,
+      deactivated: account.deactivated,
+      displayName: account.displayName,
+      externalId: account.id,
+    })),
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "The Slack directory could not be recorded."),
+    };
+  }
+
+  revalidatePath("/admin/slack");
+
+  const summary = data as {
+    matched: number;
+    removed: number;
+    unmatched: number;
+  } | null;
+
+  // Guest accounts are not stored — the inventory has no column that means
+  // anything for the other provider — but the count is worth saying once,
+  // because a workspace full of guests explains an unmatched table that
+  // otherwise looks alarming.
+  const guests = accounts.filter((account) => account.guest).length;
+  const guestNote = guests > 0 ? ` ${guests} of them are guests.` : "";
+
+  return {
+    ok: true,
+    message: summary
+      ? `Slack synced. ${summary.matched} matched, ${summary.unmatched} not in the portal.${guestNote}`
+      : "Slack synced.",
   };
 }
 
