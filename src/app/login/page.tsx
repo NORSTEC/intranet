@@ -5,6 +5,7 @@ import {
   MobileLoginHeader,
 } from "@/components/login/login-visual";
 import { GoogleSignInButton } from "@/components/login/google-sign-in-button";
+import { SiteFooter } from "@/components/site-footer";
 
 export default async function LoginPage({
   searchParams,
@@ -75,6 +76,27 @@ export default async function LoginPage({
             </p>
           )}
 
+          {/* GDPR article 13 wants this at the moment the data is collected,
+              and the collection starts on the next click: finishing Google
+              sign-in creates a profile whether or not access is ever
+              requested. It is a notice, not a consent — the processing rests
+              on article 6(1)(b), so there is nothing here to tick. */}
+          <p className="mt-5 text-sm leading-relaxed opacity-55">
+            Signing in creates a portal profile from the name and email address
+            on your Google account, before you request anything. If you never
+            request access, it is deleted automatically after 30 days.{" "}
+            <a
+              className="legal-link"
+              href="/privacy"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Read the privacy policy
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+            .
+          </p>
+
           <div className="mt-12">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-50">Which account should I use?</p>
             <ol className="mt-5 space-y-5">
@@ -89,6 +111,8 @@ export default async function LoginPage({
             </ol>
           </div>
         </div>
+
+        <SiteFooter contentClassName="" />
       </section>
     </main>
   );

@@ -209,6 +209,35 @@ export function AccessRequestForm({
           name="message"
         />
       </label>
+      {/* Sending the request widens the processing in two ways the sign-in
+          notice does not cover: it hands the form to administrators of an
+          organization the applicant is not yet in, and a decline deletes the
+          profile outright. Article 13(1)(e) and (2)(a) want both said before
+          the click, which is what this is — a notice, not a consent gate. */}
+      <div className="border-t border-moody/20 pt-6 text-sm leading-relaxed opacity-65 sm:col-span-2">
+        <p>
+          Sending this shows your name, email address, field of study, study
+          year and message to{" "}
+          {isOrganizationRequest
+            ? "the administrators of the organization you selected"
+            : "NORSTEC portal administrators"}
+          , so that one of them can decide. If the request is declined, your
+          portal profile is deleted along with it — the name, the addresses and
+          the Google sign-in — and only a record that a decision was made
+          remains.{" "}
+          <a
+            className="legal-link"
+            href="/privacy"
+            rel="noreferrer"
+            target="_blank"
+          >
+            Privacy policy
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          .
+        </p>
+      </div>
+
       <div className="sm:col-span-2">
         <button className="portal-button" type="submit">
           Send request
