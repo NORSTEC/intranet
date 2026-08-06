@@ -7,7 +7,8 @@ transitions, and access to connected services.
 > **Status:** Google authentication, membership provisioning, access requests,
 > role checks, database migrations, Row Level Security, and Google Workspace
 > directory reconciliation are implemented. Several portal feature pages still
-> contain prototype data. Slack is not built yet.
+> contain prototype data. Slack is read-only so far — the portal reports which
+> Slack accounts belong to nobody, and manages no channels.
 
 ## Stack
 
@@ -238,6 +239,7 @@ waits for a human. Worth turning on once more than one person is committing.
 - [Security model](docs/security-model.md)
 - [Membership lifecycle and edge cases](docs/membership-lifecycle.md)
 - [Google Workspace integration](docs/google-workspace.md)
+- [Slack integration](docs/slack.md)
 
 ## Access
 

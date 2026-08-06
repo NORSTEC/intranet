@@ -74,6 +74,7 @@ const breadcrumbLabels: Record<string, string> = {
   organization: "Organization",
   organizations: "Organizations",
   profile: "Profile",
+  slack: "Slack accounts",
   statistics: "Statistics",
   teams: "Teams",
 };

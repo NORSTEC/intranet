@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(191);
+select plan(193);
 
 insert into public.people (
   full_name,
@@ -2875,6 +2875,7 @@ select is(
 );
 
 
+
 -- Identity, contact addresses and unlinking. Each assertion below stands for a
 -- way one of these used to go wrong: a merge moving somebody's contact
 -- address, a Workspace rename stranding it, a reassigned address inheriting
@@ -3363,5 +3364,35 @@ select is(
   'choosing the duplicate address afterwards is what makes it the contact one'
 );
 
+
+-- The Slack sync rewrites the whole inventory for the organization and deletes
+-- whatever the snapshot leaves out, so the caller check is the only thing
+-- standing between an ordinary member and the contents of that table.
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$ select public.sync_slack_directory('[]'::jsonb) $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot sync the Slack directory'
+);
+
+reset role;
+set local role anon;
+
+select throws_ok(
+  $$ select public.sync_slack_directory('[]'::jsonb) $$,
+  '42501',
+  'permission denied for function sync_slack_directory',
+  'a signed-out visitor cannot sync the Slack directory'
+);
+
+reset role;
 select * from finish();
 rollback;
