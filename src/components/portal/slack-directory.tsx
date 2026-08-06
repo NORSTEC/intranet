@@ -26,16 +26,99 @@ export type SlackDirectoryRow = {
   deactivated: boolean;
   displayName: string | null;
   externalId: string;
+  guestType: "multi_channel" | "single_channel" | null;
+  handle: string | null;
   personId: number | null;
   personName: string | null;
   /** Null when the workspace domain could not be read, so no link is shown. */
   profileUrl: string | null;
+  workspaceRole: "admin" | "member" | "owner";
 };
 
-type SortKey = "account" | "deactivated" | "person";
+type SortKey = "account" | "person" | "role" | "slackStatus";
 
-function deactivatedLabel(deactivated: boolean) {
-  return deactivated ? "Yes" : "No";
+// The word is Slack's, not the portal's. "Suspended" already means portal
+// access in this codebase, and the two are unrelated: a deactivated Slack
+// account says nothing about whether somebody can sign in here.
+function slackStatusLabel(account: SlackDirectoryRow) {
+  return account.deactivated ? "Deactivated" : "Active";
+}
+
+const guestLabels: Record<
+  NonNullable<SlackDirectoryRow["guestType"]>,
+  string
+> = {
+  multi_channel: "Multi-channel guest",
+  single_channel: "Single-channel guest",
+};
+
+// Ordered so the accounts worth a second look sort together rather than
+// alphabetically, which would put "Admin" above "Member" and "Owner" below it.
+const roleRank: Record<SlackDirectoryRow["workspaceRole"], string> = {
+  admin: "1",
+  member: "3",
+  owner: "0",
+};
+
+function roleLabel(account: SlackDirectoryRow) {
+  if (account.workspaceRole === "owner") return "Owner";
+  if (account.workspaceRole === "admin") return "Workspace admin";
+  return account.guestType ? guestLabels[account.guestType] : "Member";
+}
+
+/**
+ * The real name and the @handle, whichever of them is not already the headline.
+ * People refer to each other by handle in Slack and by name everywhere else, so
+ * a row that shows only one of the two is hard to match against either.
+ */
+function SecondaryLine({ account }: { account: SlackDirectoryRow }) {
+  const headline = accountLabel(account);
+  const parts = [
+    account.displayName === headline ? null : account.displayName,
+    account.handle && `@${account.handle}` !== headline
+      ? `@${account.handle}`
+      : null,
+  ].filter((part): part is string => Boolean(part));
+
+  if (parts.length === 0) return null;
+
+  return (
+    <span className="mt-0.5 block text-sm opacity-55">{parts.join(" · ")}</span>
+  );
+}
+
+function Badge({ tone, children }: { tone: "guest" | "role"; children: string }) {
+  return (
+    <span
+      className={`portal-pill text-xs ${
+        tone === "role" ? "portal-pill-filled" : ""
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+// Only the facts that change how a row should be read. A plain member with no
+// guest status gets nothing, so the badges stay rare enough to mean something.
+function AccountBadges({ account }: { account: SlackDirectoryRow }) {
+  const role =
+    account.workspaceRole === "owner"
+      ? "Owner"
+      : account.workspaceRole === "admin"
+        ? "Workspace admin"
+        : null;
+
+  if (!role && !account.guestType) return null;
+
+  return (
+    <span className="mt-1.5 flex flex-wrap gap-1.5">
+      {role && <Badge tone="role">{role}</Badge>}
+      {account.guestType && (
+        <Badge tone="guest">{guestLabels[account.guestType]}</Badge>
+      )}
+    </span>
+  );
 }
 
 // An account Slack holds no address for still has to say something in the
@@ -50,14 +133,14 @@ const deactivationOptions = ["deactivated", "active"] as const;
 type DeactivationFilter = (typeof deactivationOptions)[number];
 
 const deactivationLabels: Record<DeactivationFilter, string> = {
-  active: "Not deactivated",
+  active: "Active",
   deactivated: "Deactivated",
 };
 
 function deactivationFilterLabel(selected: DeactivationFilter[]) {
-  if (selected.length === deactivationOptions.length) return "Deactivated: All";
-  if (selected.length === 0) return "Deactivated: None";
-  return `Deactivated: ${deactivationLabels[selected[0]]}`;
+  if (selected.length === deactivationOptions.length) return "In Slack: All";
+  if (selected.length === 0) return "In Slack: None";
+  return `In Slack: ${deactivationLabels[selected[0]]}`;
 }
 
 function toggleDeactivation(
@@ -86,7 +169,7 @@ function DeactivationFilterMenu({
   return (
     <FilterMenu icon="filter_alt" label={deactivationFilterLabel(selected)}>
       <fieldset>
-        <legend className="section-label mb-2 opacity-45">Deactivated</legend>
+        <legend className="section-label mb-2 opacity-45">In Slack</legend>
         {deactivationOptions.map((option) => (
           <CheckboxOption
             checked={selected.includes(option)}
@@ -102,7 +185,8 @@ function DeactivationFilterMenu({
 
 function sortValue(account: SlackDirectoryRow, key: SortKey) {
   if (key === "person") return account.personName ?? "";
-  if (key === "deactivated") return deactivatedLabel(account.deactivated);
+  if (key === "role") return roleRank[account.workspaceRole] + roleLabel(account);
+  if (key === "slackStatus") return slackStatusLabel(account);
   return accountLabel(account);
 }
 
@@ -178,6 +262,7 @@ export function SlackDirectory({
           matchesDeactivation(account, unmatchedDeactivation) &&
           (!normalized ||
             accountLabel(account).toLocaleLowerCase("en").includes(normalized) ||
+            account.handle?.toLocaleLowerCase("en").includes(normalized) ||
             account.displayName?.toLocaleLowerCase("en").includes(normalized)),
       ),
       unmatchedSort.sortKey,
@@ -201,6 +286,7 @@ export function SlackDirectory({
           matchesDeactivation(account, matchedDeactivation) &&
           (!normalized ||
             accountLabel(account).toLocaleLowerCase("en").includes(normalized) ||
+            account.handle?.toLocaleLowerCase("en").includes(normalized) ||
             account.personName?.toLocaleLowerCase("en").includes(normalized)),
       ),
       matchedSort.sortKey,
@@ -265,7 +351,11 @@ export function SlackDirectory({
           Not in the portal
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Slack accounts no portal profile claims. Check who it is in Slack before treating it as abandoned.
+          Slack accounts no portal profile claims. Most are members whose Slack
+          address the portal does not know yet, not accounts to clean up —
+          matching is by address, so somebody signed in to Slack with a personal
+          or organization address they never added to their profile lands here.
+          Check who it is in Slack before treating it as abandoned.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -285,17 +375,18 @@ export function SlackDirectory({
 
         {unmatched.length > 0 ? (
           <div className="mt-8 overflow-x-auto">
-            <table className="w-full min-w-[52rem] border-collapse">
+            <table className="w-full min-w-[58rem] border-collapse">
               <caption className="sr-only">
-                Slack accounts with no matching person in the portal, and
-                whether each is deactivated
+                Slack accounts with no matching person in the portal, what each
+                account is in the workspace, and whether it is still active
               </caption>
               <thead>
                 <tr>
                   {(
                     [
                       ["account", "Account"],
-                      ["deactivated", "Deactivated"],
+                      ["role", "In the workspace"],
+                      ["slackStatus", "Slack account"],
                     ] as const
                   ).map(([key, heading]) => (
                     <SortableTableHeader
@@ -322,16 +413,11 @@ export function SlackDirectory({
                       <span className="block font-medium break-words">
                         {accountLabel(account)}
                       </span>
-                      {account.displayName &&
-                        account.displayName !== accountLabel(account) && (
-                          <span className="mt-0.5 block text-sm opacity-55">
-                            {account.displayName}
-                          </span>
-                        )}
+                      <SecondaryLine account={account} />
+                      <AccountBadges account={account} />
                     </td>
-                    <td className="py-3 pr-5">
-                      {deactivatedLabel(account.deactivated)}
-                    </td>
+                    <td className="py-3 pr-5">{roleLabel(account)}</td>
+                    <td className="py-3 pr-5">{slackStatusLabel(account)}</td>
                     <td className="py-3 pr-4">
                       <div className="flex flex-wrap justify-end gap-3">
                         <SlackProfileLink href={account.profileUrl} />
@@ -360,7 +446,9 @@ export function SlackDirectory({
           Linked to a person
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Slack accounts that belong to somebody in the portal.
+          Slack accounts that belong to somebody in the portal. Deactivated is
+          Slack&rsquo;s own state and says nothing about portal access — the two
+          are set separately, and the portal cannot change this one.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -380,17 +468,18 @@ export function SlackDirectory({
 
         {matched.length > 0 ? (
           <div className="mt-8 overflow-x-auto">
-            <table className="w-full min-w-[56rem] border-collapse">
+            <table className="w-full min-w-[62rem] border-collapse">
               <caption className="sr-only">
-                Slack accounts linked to a person in the portal, and whether
-                each is deactivated
+                Slack accounts linked to a person in the portal, what each
+                account is in the workspace, and whether it is still active
               </caption>
               <thead>
                 <tr>
                   {(
                     [
                       ["person", "Name"],
-                      ["deactivated", "Deactivated"],
+                      ["role", "In the workspace"],
+                      ["slackStatus", "Slack account"],
                     ] as const
                   ).map(([key, heading]) => (
                     <SortableTableHeader
@@ -426,12 +515,12 @@ export function SlackDirectory({
                           <span className="mt-0.5 block truncate text-sm opacity-55">
                             {accountLabel(account)}
                           </span>
+                          <AccountBadges account={account} />
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 pr-5">
-                      {deactivatedLabel(account.deactivated)}
-                    </td>
+                    <td className="py-3 pr-5">{roleLabel(account)}</td>
+                    <td className="py-3 pr-5">{slackStatusLabel(account)}</td>
                     <td className="py-3 pr-4">
                       <div className="flex flex-wrap justify-end gap-3">
                         <SlackProfileLink href={account.profileUrl} />

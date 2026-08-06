@@ -289,6 +289,9 @@ export async function syncSlackDirectory(): Promise<PortalManagementResult> {
       deactivated: account.deactivated,
       displayName: account.displayName,
       externalId: account.id,
+      guestType: account.guestType,
+      handle: account.handle,
+      workspaceRole: account.workspaceRole,
     })),
   });
 
@@ -307,11 +310,9 @@ export async function syncSlackDirectory(): Promise<PortalManagementResult> {
     unmatched: number;
   } | null;
 
-  // Guest accounts are not stored — the inventory has no column that means
-  // anything for the other provider — but the count is worth saying once,
-  // because a workspace full of guests explains an unmatched table that
-  // otherwise looks alarming.
-  const guests = accounts.filter((account) => account.guest).length;
+  // Worth saying once in the toast as well as per row, because a workspace full
+  // of guests explains an unmatched table that otherwise looks alarming.
+  const guests = accounts.filter((account) => account.guestType !== null).length;
   const guestNote = guests > 0 ? ` ${guests} of them are guests.` : "";
 
   return {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CardIcon } from "@/components/portal/card-icon";
 
 export type RecommendedAction = {
   description: string;
@@ -23,15 +24,7 @@ export function RecommendedActions({ actions }: { actions: RecommendedAction[] }
             href={action.href}
             key={action.href}
           >
-            <span
-              aria-hidden="true"
-              // Google's own `.material-symbols-outlined` rule is unlayered and
-              // therefore beats Tailwind's layered utilities, so the size has to
-              // be marked important to apply at all.
-              className="material-symbols-outlined text-[5.5rem]! leading-none"
-            >
-              {action.icon}
-            </span>
+            <CardIcon icon={action.icon} />
             <h3 className="mt-7 text-2xl font-medium">{action.title}</h3>
             <p className="mt-3 text-sm opacity-55">{action.description}</p>
             <span className="mt-auto flex items-center justify-end pt-8">

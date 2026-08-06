@@ -1,3 +1,4 @@
+import { SLACK_ICON } from "@/components/portal/card-icon";
 import { AccessWelcome } from "@/components/portal/dashboard/access-welcome";
 import { DashboardHero } from "@/components/portal/dashboard/dashboard-hero";
 import { NewMemberCard } from "@/components/portal/dashboard/new-member-card";
@@ -50,13 +51,24 @@ export default async function DashboardPage() {
   const organizationNames = sentenceList(
     activeOrganizations.map((organization) => organization.name),
   );
+  // Two organizations joined in different months are two facts, and one shared
+  // "since" would misdate whichever came second — so each organization carries
+  // its own date unless they genuinely share one.
+  const membershipMonths = activeOrganizations.map((organization) =>
+    formatMonth(organization.since),
+  );
+  const sharedMonth = membershipMonths.every((month) => month === membershipMonths[0]);
   const membershipSentence = isAlumni
     ? lastEnded?.until
       ? `You hold alumni access to the portal. Your membership in ${lastEnded.name} ended ${formatMonth(lastEnded.until)}.`
       : "You hold alumni access to the portal."
-    : `Member of ${organizationNames}${
-        dashboard.memberSince ? ` since ${formatMonth(dashboard.memberSince)}` : ""
-      }.`;
+    : sharedMonth
+      ? `Member of ${organizationNames} since ${membershipMonths[0]}.`
+      : `Member of ${sentenceList(
+          activeOrganizations.map(
+            (organization, index) => `${organization.name} since ${membershipMonths[index]}`,
+          ),
+        )}.`;
   const roleSentence = access.isPortalAdmin
     ? " You administer the portal."
     : !isAlumni && activeOrganizations.some((organization) => organization.role === "organization_admin")
@@ -74,6 +86,7 @@ export default async function DashboardPage() {
     canLinkBackupAccount,
     pendingAccessRequests,
     unmatchedWorkspaceAccounts,
+    unmatchedSlackAccounts,
   } = dashboard.actions;
   const actions: RecommendedAction[] = [];
   if (unmatchedWorkspaceAccounts > 0) {
@@ -85,6 +98,17 @@ export default async function DashboardPage() {
       href: "/admin/workspace",
       icon: "cloud",
       title: "Google accounts to review",
+    });
+  }
+  if (unmatchedSlackAccounts > 0) {
+    actions.push({
+      description:
+        unmatchedSlackAccounts === 1
+          ? "1 account in the Norstec Slack workspace belongs to nobody in the portal."
+          : `${unmatchedSlackAccounts} accounts in the Norstec Slack workspace belong to nobody in the portal.`,
+      href: "/admin/slack",
+      icon: SLACK_ICON,
+      title: "Slack accounts to review",
     });
   }
   if (pendingAccessRequests > 0) {

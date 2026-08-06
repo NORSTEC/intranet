@@ -49,13 +49,32 @@ Two things differ from the Google sync:
   both providers. An account that stops appearing in `users.list` has been
   removed from the workspace outright, and its row goes with it.
 
+  The screen deliberately does not repeat the stored word. "Suspended" already
+  means *portal access* in this codebase, and the two are unrelated — a
+  deactivated Slack account says nothing about whether somebody can sign in
+  here, and the portal cannot change the Slack one at all. The column is
+  headed "Slack account" and reads Active or Deactivated.
+
 Bots, app users and Slackbot are filtered out in the client rather than stored.
 They never match anybody, and leaving them in would fill the unmatched table —
 whose whole value is that everything in it deserves a look — with rows nobody
 can act on.
 
-Guest status is read from Slack and reported in the sync summary, but not
-stored. There is no column that would mean anything for the other provider.
+Three facts Google has no equivalent for live in `provider_details`, a jsonb
+column rather than three typed ones: the `@handle`, whether somebody is a
+single- or multi-channel guest, and whether they administer the workspace.
+`external_accounts` is a shared inventory, and `is_guest` would be a column
+meaningless for every Google row in it — the sort of thing that accumulates
+until nobody can tell which columns apply to what.
+
+The column is replaced rather than merged on each sync, so somebody who stops
+being a guest, or loses the admin role, loses the key instead of keeping a
+stale one.
+
+Guest type is kept apart from a single "guest" flag because the two have
+different costs: single-channel guests are free on Pro, multi-channel guests
+take a paid seat like a full member. Alumni are the obvious future population
+of both.
 
 ## Matching
 
@@ -97,6 +116,19 @@ here. While the scopes are read-only it costs little either way. Before any
 scope that can change a channel is added, confirm it, because a preview
 deployment that can remove people from channels is a worse credential than the
 static token this design avoided.
+
+## What Slack cannot tell the portal
+
+The one field this report most wants is **last activity**, and `users.list`
+does not carry it. Slack exposes it through `admin.analytics.getFile` and
+SCIM, both Business+ and Enterprise Grid. So the Google guidance — open the
+account and look at the last sign-in before treating it as abandoned — has no
+equivalent here, and "Not in the portal" cannot be narrowed to "and dormant".
+
+Also unavailable or deliberately skipped: `has_2fa` needs an admin token rather
+than a bot token; profile photos are Slack CDN URLs that would have to be
+allow-listed in the image config for a picture the portal already has a better
+version of; time zone and status text change too often to be worth storing.
 
 ## Slack app scopes
 
