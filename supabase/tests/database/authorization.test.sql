@@ -2983,8 +2983,15 @@ select is(
   'the address a rename left behind is released rather than held forever'
 );
 
--- The Admin console gives that address to somebody new, who signs in with a
--- Google account of their own.
+-- The Admin console deletes that account and gives the address to somebody
+-- new. Auth allows one user per address, so the successor can only exist once
+-- the previous holder's Auth user is gone — which is what deleting the
+-- Workspace account, or unlinking it here, leaves behind. What survives is the
+-- *address row* on the previous holder's profile, still naming the Google
+-- account that proved it, and that is the whole of what the portal has to go
+-- on when the successor arrives.
+delete from auth.users where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
 insert into auth.users (
   id, aud, role, email, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,

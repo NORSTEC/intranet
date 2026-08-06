@@ -27,6 +27,15 @@ begin;
 -- that is already the sign-in address of a *different* Google account is not
 -- evidence of the same person. That is exactly the recycled-address case, and
 -- it is the one shape address matching was never able to refuse.
+--
+-- Note which half of that condition does the work. Two Auth users can never
+-- share an address — GoTrue keeps a unique index on it — so the successor only
+-- exists once the previous holder's Auth user is gone, which is what deleting
+-- the Workspace account or unlinking it here leaves behind. What survives is
+-- the address row, still naming the Google account that proved it, and that
+-- subject identifier is the whole of what the portal has to recognise the
+-- difference by. The `portal_accounts` half is belt and braces for identities
+-- the index does not cover.
 alter table public.portal_accounts
   add column if not exists provider_id text;
 
