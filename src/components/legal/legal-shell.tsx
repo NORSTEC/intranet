@@ -4,11 +4,13 @@ import type { ReactNode } from "react";
 import { ThemeToggle } from "@/components/portal/portal-shell";
 import { SiteFooter } from "@/components/site-footer";
 
-export function PortalEntryShell({
-  children,
-}: {
-  children: ReactNode;
-}) {
+/**
+ * The chrome for public legal pages. It deliberately carries no sign-out
+ * button and reads no session: the privacy policy has to be readable by
+ * somebody who has not signed in and never will, which is exactly the reader
+ * article 13 is written for.
+ */
+export function LegalShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-egg text-moody">
       <header className="border-b border-moody">
@@ -38,17 +40,7 @@ export function PortalEntryShell({
             </span>
           </Link>
 
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <form action="/auth/signout" method="post">
-              <button aria-label="Use another account" className="portal-button" type="submit">
-                <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">
-                  logout
-                </span>
-                <span className="hidden sm:inline">Use another account</span>
-              </button>
-            </form>
-          </div>
+          <ThemeToggle />
         </div>
       </header>
 

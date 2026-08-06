@@ -11,6 +11,7 @@ import {
   usePortalBreadcrumbLabels,
 } from "@/components/portal/portal-breadcrumb-data";
 import { PortalLogoToggle } from "@/components/portal/portal-logo-toggle";
+import { SiteFooter } from "@/components/site-footer";
 import { useTheme } from "@/hooks/use-theme";
 
 type NavigationItem = {
@@ -562,14 +563,16 @@ export function PortalShell({
       </motion.aside>
 
       <main
-        className={`relative min-h-screen overflow-hidden pt-16 transition-[margin] duration-300 lg:pt-0 ${
+        className={`relative flex min-h-screen flex-col overflow-hidden pt-16 transition-[margin] duration-300 lg:pt-0 ${
           sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
         }`}
       >
-        <div className="relative z-10 mx-auto w-full max-w-[100rem] px-5 py-12 sm:px-8 lg:px-16 lg:py-20 xl:px-20 2xl:px-28">
+        <div className="relative z-10 mx-auto w-full max-w-[100rem] flex-1 px-5 py-12 sm:px-8 lg:px-16 lg:py-20 xl:px-20 2xl:px-28">
           <Breadcrumbs />
           {children}
         </div>
+
+        <SiteFooter />
       </main>
       </div>
     </PortalBreadcrumbProvider>
