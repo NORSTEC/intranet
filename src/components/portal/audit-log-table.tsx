@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { fetchAuditLogEntry } from "@/app/(portal)/admin/audit-log/actions";
 import { AuditEventFacts } from "@/components/portal/audit-event-facts";
 import {
+  Pagination,
+  usePagination,
+} from "@/components/portal/directory-table";
+import {
   CheckboxOption,
   FilterMenu,
 } from "@/components/portal/members-directory";
@@ -192,6 +196,8 @@ export function AuditLogTable({
     sortDirection,
   ]);
 
+  const entriesPage = usePagination(visibleEntries);
+
   function toggleCategory(category: AuditCategory) {
     setSelectedCategories((current) =>
       current.includes(category)
@@ -360,7 +366,7 @@ export function AuditLogTable({
               </tr>
             </thead>
             <tbody>
-              {visibleEntries.map((entry) => (
+              {entriesPage.pageRows.map((entry) => (
                 <tr
                   aria-label={`View ${entry.title}`}
                   className="cursor-pointer border-b border-moody transition-colors hover:bg-moody hover:text-egg focus-visible:bg-moody focus-visible:text-egg focus-visible:outline-none"
@@ -414,6 +420,8 @@ export function AuditLogTable({
           {entries.length === 0 ? emptyMessage : "No events match these filters."}
         </p>
       )}
+
+      <Pagination {...entriesPage} label="Audit events" />
 
       {openedEntry && (
         <AuditEventDialog

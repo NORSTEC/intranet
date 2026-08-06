@@ -112,9 +112,7 @@ export default async function SlackAccountsPage() {
   return (
     <>
       <p className="max-w-2xl text-sm opacity-55">
-        Who is in the Norstec Slack workspace, and how much of it the portal
-        recognises. Reading only — deactivating a Slack member is not something
-        the portal can do, so acting on a row means opening it in Slack.
+        What the Norstec Slack workspace contains, and how much of it the portal recognises.
       </p>
 
       <div className="mt-10">

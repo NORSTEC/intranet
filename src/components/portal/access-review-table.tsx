@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { reviewAccessRequest } from "@/app/(portal)/administration/access-requests/actions";
 import {
+  Pagination,
+  usePagination,
+} from "@/components/portal/directory-table";
+import {
   CheckboxOption,
   FilterMenu,
 } from "@/components/portal/members-directory";
@@ -342,6 +346,8 @@ export function AccessReviewTable({
       });
   }, [query, requests, selectedScopes, sortDirection, sortKey]);
 
+  const requestsPage = usePagination(visibleRequests);
+
   const detailed = requests.find((request) => request.id === detailsId) ?? null;
   const decidingRequest =
     requests.find((request) => request.id === deciding?.requestId) ?? null;
@@ -488,7 +494,7 @@ export function AccessReviewTable({
               </tr>
             </thead>
             <tbody>
-              {visibleRequests.map((request) => (
+              {requestsPage.pageRows.map((request) => (
                 <tr className="border-b border-moody" key={request.id}>
                   <td className="py-3 pl-4 pr-5 font-medium">
                     {request.requesterName}
@@ -569,6 +575,8 @@ export function AccessReviewTable({
             : "No requests match these filters."}
         </p>
       )}
+
+      <Pagination {...requestsPage} label="Access requests" />
 
       {detailed && (
         <DetailsDialog onClose={() => setDetailsId(null)} request={detailed} />
