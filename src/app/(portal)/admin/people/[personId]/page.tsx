@@ -307,6 +307,7 @@ export default async function PortalPersonPage({
       deriveAccessLevel({
         hasActiveMembership: activeMemberships.length > 0,
         hasAlumniAccess: Boolean(person.alumni_access_granted_at),
+        hasEndedMembership: endedMemberships.length > 0,
         isOrganizationAdmin: activeMemberships.some(
           (membership) => membership.role === "organization_admin",
         ),
