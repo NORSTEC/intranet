@@ -62,12 +62,12 @@ export function AccessRequestForm({
           <h2 className="text-h3">
             {isReturningMember
               ? `You were a member of ${provenOrganization.name}`
-              : `Your ${provenOrganization.name} account is recognised`}
+              : `${provenOrganization.name} reviews who joins`}
           </h2>
           <p className="mt-3 max-w-[65ch] text-sm leading-relaxed opacity-65">
             {isReturningMember
               ? `That membership has ended, so an administrator has to approve you again before you get back in. ${provenOrganization.name} is selected below.`
-              : `${provenOrganization.name} reviews who joins, so signing in is not enough on its own. It is selected below — send the request and an administrator decides.`}
+              : `Signing in with one of its Google accounts is not enough on its own there. ${provenOrganization.name} is selected below — send the request and an administrator decides.`}
           </p>
         </section>
       )}

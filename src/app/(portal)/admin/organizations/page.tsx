@@ -33,9 +33,16 @@ export default async function OrganizationAccessPage() {
   // rather than selected. One call per organization, and there are a handful.
   const organizations: OrganizationAccess[] = await Promise.all(
     rows.map(async (row) => {
-      const { data } = await supabase.rpc("list_organization_domains", {
+      const { data, error } = await supabase.rpc("list_organization_domains", {
         p_organization_id: row.id,
       });
+
+      // An empty list is a sentence on this page — "no domain answers for this
+      // organization" — and an administrator decides whether to register one
+      // from it. A failed read must not be able to say that.
+      if (error) {
+        throw new Error(`Could not load the domains for ${row.name}`);
+      }
 
       return {
         domains: ((data ?? []) as DomainRow[]).map((domain) => ({

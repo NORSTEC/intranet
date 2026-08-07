@@ -55,7 +55,6 @@ export default async function AccessPage({
   const {
     error,
     organization: provenOrganizationSlug,
-    returning,
     withdrawn,
   } = await searchParams;
 
@@ -106,8 +105,14 @@ export default async function AccessPage({
   // proved it belongs to. Norstec is kept out of the list on purpose — nobody
   // asks their way into it — but a Norstec account that needs approval anyway,
   // because the membership behind it ended, has to be able to ask for the one
-  // organization it is actually about. So the proven organization joins the
+  // organization it is actually about. So the named organization joins the
   // list whether or not the list would otherwise carry it.
+  //
+  // The parameter only ever selects an organization. Nothing the page says
+  // about the person rests on it: anybody can type it, and a page that read a
+  // claim about somebody out of their own URL would be telling them what they
+  // just told it. Whether they were a member here before is asked of the
+  // database below.
   const provenOrganization = provenOrganizationSlug
     ? ((
         await supabase
@@ -118,6 +123,21 @@ export default async function AccessPage({
           .maybeSingle()
       ).data as Organization | null)
     : null;
+
+  const isReturningMember = provenOrganization
+    ? Boolean(
+        (
+          await supabase
+            .from("memberships")
+            .select("id")
+            .eq("person_id", access.profile.personId)
+            .eq("organization_id", provenOrganization.id)
+            .eq("status", "ended")
+            .limit(1)
+            .maybeSingle()
+        ).data,
+      )
+    : false;
 
   const listedOrganizations = (organizationsResult.data ?? []) as Organization[];
   const organizations =
@@ -206,7 +226,7 @@ export default async function AccessPage({
             <AccessRequestForm
               errorMessage={error ? errorMessages[error] : undefined}
               firstName={access.profile.firstName ?? ""}
-              isReturningMember={returning === "true"}
+              isReturningMember={isReturningMember}
               lastName={access.profile.lastName ?? ""}
               organizations={organizations}
               provenOrganization={provenOrganization}

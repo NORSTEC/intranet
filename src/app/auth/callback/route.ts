@@ -74,7 +74,20 @@ export async function GET(request: Request) {
   // account. It is not enough now that joining is a policy an administrator
   // can change, so the decision is asked for here, on every sign-in. It is the
   // same function the trigger calls, and it is idempotent.
-  const { data: joinResult } = await supabase.rpc("apply_own_domain_join");
+  const { data: joinResult, error: joinError } = await supabase.rpc(
+    "apply_own_domain_join",
+  );
+
+  // Treating a failed decision as an empty one would send somebody the policy
+  // admits straight to the request page, where they would ask for access they
+  // already had. Signing in again is the recovery, so the sign-in error is the
+  // honest answer.
+  if (joinError) {
+    return NextResponse.redirect(
+      new URL("/login?error=authorization", requestUrl.origin),
+    );
+  }
+
   const join = (joinResult ?? {}) as {
     outcome?: string;
     organizationSlug?: string;

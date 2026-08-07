@@ -125,9 +125,14 @@ begin
   from public.person_emails as address
   where split_part(address.email, '@', 2) = target_domain;
 
-  -- People who hold an address on the domain and are not already members of
-  -- the organization. Under an automatic join policy this is how many
-  -- memberships the registration eventually produces, one per sign-in.
+  -- People who hold an address on the domain and hold no membership row in the
+  -- organization at all — `apply_domain_join` refuses every existing row,
+  -- ended and suspended alike, so counting only active ones would overstate it.
+  --
+  -- It is still an upper bound rather than a forecast, and the interface says
+  -- so. Joining keys on the hosted domain an account proves at sign-in, which
+  -- no query can know in advance: somebody holding the address without a
+  -- Workspace account behind it is counted here and admitted by nothing.
   select count(distinct address.person_id)
   into membership_count
   from public.person_emails as address
@@ -137,7 +142,6 @@ begin
       from public.memberships as membership
       where membership.person_id = address.person_id
         and membership.organization_id = p_organization_id
-        and membership.status = 'active'
     );
 
   return jsonb_build_object(
@@ -236,6 +240,18 @@ begin
     now()
   );
 
+  -- Addresses the portal already held on this domain were recorded as personal,
+  -- because at the time they were. Registration is the moment that stops being
+  -- true, and the profile page reads `email_type` to decide whether somebody
+  -- may remove an address themselves — so leaving the old value there offers a
+  -- button the database then refuses. The reclassification happens here rather
+  -- than waiting for each person to sign in again.
+  update public.person_emails
+  set email_type = 'organization',
+      updated_at = now()
+  where split_part(email, '@', 2) = target_domain
+    and email_type <> 'organization';
+
   insert into public.audit_events (
     actor_person_id, action, organization_id, details
   ) values (
@@ -307,6 +323,15 @@ begin
 
   delete from private.organization_domains
   where domain = target_domain;
+
+  -- The mirror of the reclassification on registration. The addresses go back
+  -- to being ordinary personal ones, which their owners may then remove
+  -- themselves — the memberships they produced are deliberately left alone.
+  update public.person_emails
+  set email_type = 'personal',
+      updated_at = now()
+  where split_part(email, '@', 2) = target_domain
+    and email_type <> 'personal';
 
   insert into public.audit_events (
     actor_person_id, action, organization_id, details

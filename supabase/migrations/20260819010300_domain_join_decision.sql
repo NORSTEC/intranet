@@ -94,10 +94,14 @@ begin
     );
   end if;
 
-  -- An ended membership outranks the policy. Somebody the organization has
-  -- already let go does not walk back in because their Workspace account
-  -- outlived the decision.
-  if membership_status = 'ended' or join_policy <> 'auto' then
+  -- Any membership row that already exists outranks the policy. `ended` is the
+  -- one that matters most — somebody the organization has already let go does
+  -- not walk back in because their Workspace account outlived the decision —
+  -- but `planned`, `suspended` and `alumni` are equally not an invitation to
+  -- insert. They also cannot be reported as a join: the insert below would do
+  -- nothing on conflict while the caller was told a membership had been
+  -- created, and would route somebody into a portal they cannot enter.
+  if membership_status is not null or join_policy <> 'auto' then
     return jsonb_build_object(
       'outcome', case
         when join_policy = 'off' then 'identity_only'
@@ -105,6 +109,7 @@ begin
       end,
       'organizationId', target_organization_id,
       'organizationSlug', target_organization_slug,
+      'membershipStatus', membership_status,
       'returning', membership_status = 'ended'
     );
   end if;

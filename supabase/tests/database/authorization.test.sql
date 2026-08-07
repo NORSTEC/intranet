@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(275);
+select plan(278);
 
 insert into public.people (
   full_name,
@@ -3586,6 +3586,20 @@ select throws_ok(
   'an ordinary member cannot read which domains an organization answers to'
 );
 
+-- The dry run counts `person_emails` rows for any domain somebody types, so it
+-- answers "how many people here use this provider" for the whole portal.
+select throws_ok(
+  $$
+    select public.preview_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'gmail.com'
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot ask what a domain would capture'
+);
+
 select throws_ok(
   $$
     select public.set_organization_domain_join_policy(
@@ -4043,6 +4057,47 @@ select is(
   ),
   'ended',
   'the ended membership is left as it is rather than quietly reactivated'
+);
+
+-- `planned`, `suspended` and `alumni` are membership rows too. Reporting one of
+-- them as a join would route somebody into a portal they cannot enter, on the
+-- strength of an insert that did nothing.
+update public.memberships
+set status = 'suspended'
+where person_id = (
+  select id from public.people where full_name = 'Join Applicant'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated"}',
+  true
+);
+
+select is(
+  (select public.apply_own_domain_join() ->> 'outcome'),
+  'request',
+  'a suspended membership is not an invitation to insert one either'
+);
+
+reset role;
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Join Applicant'
+  ),
+  'suspended',
+  'and the row it found is left exactly as it was'
+);
+
+update public.memberships
+set status = 'ended'
+where person_id = (
+  select id from public.people where full_name = 'Join Applicant'
 );
 
 -- Linking used to run its own copy of the domain rule, so every guard on the

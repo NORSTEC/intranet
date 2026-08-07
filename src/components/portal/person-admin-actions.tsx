@@ -414,7 +414,11 @@ export function PersonAdminActions({
                   )}
 
                   <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                    {!address.isPrimary && !address.account && (
+                    {/* An address with a sign-in account is the likeliest
+                        contact address there is, and `set_person_primary_email`
+                        has never cared whether one signs in. Only removal is
+                        ordered after the account. */}
+                    {!address.isPrimary && (
                       <button
                         className="portal-button"
                         disabled={busy}

@@ -58,6 +58,15 @@ export function OrganizationAccessSettings({
     domain: string;
     organizationName: string;
   } | null>(null);
+  // Switching to automatic joining is the one control here that decides who
+  // gets in without anybody looking, so it asks before it applies rather than
+  // acting on the click that selected it.
+  const [pendingPolicy, setPendingPolicy] = useState<{
+    domainCount: number;
+    organizationId: number;
+    organizationName: string;
+    policy: (typeof joinPolicies)[number];
+  } | null>(null);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -165,14 +174,23 @@ export function OrganizationAccessSettings({
                             className="size-4 accent-moody"
                             disabled={busy}
                             name={`join-policy-${organization.id}`}
-                            onChange={() =>
+                            onChange={() => {
+                              if (policy.value === "auto") {
+                                setPendingPolicy({
+                                  domainCount: organization.domains.length,
+                                  organizationId: organization.id,
+                                  organizationName: organization.name,
+                                  policy,
+                                });
+                                return;
+                              }
                               run(() =>
                                 setOrganizationJoinPolicy({
                                   organizationId: organization.id,
                                   policy: policy.value,
                                 }),
-                              )
-                            }
+                              );
+                            }}
                             type="radio"
                             value={policy.value}
                           />
@@ -282,16 +300,18 @@ export function OrganizationAccessSettings({
                         : `${preview.addressCount} addresses`}{" "}
                       the portal already holds.{" "}
                       {organization.joinPolicy === "auto"
-                        ? `${
+                        ? `At most ${
                             preview.wouldJoinCount === 1
-                              ? "One person"
-                              : `${preview.wouldJoinCount} people`
-                          } would join ${organization.name} as they sign in.`
-                        : `${
+                              ? "one of them"
+                              : `${preview.wouldJoinCount} of them`
+                          } would join ${
+                            organization.name
+                          } as they sign in — only the ones whose Google account belongs to the Workspace itself.`
+                        : `At most ${
                             preview.wouldJoinCount === 1
-                              ? "One person"
-                              : `${preview.wouldJoinCount} people`
-                          } would be sent to a request instead of joining, because this organization asks first.`}
+                              ? "one of them"
+                              : `${preview.wouldJoinCount} of them`
+                          } would be sent to a request rather than joining, because this organization asks first.`}
                     </p>
                     <button
                       className="portal-button mt-5"
@@ -332,6 +352,40 @@ export function OrganizationAccessSettings({
           );
         })}
       </div>
+
+      {pendingPolicy && (
+        <ConfirmDialog
+          busy={busy}
+          confirmIcon="how_to_reg"
+          confirmLabel="Let them join"
+          onCancel={() => setPendingPolicy(null)}
+          onConfirm={() => {
+            const { organizationId, policy } = pendingPolicy;
+            setPendingPolicy(null);
+            run(() =>
+              setOrganizationJoinPolicy({
+                organizationId,
+                policy: policy.value,
+              }),
+            );
+          }}
+          title={`Let ${pendingPolicy.organizationName} accounts join without review?`}
+        >
+          <p>
+            Anybody signing in with a Google account on{" "}
+            {pendingPolicy.domainCount === 1
+              ? "its domain"
+              : `one of its ${pendingPolicy.domainCount} domains`}{" "}
+            becomes an active member of {pendingPolicy.organizationName} at that
+            moment, appears in its member directory, and sees everything a member
+            sees. Nobody is asked.
+          </p>
+          <p className="mt-3">
+            People it has already let go stay out — an ended membership is never
+            reinstated this way. Everyone else on the domain is in.
+          </p>
+        </ConfirmDialog>
+      )}
 
       {pendingRemoval && (
         <ConfirmDialog

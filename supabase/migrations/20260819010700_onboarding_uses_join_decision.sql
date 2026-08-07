@@ -50,9 +50,12 @@ begin
     raise exception using errcode = 'P0001', message = 'onboarding_not_pending';
   end if;
 
-  -- Completed before the decision, not after: `apply_domain_join` refuses an
-  -- account still in onboarding, because a membership attached to a profile
-  -- that is about to be folded into another belongs to nobody.
+  -- Completed before the decision, not after. `public.apply_own_domain_join`,
+  -- which the sign-in callback asks on every sign-in, returns `onboarding` and
+  -- decides nothing while an account is still pending — a membership attached
+  -- to a profile that is about to be folded into another belongs to nobody.
+  -- The private function this calls does not check that itself, so completing
+  -- first is what keeps the two doors agreeing.
   update public.portal_accounts
   set onboarding_status = 'complete',
       last_seen_at = now()
