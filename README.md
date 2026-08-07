@@ -36,8 +36,7 @@ That is the whole setup. The container brings its own Node, pnpm and Docker,
 installs dependencies, and creates your `.env.local` from the example. Then:
 
 ```bash
-pnpm db:start
-pnpm dev
+pnpm dev:all
 ```
 
 Nobody has to install a matching Node version or find out the hard way that
@@ -52,9 +51,12 @@ You need [Node.js 24+](https://nodejs.org), [pnpm](https://pnpm.io) and
 ```bash
 pnpm install
 cp .env.example .env.local
-pnpm db:start
-pnpm dev
+pnpm dev:all
 ```
+
+`pnpm dev:all` is `pnpm db:start` followed by `pnpm dev`, which is what you
+want the first time and every morning after. Run them separately when you want
+the database up without the application — before `pnpm db:test`, say.
 
 `pnpm db:start` boots a complete Supabase stack in Docker — Postgres, Auth,
 Storage — applies every migration, and prints the URL and key that
@@ -110,8 +112,10 @@ Nothing here mocks Supabase. A mocked database tests the mock.
 2. `.github/workflows/checks.yml` runs two jobs: types/lint/tests/build, and a
    fresh database built from every migration with the authorization suite run
    against it. Both must pass.
-   `.github/workflows/security.yml` runs CodeQL and blocks the pull request if
-   it adds a dependency with a known high-severity vulnerability.
+   `.github/workflows/security.yml` blocks the pull request if it adds a
+   dependency with a known high-severity vulnerability. CodeQL runs alongside
+   it from GitHub's default setup rather than from a workflow file — one
+   analysis of the application code, one of the workflow files themselves.
 3. Merge to `main`.
 4. `.github/workflows/migrate.yml` applies any new migrations to the hosted
    Supabase project.

@@ -1,0 +1,86 @@
+##
+# CodeRabbit reviews every pull request here.
+#
+# None of this file is required to make that happen — CodeRabbit reviews on
+# open and re-reviews on every subsequent push with no configuration at all,
+# and `auto_incremental_review` is true by default. What this file does is make
+# that behaviour explicit rather than inherited, and stop the reviewer from
+# spending its comments on things nobody should act on.
+#
+# The two that matter are below `path_filters` and `path_instructions`. A
+# 174,000-line lockfile and generated build output are not worth reviewing, and
+# migrations in this repository are append-only (AGENTS.md) — without being
+# told, a reviewer will keep suggesting improvements to migration files that
+# have already been applied to production and can no longer be changed.
+##
+
+language: en-GB
+
+reviews:
+  # `chill` comments on what is wrong. `assertive` also comments on what could
+  # be nicer, which on a three-person team is mostly noise.
+  profile: chill
+
+  # CodeRabbit posts its findings; it does not block the merge button. The
+  # required status checks in .github/workflows/checks.yml are what block, and
+  # a review tool's opinion should not sit alongside them as if it carried the
+  # same weight.
+  request_changes_workflow: false
+
+  high_level_summary: true
+  review_status: true
+  poem: false
+
+  auto_review:
+    enabled: true
+
+    # Re-review each new push rather than only the first one. This is the
+    # default, and it is written down because it is the setting people go
+    # looking for when reviews stop appearing after the initial push.
+    auto_incremental_review: true
+
+    # A draft pull request is work in progress by definition. Reviewing it
+    # produces comments on code the author already knows is unfinished.
+    drafts: false
+
+    base_branches:
+      - main
+
+  path_filters:
+    - "!pnpm-lock.yaml"
+    - "!**/*.tsbuildinfo"
+    - "!.next/**"
+    - "!public/**"
+
+  path_instructions:
+    - path: "supabase/migrations/**"
+      instructions: >-
+        Migrations are append-only. Once a migration has been merged it has been
+        applied to the hosted project, and editing its body means the database
+        and the repository no longer agree. Do not suggest changes to existing
+        migration files; if something is wrong, say that a new migration is
+        needed to correct it. Do review new migrations closely for row level
+        security and `security definer` functions — authorization in this
+        project lives in the database, not in application code, so a mistake
+        there is a data breach rather than a bug.
+
+    - path: "supabase/tests/database/**"
+      instructions: >-
+        This is the authorization suite. Flag policy or RPC changes elsewhere in
+        the pull request that arrive without a corresponding assertion here.
+
+    - path: ".github/workflows/**"
+      instructions: >-
+        Actions are pinned to a commit rather than a tag on purpose. Do not
+        suggest replacing a pinned SHA with a version tag. Do flag any `${{ }}`
+        expression interpolated directly into a `run:` script, and any job that
+        exposes secrets to a workflow reachable from a fork.
+
+    - path: "src/**/*.tsx"
+      instructions: >-
+        Server Components by default. Flag a `"use client"` boundary drawn wider
+        than it needs to be, and any Supabase call made from the client that
+        relies on the caller being trusted.
+
+chat:
+  auto_reply: true
