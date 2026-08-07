@@ -21,32 +21,8 @@ transitions, and access to connected services.
 
 ## Getting started
 
-### The easy way: Dev Container
-
-Install [Docker](https://docs.docker.com/get-started/get-docker/) and open this
-folder in an editor that speaks the Dev Container spec — it is an open standard,
-not a VS Code feature:
-
-- **VS Code** with the Dev Containers extension → *Reopen in Container*
-- **WebStorm / IntelliJ** → open `.devcontainer/devcontainer.json` and click the
-  gutter icon, or use JetBrains Gateway
-- **GitHub Codespaces** → *Code → Create codespace*, no local Docker at all
-
-That is the whole setup. The container brings its own Node, pnpm and Docker,
-installs dependencies, and creates your `.env.local` from the example. Then:
-
-```bash
-pnpm dev:all
-```
-
-Nobody has to install a matching Node version or find out the hard way that
-theirs is too old. The container is optional — it is a shortcut, not a
-requirement, and the next section works just as well.
-
-### Or install the tools yourself
-
-You need [Node.js 24+](https://nodejs.org), [pnpm](https://pnpm.io) and
-[Docker](https://docs.docker.com/get-started/get-docker/) running.
+You need three things installed: [Node.js 24+](https://nodejs.org),
+[pnpm](https://pnpm.io), and [Docker Desktop](https://docs.docker.com/get-started/get-docker/).
 
 ```bash
 pnpm install
@@ -54,20 +30,12 @@ cp .env.example .env.local
 pnpm dev:all
 ```
 
+Open `http://localhost:3000`. That is all of it — it works the same in any
+editor.
+
 `pnpm dev:all` is `pnpm db:start` followed by `pnpm dev`, which is what you
 want the first time and every morning after. Run them separately when you want
 the database up without the application — before `pnpm db:test`, say.
-
-`pnpm db:start` boots a complete Supabase stack in Docker — Postgres, Auth,
-Storage — applies every migration, and prints the URL and key that
-`.env.example` already has as its defaults. Open `http://localhost:3000`.
-
-**Develop against the local database, not the hosted one.** The hosted project
-holds real members' names, addresses and sign-in accounts. A mistake there is
-not undoable, and the portal is subject to GDPR. If you think you need the
-hosted project for something, ask first.
-
-Useful afterwards:
 
 ```bash
 pnpm db:reset   # throw the local database away and rebuild it from migrations
@@ -77,6 +45,55 @@ pnpm db:stop    # shut the stack down
 The Supabase Studio at `http://localhost:54323` is a browser interface to the
 local database. Mail the portal sends locally is caught at
 `http://localhost:54324` rather than delivered.
+
+**Develop against the local database, not the hosted one.** The hosted project
+holds real members' names, addresses and sign-in accounts. A mistake there is
+not undoable, and the portal is subject to GDPR. If you think you need the
+hosted project for something, ask first. Pull requests build nothing that could
+reach it — see [There is only one deployed environment](#there-is-only-one-deployed-environment).
+
+### What Docker is doing here, and what it is not
+
+Docker Desktop has to be running, but you never open it. `pnpm db:start` uses
+it and nothing else does.
+
+Supabase is not one program. It is Postgres, an auth service, a REST layer, a
+gateway, storage, a mail catcher and a few more — around ten of them, which
+have to be the versions that match each other. Installing that by hand, on
+three laptops, and keeping it in step with CI, is not a thing that stays
+working. Docker ships each one as a prebuilt image, and `pnpm db:start`
+launches the set. You, the person next to you, and GitHub Actions end up with
+the same database down to the patch version.
+
+**Your application does not run in Docker.** `pnpm dev` is an ordinary Node
+process on your own machine, talking to `localhost:54321`, which is where the
+containers are listening. Nothing you write goes into a container, and no
+Docker knowledge is required to work here.
+
+The first `pnpm db:start` takes a few minutes while images download; after that
+it is about twenty seconds. Give Docker Desktop **at least 8 GB of memory**
+under *Settings → Resources*. Below that the stack starts and then dies partway
+through migrations, which looks convincingly like a broken migration.
+
+Three failures account for nearly all of them:
+
+| What you see | What it means |
+| --- | --- |
+| `Cannot connect to the Docker daemon` | Docker Desktop is not running |
+| `db:start` hangs on health checks | not enough memory, see above |
+| `port 54322 already in use` | run `pnpm db:stop`, or another Supabase project is up |
+
+### Optional: Dev Container
+
+`.devcontainer/devcontainer.json` describes the same setup as a container, so
+your editor can build it instead of you installing Node and pnpm yourself. It
+is a convenience and nothing depends on it — the instructions above are the
+supported path, and skipping this section costs you nothing.
+
+It needs an editor that implements the Dev Container spec: VS Code with the Dev
+Containers extension, Cursor, JetBrains IDEs from 2023.2, or GitHub Codespaces,
+which needs no local Docker at all. Editors that do not implement it — Zed,
+Neovim, Sublime — use the instructions above.
 
 ## Before you push
 
@@ -134,6 +151,41 @@ timestamped migration that `create or replace`s it. See
 [AGENTS.md](AGENTS.md) for the details and for the drift this has caused
 before.
 
+### There is only one deployed environment
+
+`vercel.json` stops Vercel building anything that is not production. Every
+other deployment it would make — one per pull request — is skipped before the
+build starts.
+
+This is not a limitation being worked around; it is the honest shape of the
+setup. A preview deployment is worth having when it can be clicked through, and
+that needs a database. The only hosted database here is production, which holds
+real members' names, addresses and sign-in accounts. Pointing pull requests at
+it would mean unreviewed code writing to the member register, so the Supabase
+variables are scoped to Production alone and previews have no credentials at
+all. What that produced was a preview URL that always built green and always
+died on the first click — a thing that looks broken and costs somebody an hour
+before they work out it was never meant to work.
+
+So there is nothing to click, and nothing pretending otherwise. What replaces
+it is the local stack: `pnpm dev:all` gives every developer a full portal
+against a database built from the same migrations, which is a better review
+environment than a shared preview would have been anyway.
+
+The path to changing this is a second Supabase project for previews to point at
+— either a free one in its own organization, or Supabase's branching feature,
+which creates a throwaway database per pull request and is billed for as long
+as each one lives. Neither is needed at three developers. When one of them is,
+delete `vercel.json` and add the preview-scoped variables in Vercel.
+
+The `Supabase Preview` check that appears on every pull request and reports
+`skipped` is the branching feature reporting that it is switched off. Skipped
+checks block nothing. To be rid of the row, disconnect the GitHub integration
+under **Project Settings → Integrations** in the Supabase dashboard — but leave
+`SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID` alone. Those belong to
+`migrate.yml`, which is a different mechanism and still the one that migrates
+production.
+
 ## Repository setup
 
 These are GitHub and Vercel settings, not files, so they have to be turned on
@@ -144,11 +196,32 @@ production automatically, and that deployment holds an identity that can read
 the member database and suspend Google Workspace accounts. Anyone who can push
 to `main` can run code as that identity.
 
-- **Settings → Branches → add a rule for `main`:** require a pull request,
-  require the `Types, lint and build` and `Migrations and authorization tests`
-  checks to pass, block force pushes and deletion. If you are the only
-  maintainer, do not require approvals — you would lock yourself out — but
-  leave everything else on.
+- **Settings → Rules → Rulesets → New branch ruleset**, targeting the default
+  branch, with the enforcement status set to **Active** and the bypass list left
+  **empty**. Turn on: restrict deletions, block force pushes, require a pull
+  request (with conversation resolution, and zero approvals while there is one
+  maintainer — requiring them would lock you out), require the status checks
+  `Types, lint, tests and build`, `Migrations and authorization tests` and
+  `Dependency review` to pass with branches up to date, and require code
+  scanning results from CodeQL.
+
+  Use a ruleset rather than the older **Settings → Branches** rule. Both are
+  still offered and both still work, but they layer — when the two disagree the
+  stricter wins, and nothing tells you which one refused your push. Keep one.
+  If a classic rule already exists, create the ruleset first, confirm on a
+  throwaway pull request that it blocks what it should, and only then delete the
+  classic rule. The other order leaves `main` unprotected in between, and `main`
+  deploys straight to production.
+
+  CodeQL gets its own rule rather than being listed among the status checks
+  because it does not run on every pull request — a branch that only touches
+  Markdown has nothing to analyse. As a required status check that pull request
+  would wait forever; the code scanning rule understands the difference between
+  "no findings" and "did not run".
+
+  Leave **require signed commits** and **require linear history** off. Signed
+  commits break merges from the web interface and from anyone without GPG set
+  up, which is a bad thing to discover during a release.
 - **Organization → Settings → Authentication security:** require two-factor
   authentication for every member.
 - **Review who has write access**, on GitHub and on the Vercel team. Both are
