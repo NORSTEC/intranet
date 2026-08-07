@@ -720,6 +720,15 @@ async function applyWorkspaceSuspension(input: {
     return { ok: false, message: "This person has no Norstec account." };
   }
 
+  // Google refuses a delegated role any change to a super administrator, in
+  // either direction, so the portal cannot suspend one and cannot reactivate
+  // one either. Checked here rather than in the callers: five paths reach this
+  // function — the directory screen, portal access changing in step, deletion,
+  // restoration — and a guard on one of them is a guard on none.
+  if (await isSuperAdministrator(input.externalId)) {
+    return { ok: false, message: SUPER_ADMIN_REFUSAL };
+  }
+
   try {
     await setWorkspaceUserSuspended(input.externalId, input.suspended);
   } catch (error) {
@@ -809,22 +818,6 @@ export async function setWorkspaceAccountSuspension(input: {
     };
   }
 
-  // Google refuses this before the portal ever gets to try: the service account
-  // holds a delegated role, and a delegated role cannot change a super
-  // administrator. Reading the stored flag first turns a 403 whose wording
-  // blames the portal's own permissions into the actual reason, and it costs
-  // one indexed lookup on a row the page has already displayed.
-  if (input.suspended) {
-    const blocked = await isSuperAdministrator(input.externalId);
-    if (blocked) {
-      return {
-        ok: false,
-        message:
-          "This is a Google super administrator, and the portal's delegated role cannot change one. Suspend it in the Google Admin console, or remove the super administrator role there first.",
-      };
-    }
-  }
-
   const result = await applyWorkspaceSuspension({
     externalId: input.externalId,
     suspended: input.suspended,
@@ -835,11 +828,14 @@ export async function setWorkspaceAccountSuspension(input: {
   return result;
 }
 
+const SUPER_ADMIN_REFUSAL =
+  "This is a Google super administrator, and the portal's delegated role cannot change one. Do it in the Google Admin console, or remove the super administrator role there first.";
+
 /**
  * Read from the portal's own copy rather than from Google. The directory has
  * already been synced to display the row being acted on, so asking Google again
  * would add a request that can fail for its own reasons — and a stale answer
- * here fails safe: it refuses a suspension Google would have refused anyway.
+ * here fails safe: it refuses a change Google would have refused anyway.
  */
 async function isSuperAdministrator(externalId: string) {
   const supabase = await createClient();

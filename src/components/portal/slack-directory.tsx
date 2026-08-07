@@ -306,7 +306,7 @@ export function SlackDirectory({
           <div className="mt-8 overflow-x-auto">
             <table className="w-full min-w-[58rem] border-collapse">
               <caption className="sr-only">
-                Slack accounts with no matching person in the portal, what each
+                Slack accounts with no matching person in the portal, what
                 account type each is in Slack, and whether it is still active
               </caption>
               <thead>
@@ -410,7 +410,7 @@ export function SlackDirectory({
           <div className="mt-8 overflow-x-auto">
             <table className="w-full min-w-[62rem] border-collapse">
               <caption className="sr-only">
-                Slack accounts linked to a person in the portal, what each
+                Slack accounts linked to a person in the portal, what
                 account type each is in Slack, and whether it is still active
               </caption>
               <thead>

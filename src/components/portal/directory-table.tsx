@@ -213,15 +213,19 @@ export function CheckboxOption({
 }) {
   return (
     <label className="flex cursor-pointer items-center gap-3 py-2 text-sm font-medium">
+      {/* The real checkbox is the focusable element but is visually hidden, so
+          without this the box a sighted keyboard user is looking at never moves
+          — they tab through a filter menu with no idea which option they are
+          on. `peer` lets the drawn box answer for the input it stands in for. */}
       <input
         checked={checked}
-        className="sr-only"
+        className="peer sr-only"
         onChange={onChange}
         type="checkbox"
       />
       <span
         aria-hidden="true"
-        className={`flex size-5 shrink-0 items-center justify-center rounded-[0.35rem] border-2 border-moody ${checked ? "bg-moody text-egg" : "bg-transparent text-transparent"}`}
+        className={`flex size-5 shrink-0 items-center justify-center rounded-[0.35rem] border-2 border-moody peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-moody ${checked ? "bg-moody text-egg" : "bg-transparent text-transparent"}`}
       >
         <span className="material-symbols-outlined text-[0.9rem] font-bold">
           check

@@ -124,14 +124,12 @@ function sortAccounts(
 }
 
 /**
- * A super administrator cannot be suspended from here. The portal's service
- * account holds a delegated role, and Google refuses a delegated role any
- * change to a super administrator — so the button is disabled rather than left
- * to fail, and it says why on hover instead of after the click.
- *
- * Only suspending is blocked. Reactivating one is refused by Google too, but a
- * super administrator that is already suspended is a state worth being able to
- * try to leave.
+ * A super administrator cannot be changed from here at all. The portal's
+ * service account holds a delegated role, and Google refuses a delegated role
+ * any change to a super administrator — suspending one and reactivating one
+ * alike. So the button is disabled in both directions rather than left to fail,
+ * and it says why on hover instead of after the click. The server action
+ * refuses the same thing, because a disabled button is a hint and not a guard.
  */
 function SuspensionButton({
   account,
@@ -142,7 +140,7 @@ function SuspensionButton({
   busy: boolean;
   onClick: () => void;
 }) {
-  const blocked = !account.suspended && account.adminRole === "super_admin";
+  const blocked = account.adminRole === "super_admin";
 
   return (
     <button
@@ -153,7 +151,7 @@ function SuspensionButton({
       onClick={onClick}
       title={
         blocked
-          ? "A Google super administrator cannot be suspended from the portal. Do it in the Admin console."
+          ? "A Google super administrator cannot be changed from the portal. Do it in the Admin console."
           : undefined
       }
       type="button"
@@ -624,9 +622,15 @@ export function WorkspaceDirectory({
                 Suspending it removes whatever that role was being used for.
               </p>
             )}
-          {!pendingAccount.suspended && pendingAccount.lastLoginAt && (
+          {/* "Never" is the strongest signal of the three, so suppressing it
+              when the timestamp is null threw away the reason this is here.
+              An account nobody has ever signed in to is either abandoned or
+              brand new, and both are worth pausing over. */}
+          {!pendingAccount.suspended && (
             <p className="mt-3 opacity-65">
-              Last signed in {lastSignInLabel(pendingAccount)}.
+              {pendingAccount.lastLoginAt
+                ? `Last signed in ${lastSignInLabel(pendingAccount)}.`
+                : "Nobody has ever signed in to this account."}
             </p>
           )}
         </ConfirmDialog>
