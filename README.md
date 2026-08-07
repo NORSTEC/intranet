@@ -172,19 +172,42 @@ it is the local stack: `pnpm dev:all` gives every developer a full portal
 against a database built from the same migrations, which is a better review
 environment than a shared preview would have been anyway.
 
-The path to changing this is a second Supabase project for previews to point at
-— either a free one in its own organization, or Supabase's branching feature,
-which creates a throwaway database per pull request and is billed for as long
-as each one lives. Neither is needed at three developers. When one of them is,
-delete `vercel.json` and add the preview-scoped variables in Vercel.
+The path to changing this is a second database for previews to point at. Either
+a free Supabase project — the free plan allows two per organization and this
+one uses one — or Supabase's branching feature, which creates a throwaway
+database per pull request and bills for as long as each lives. Both were
+considered and neither is worth it at three developers: a single shared preview
+database has one schema, and with schema changes arriving as often as they do
+here, half the pull requests would render against a schema that is not theirs.
+When that calculation changes, delete `vercel.json` and add the preview-scoped
+variables in Vercel.
 
-The `Supabase Preview` check that appears on every pull request and reports
-`skipped` is the branching feature reporting that it is switched off. Skipped
-checks block nothing. To be rid of the row, disconnect the GitHub integration
-under **Project Settings → Integrations** in the Supabase dashboard — but leave
-`SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID` alone. Those belong to
-`migrate.yml`, which is a different mechanism and still the one that migrates
-production.
+#### The three things called "environment"
+
+Vercel, GitHub and Supabase all use the word, and they mean different things by
+it. Most of the confusion about what is deployed where comes from assuming they
+line up.
+
+| | What an "environment" is there | What exists here |
+| --- | --- | --- |
+| **Vercel** | a filter on variables — which ones a given build receives | Production holds all of them. Preview and Development hold none |
+| **GitHub** | a box of secrets with rules about which branches may reach it | `Production` holds the two migration secrets and admits only `main`. `Preview` is empty |
+| **Supabase** | nothing. One project is one database | one project |
+
+Supabase has no environments at all unless branching is switched on, which is
+the reason there was never anywhere for a preview to point.
+
+Two leftovers appear in the interfaces and mean nothing. GitHub's `Preview`
+environment was created by Vercel's bot and holds no secrets and no rules; it
+can be deleted under **Settings → Environments** or left alone. The `Supabase
+Preview` check that reports `skipped` on every pull request is the branching
+feature saying it is switched off; skipped checks block nothing, and the row
+goes away by disconnecting the GitHub integration under **Project Settings →
+Integrations** in the Supabase dashboard.
+
+Leave `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID` where they are. They
+belong to `migrate.yml`, which is a different mechanism and still the one that
+migrates production.
 
 ## Repository setup
 
