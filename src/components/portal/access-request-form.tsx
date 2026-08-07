@@ -24,18 +24,25 @@ const requestTypes = [
 export function AccessRequestForm({
   errorMessage,
   firstName,
+  isReturningMember,
   lastName,
   organizations,
+  provenOrganization,
   studyYear,
 }: {
   errorMessage?: string;
   firstName: string;
+  isReturningMember?: boolean;
   lastName: string;
   organizations: Organization[];
+  provenOrganization?: Organization | null;
   studyYear: number | null;
 }) {
+  // Arriving with an organization account already answers the first question
+  // the form asks, and for somebody who was a member before, an empty form
+  // reads as the portal having forgotten them.
   const [requestType, setRequestType] = useState<"alumni" | "organization">(
-    "alumni",
+    provenOrganization ? "organization" : "alumni",
   );
   const isOrganizationRequest = requestType === "organization";
 
@@ -48,6 +55,21 @@ export function AccessRequestForm({
         <p className="text-sm text-[#a33b2b] sm:col-span-2" role="alert">
           {errorMessage}
         </p>
+      )}
+
+      {provenOrganization && (
+        <section className="portal-surface border-copper p-5 sm:col-span-2 sm:p-6">
+          <h2 className="text-h3">
+            {isReturningMember
+              ? `You were a member of ${provenOrganization.name}`
+              : `${provenOrganization.name} reviews who joins`}
+          </h2>
+          <p className="mt-3 max-w-[65ch] text-sm leading-relaxed opacity-65">
+            {isReturningMember
+              ? `That membership has ended, so an administrator has to approve you again before you get back in. ${provenOrganization.name} is selected below.`
+              : `Signing in with one of its Google accounts is not enough on its own there. ${provenOrganization.name} is selected below — send the request and an administrator decides.`}
+          </p>
+        </section>
       )}
 
       <fieldset className="grid gap-3 sm:col-span-2">
@@ -125,19 +147,22 @@ export function AccessRequestForm({
 
       {isOrganizationRequest && (
         <>
-          <div className="flex items-start gap-3 text-sm leading-relaxed opacity-65 sm:col-span-2">
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined mt-0.5 shrink-0 text-base"
-            >
-              info
-            </span>
-            <p>
-              If your organization gave you an organization email address,
-              sign in with that Google account instead — it grants access
-              right away, with no approval needed.
-            </p>
-          </div>
+          {!provenOrganization && (
+            <div className="flex items-start gap-3 text-sm leading-relaxed opacity-65 sm:col-span-2">
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined mt-0.5 shrink-0 text-base"
+              >
+                info
+              </span>
+              <p>
+                If your organization gave you an organization email address,
+                sign in with that Google account instead. Some organizations let
+                you straight in that way; the rest still review the request, but
+                they know the account is theirs.
+              </p>
+            </div>
+          )}
           <label className="grid gap-2 sm:col-span-2">
             <span className="section-label opacity-45">
               Organization{" "}
@@ -147,7 +172,7 @@ export function AccessRequestForm({
             </span>
             <select
               className="portal-field"
-              defaultValue=""
+              defaultValue={provenOrganization?.id ?? ""}
               name="organizationId"
               required
             >

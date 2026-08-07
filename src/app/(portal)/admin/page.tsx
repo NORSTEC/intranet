@@ -14,6 +14,13 @@ const sections = [
   },
   {
     description:
+      "Which email domains belong to which organization, and whether an account on one joins straight away or has to ask.",
+    href: "/admin/organizations",
+    icon: "domain",
+    title: "Organizations and joining",
+  },
+  {
+    description:
       "Every account in the norstec.no Google Workspace, and which of them belong to nobody in the portal.",
     href: "/admin/workspace",
     icon: "cloud",

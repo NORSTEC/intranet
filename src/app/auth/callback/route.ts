@@ -68,6 +68,32 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/onboarding/account", requestUrl.origin));
   }
 
+  // The trigger on auth.users fires on inserts and on changes to the email,
+  // its confirmation or the app metadata — never on an ordinary repeat
+  // sign-in. That was enough while a matching domain was a fact about the
+  // account. It is not enough now that joining is a policy an administrator
+  // can change, so the decision is asked for here, on every sign-in. It is the
+  // same function the trigger calls, and it is idempotent.
+  const { data: joinResult, error: joinError } = await supabase.rpc(
+    "apply_own_domain_join",
+  );
+
+  // Treating a failed decision as an empty one would send somebody the policy
+  // admits straight to the request page, where they would ask for access they
+  // already had. Signing in again is the recovery, so the sign-in error is the
+  // honest answer.
+  if (joinError) {
+    return NextResponse.redirect(
+      new URL("/login?error=authorization", requestUrl.origin),
+    );
+  }
+
+  const join = (joinResult ?? {}) as {
+    outcome?: string;
+    organizationSlug?: string;
+    returning?: boolean;
+  };
+
   const { data: membership, error: membershipError } = await supabase
     .from("memberships")
     .select("id")
@@ -84,7 +110,21 @@ export async function GET(request: Request) {
   // sending them to /access would only bounce them straight back to the portal.
   const hasPortalAccess = Boolean(membership) || Boolean(person.alumni_access_granted_at);
 
-  return NextResponse.redirect(
-    new URL(hasPortalAccess ? "/" : "/access", requestUrl.origin),
-  );
+  if (hasPortalAccess) {
+    return NextResponse.redirect(new URL("/", requestUrl.origin));
+  }
+
+  // A proven organization account that still needs approval carries the answer
+  // to the first question the request form asks. Somebody who was a member
+  // before meets an empty form otherwise, and reads it as the portal having
+  // forgotten them.
+  const accessUrl = new URL("/access", requestUrl.origin);
+  if (join.outcome === "request" && join.organizationSlug) {
+    accessUrl.searchParams.set("organization", join.organizationSlug);
+    if (join.returning) {
+      accessUrl.searchParams.set("returning", "true");
+    }
+  }
+
+  return NextResponse.redirect(accessUrl);
 }

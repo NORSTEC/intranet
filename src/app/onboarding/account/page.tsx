@@ -47,8 +47,10 @@ export default async function AccountOnboardingPage({
             member record. Article 13 asks for that to be said where the
             choice is made. */}
         <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-45">
-          Both choices give you a membership in the organization that owns this
-          email domain, and put your name in its member directory.{" "}
+          If that organization admits its own Google accounts without review,
+          either choice gives you a membership and puts your name in its member
+          directory. If it reviews them, you are taken to a request instead, and
+          an administrator decides.{" "}
           <a
             className="legal-link"
             href="/privacy"

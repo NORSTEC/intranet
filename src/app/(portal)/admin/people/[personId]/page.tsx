@@ -7,6 +7,7 @@ import {
 import {
   PersonAdminActions,
   type MergeCandidate,
+  type PersonAddress,
   type PersonSignInAccount,
 } from "@/components/portal/person-admin-actions";
 import { PersonAuditFeed } from "@/components/portal/person-audit-feed";
@@ -272,6 +273,28 @@ export default async function PortalPersonPage({
       isOnboarding: account.onboarding_status === "pending",
     }),
   );
+  // One list rather than two, because the two operations are ordered: an
+  // address cannot be removed while an account still signs in with it. An
+  // account whose address is not on the profile — the conflict a Workspace
+  // rename can leave behind — still has to be reachable, so it appears as its
+  // own row rather than disappearing.
+  const accountByEmail = new Map(
+    personAccounts.map((account) => [account.email, account]),
+  );
+  const personAddresses: PersonAddress[] = [
+    ...emails.map((email) => ({
+      account: accountByEmail.get(email.email) ?? null,
+      email: email.email,
+      isPrimary: email.is_primary,
+    })),
+    ...personAccounts
+      .filter((account) => !emails.some((email) => email.email === account.email))
+      .map((account) => ({
+        account,
+        email: account.email,
+        isPrimary: false,
+      })),
+  ];
   const lastSignInAt = person.portal_accounts
     .map((account) => account.last_seen_at)
     .sort()
@@ -432,7 +455,7 @@ export default async function PortalPersonPage({
         isPortalAdmin={Boolean(person.portal_administrators)}
         isSelf={isSelf}
         mergeCandidates={mergeCandidates}
-        personAccounts={personAccounts}
+        personAddresses={personAddresses}
         personEmails={emails.map((email) => email.email)}
         personId={person.id}
         personName={name}

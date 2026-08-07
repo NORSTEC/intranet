@@ -44,10 +44,19 @@ function scopeLabel(request: AccessRequest) {
 export default async function AccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; withdrawn?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    organization?: string;
+    returning?: string;
+    withdrawn?: string;
+  }>;
 }) {
   const access = await getPortalAccess();
-  const { error, withdrawn } = await searchParams;
+  const {
+    error,
+    organization: provenOrganizationSlug,
+    withdrawn,
+  } = await searchParams;
 
   if (access.status === "unauthenticated") {
     redirect("/login");
@@ -92,7 +101,54 @@ export default async function AccessPage({
     redirect("/login?error=authorization");
   }
 
-  const organizations = (organizationsResult.data ?? []) as Organization[];
+  // The sign-in callback names the organization whose Workspace this account
+  // proved it belongs to. Norstec is kept out of the list on purpose — nobody
+  // asks their way into it — but a Norstec account that needs approval anyway,
+  // because the membership behind it ended, has to be able to ask for the one
+  // organization it is actually about. So the named organization joins the
+  // list whether or not the list would otherwise carry it.
+  //
+  // The parameter only ever selects an organization. Nothing the page says
+  // about the person rests on it: anybody can type it, and a page that read a
+  // claim about somebody out of their own URL would be telling them what they
+  // just told it. Whether they were a member here before is asked of the
+  // database below.
+  const provenOrganization = provenOrganizationSlug
+    ? ((
+        await supabase
+          .from("organizations")
+          .select("id, name")
+          .eq("slug", provenOrganizationSlug)
+          .eq("status", "active")
+          .maybeSingle()
+      ).data as Organization | null)
+    : null;
+
+  const isReturningMember = provenOrganization
+    ? Boolean(
+        (
+          await supabase
+            .from("memberships")
+            .select("id")
+            .eq("person_id", access.profile.personId)
+            .eq("organization_id", provenOrganization.id)
+            .eq("status", "ended")
+            .limit(1)
+            .maybeSingle()
+        ).data,
+      )
+    : false;
+
+  const listedOrganizations = (organizationsResult.data ?? []) as Organization[];
+  const organizations =
+    provenOrganization &&
+    !listedOrganizations.some(
+      (candidate) => candidate.id === provenOrganization.id,
+    )
+      ? [...listedOrganizations, provenOrganization].sort((left, right) =>
+          left.name.localeCompare(right.name),
+        )
+      : listedOrganizations;
   const latestRequest = requestsResult.data as AccessRequest | null;
   // Only a pending request is ever read here. A declined one cannot reach this
   // page: the decision discards the applicant's profile, and the request row
@@ -170,8 +226,10 @@ export default async function AccessPage({
             <AccessRequestForm
               errorMessage={error ? errorMessages[error] : undefined}
               firstName={access.profile.firstName ?? ""}
+              isReturningMember={isReturningMember}
               lastName={access.profile.lastName ?? ""}
               organizations={organizations}
+              provenOrganization={provenOrganization}
               studyYear={access.profile.studyYear}
             />
           </>
