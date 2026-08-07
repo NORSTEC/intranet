@@ -139,6 +139,7 @@ export default async function SlackAccountsPage() {
     <>
       <p className="max-w-2xl text-sm opacity-55">
         What the Norstec Slack workspace contains, and how much of it the portal recognises.
+        Account type and account status are both Slack’s own, and neither says anything about portal access.
       </p>
 
       <div className="mt-10">

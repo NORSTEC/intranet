@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
+  CheckboxOption,
+  FilterMenu,
   Pagination,
   usePagination,
 } from "@/components/portal/directory-table";
@@ -40,60 +42,11 @@ function statusLabel(status: DirectoryStatus) {
   return status === "active" ? "Active" : "Alumni";
 }
 
-export function CheckboxOption({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  onChange: () => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-3 py-2 text-sm font-medium">
-      <input
-        checked={checked}
-        className="sr-only"
-        onChange={onChange}
-        type="checkbox"
-      />
-      <span
-        aria-hidden="true"
-        className={`flex size-5 shrink-0 items-center justify-center rounded-[0.35rem] border-2 border-moody ${checked ? "bg-moody text-egg" : "bg-transparent text-transparent"}`}
-      >
-        <span className="material-symbols-outlined text-[0.9rem] font-bold">
-          check
-        </span>
-      </span>
-      <span>{label}</span>
-    </label>
-  );
-}
-
-export function FilterMenu({
-  children,
-  icon,
-  label,
-}: {
-  children: React.ReactNode;
-  icon: string;
-  label: string;
-}) {
-  return (
-    <details className="group relative">
-      <summary className="portal-button list-none [&::-webkit-details-marker]:hidden">
-        <span className="material-symbols-outlined text-[1.15rem]">{icon}</span>
-        {label}
-        <span className="material-symbols-outlined text-[1.05rem] transition-transform group-open:rotate-180">
-          keyboard_arrow_down
-        </span>
-      </summary>
-      <div className="portal-surface absolute left-0 top-[calc(100%+0.5rem)] z-30 min-w-60 p-4">
-        {children}
-      </div>
-    </details>
-  );
-}
+// Re-exported so every existing `from "@/components/portal/members-directory"`
+// import keeps working. The components themselves moved to `directory-table`,
+// which needed them for `CheckboxFilterMenu` and cannot import this file
+// without creating a cycle — this file already imports from that one.
+export { CheckboxOption, FilterMenu } from "@/components/portal/directory-table";
 
 export function MembersDirectory({
   currentPersonId,

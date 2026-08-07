@@ -70,7 +70,7 @@ const breadcrumbLabels: Record<string, string> = {
   deleted: "Deleted people",
   members: "Members",
   people: "Manage people",
-  workspace: "Workspace accounts",
+  workspace: "Google accounts",
   organization: "Organization",
   organizations: "Organizations",
   profile: "Profile",

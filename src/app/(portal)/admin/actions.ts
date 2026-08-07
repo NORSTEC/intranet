@@ -195,8 +195,10 @@ export async function syncWorkspaceDirectory(): Promise<PortalManagementResult> 
   const { data, error } = await supabase.rpc("sync_workspace_directory", {
     p_accounts: accounts.map((account) => ({
       accountEmail: account.primaryEmail,
+      adminRole: account.adminRole,
       displayName: account.displayName,
       externalId: account.id,
+      lastLoginAt: account.lastLoginAt,
       suspended: account.suspended,
     })),
   });
@@ -718,6 +720,15 @@ async function applyWorkspaceSuspension(input: {
     return { ok: false, message: "This person has no Norstec account." };
   }
 
+  // Google refuses a delegated role any change to a super administrator, in
+  // either direction, so the portal cannot suspend one and cannot reactivate
+  // one either. Checked here rather than in the callers: five paths reach this
+  // function — the directory screen, portal access changing in step, deletion,
+  // restoration — and a guard on one of them is a guard on none.
+  if (await isSuperAdministrator(input.externalId)) {
+    return { ok: false, message: SUPER_ADMIN_REFUSAL };
+  }
+
   try {
     await setWorkspaceUserSuspended(input.externalId, input.suspended);
   } catch (error) {
@@ -815,4 +826,29 @@ export async function setWorkspaceAccountSuspension(input: {
   revalidatePath("/admin/workspace");
   revalidatePath("/admin/people");
   return result;
+}
+
+const SUPER_ADMIN_REFUSAL =
+  "This is a Google super administrator, and the portal's delegated role cannot change one. Do it in the Google Admin console, or remove the super administrator role there first.";
+
+/**
+ * Read from the portal's own copy rather than from Google. The directory has
+ * already been synced to display the row being acted on, so asking Google again
+ * would add a request that can fail for its own reasons — and a stale answer
+ * here fails safe: it refuses a change Google would have refused anyway.
+ */
+async function isSuperAdministrator(externalId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("external_accounts")
+    .select("provider_details")
+    .eq("provider", "google_workspace")
+    .eq("external_id", externalId)
+    .maybeSingle();
+
+  const details = data?.provider_details;
+  if (!details || typeof details !== "object") return false;
+  return (
+    (details as Record<string, unknown>).adminRole === "super_admin"
+  );
 }

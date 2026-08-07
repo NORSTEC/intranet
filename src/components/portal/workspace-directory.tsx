@@ -8,6 +8,7 @@ import {
 } from "@/app/(portal)/admin/actions";
 import { ConfirmDialog } from "@/components/portal/confirm-dialog";
 import {
+  CheckboxFilterMenu,
   formatDateTime,
   Pagination,
   SearchField,
@@ -17,10 +18,6 @@ import {
 } from "@/components/portal/directory-table";
 import { MemberAvatar } from "@/components/portal/member-avatar";
 import {
-  CheckboxOption,
-  FilterMenu,
-} from "@/components/portal/members-directory";
-import {
   SortableTableHeader,
   type TableSortDirection,
 } from "@/components/portal/sortable-table-header";
@@ -28,45 +25,77 @@ import { Toast } from "@/components/portal/toast";
 
 export type WorkspaceDirectoryRow = {
   accountEmail: string;
+  adminRole: "delegated_admin" | "member" | "super_admin";
   adminUrl: string;
   avatarUrl?: string;
   displayName: string | null;
   externalId: string;
+  /** ISO timestamp, or null for an account nobody has ever signed in to. */
+  lastLoginAt: string | null;
   personId: number | null;
   personName: string | null;
   suspended: boolean;
 };
 
-type SortKey = "account" | "person" | "suspended";
+type SortKey = "account" | "accountType" | "person" | "suspended";
 
-// "Status" already means something else in this portal — active or alumni, a
-// fact about membership. Google's own state is a single flag, so it is shown
-// as one rather than borrowed into a word that would then mean two things in
-// the same table.
-function suspendedLabel(suspended: boolean) {
-  return suspended ? "Yes" : "No";
+// Google's own words, ordered by how much a row deserves a second look. A
+// super administrator is also flagged as a delegated one, so the stronger
+// answer has to win — see the parser in `lib/google/workspace.ts`.
+const adminRoleOptions = ["super_admin", "delegated_admin", "member"] as const;
+
+type AdminRole = (typeof adminRoleOptions)[number];
+
+const adminRoleLabels: Record<AdminRole, string> = {
+  delegated_admin: "Delegated admin",
+  member: "Member",
+  super_admin: "Super admin",
+};
+
+function adminRoleLabel(account: WorkspaceDirectoryRow) {
+  return adminRoleLabels[account.adminRole];
 }
 
-// Two values, so the filter is the same shape as every other one in the portal
-// rather than a checkbox that reads as an on/off switch for the whole table.
-const suspensionOptions = ["suspended", "active"] as const;
+/**
+ * The fact the unmatched table was missing. An account nobody has signed in to
+ * for years is the one worth cleaning up; an account nobody signs in *as* but
+ * something depends on — `web@norstec.no` runs this portal's own deployments —
+ * has a recent sign-in, and that is the signal telling the two apart. It used
+ * to require opening the Admin console in another tab.
+ */
+function lastSignInLabel(account: WorkspaceDirectoryRow) {
+  if (!account.lastLoginAt) return "Never";
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(account.lastLoginAt));
+}
+
+// Google's own words, and the same column the Slack report calls Account
+// status — one shape for both providers, so an administrator reading the two
+// screens is answering the same question twice rather than two questions.
+// Plain "Status" is still avoided: on its own it means membership in this
+// portal, which is a different fact entirely.
+function suspendedLabel(suspended: boolean) {
+  return suspended ? "Suspended" : "Active";
+}
+
+const suspensionOptions = ["active", "suspended"] as const;
 
 type SuspensionFilter = (typeof suspensionOptions)[number];
 
 const suspensionLabels: Record<SuspensionFilter, string> = {
-  active: "Not suspended",
+  active: "Active",
   suspended: "Suspended",
 };
-
-function suspensionFilterLabel(selected: SuspensionFilter[]) {
-  if (selected.length === suspensionOptions.length) return "Suspended: All";
-  if (selected.length === 0) return "Suspended: None";
-  return `Suspended: ${suspensionLabels[selected[0]]}`;
-}
 
 function sortValue(account: WorkspaceDirectoryRow, key: SortKey) {
   if (key === "person") return account.personName ?? "";
   if (key === "suspended") return suspendedLabel(account.suspended);
+  if (key === "accountType") {
+    return String(adminRoleOptions.indexOf(account.adminRole));
+  }
   return account.accountEmail;
 }
 
@@ -77,37 +106,11 @@ function matchesSuspension(
   return selected.includes(account.suspended ? "suspended" : "active");
 }
 
-function toggleSuspension(
-  selected: SuspensionFilter[],
-  value: SuspensionFilter,
+function matchesAdminRole(
+  account: WorkspaceDirectoryRow,
+  selected: AdminRole[],
 ) {
-  return selected.includes(value)
-    ? selected.filter((candidate) => candidate !== value)
-    : [...selected, value];
-}
-
-function SuspensionFilterMenu({
-  onChange,
-  selected,
-}: {
-  onChange: (selected: SuspensionFilter[]) => void;
-  selected: SuspensionFilter[];
-}) {
-  return (
-    <FilterMenu icon="filter_alt" label={suspensionFilterLabel(selected)}>
-      <fieldset>
-        <legend className="section-label mb-2 opacity-45">Suspended</legend>
-        {suspensionOptions.map((option) => (
-          <CheckboxOption
-            checked={selected.includes(option)}
-            key={option}
-            label={suspensionLabels[option]}
-            onChange={() => onChange(toggleSuspension(selected, option))}
-          />
-        ))}
-      </fieldset>
-    </FilterMenu>
-  );
+  return selected.includes(account.adminRole);
 }
 
 function sortAccounts(
@@ -120,28 +123,43 @@ function sortAccounts(
   );
 }
 
+/**
+ * A super administrator cannot be changed from here at all. The portal's
+ * service account holds a delegated role, and Google refuses a delegated role
+ * any change to a super administrator — suspending one and reactivating one
+ * alike. So the button is disabled in both directions rather than left to fail,
+ * and it says why on hover instead of after the click. The server action
+ * refuses the same thing, because a disabled button is a hint and not a guard.
+ */
 function SuspensionButton({
+  account,
   busy,
   onClick,
-  suspended,
 }: {
+  account: WorkspaceDirectoryRow;
   busy: boolean;
   onClick: () => void;
-  suspended: boolean;
 }) {
+  const blocked = account.adminRole === "super_admin";
+
   return (
     <button
       className={`portal-button whitespace-nowrap ${
-        suspended ? "portal-button-primary" : "portal-button-danger"
+        account.suspended ? "portal-button-primary" : "portal-button-danger"
       }`}
-      disabled={busy}
+      disabled={busy || blocked}
       onClick={onClick}
+      title={
+        blocked
+          ? "A Google super administrator cannot be changed from the portal. Do it in the Admin console."
+          : undefined
+      }
       type="button"
     >
       <span aria-hidden="true" className="material-symbols-outlined text-[1.1rem]">
-        {suspended ? "lock_open" : "lock"}
+        {account.suspended ? "lock_open" : "lock"}
       </span>
-      {suspended ? "Activate account" : "Suspend account"}
+      {account.suspended ? "Activate account" : "Suspend account"}
     </button>
   );
 }
@@ -190,6 +208,12 @@ export function WorkspaceDirectory({
     useState<SuspensionFilter[]>([...suspensionOptions]);
   const [matchedSuspension, setMatchedSuspension] =
     useState<SuspensionFilter[]>([...suspensionOptions]);
+  const [unmatchedAdminRoles, setUnmatchedAdminRoles] = useState<AdminRole[]>([
+    ...adminRoleOptions,
+  ]);
+  const [matchedAdminRoles, setMatchedAdminRoles] = useState<AdminRole[]>([
+    ...adminRoleOptions,
+  ]);
   const [pendingAccount, setPendingAccount] =
     useState<WorkspaceDirectoryRow | null>(null);
   const [toast, setToast] = useState<{
@@ -211,6 +235,7 @@ export function WorkspaceDirectory({
         (account) =>
           account.personId === null &&
           matchesSuspension(account, unmatchedSuspension) &&
+          matchesAdminRole(account, unmatchedAdminRoles) &&
           (!normalized ||
             account.accountEmail.toLocaleLowerCase("en").includes(normalized) ||
             account.displayName?.toLocaleLowerCase("en").includes(normalized)),
@@ -220,6 +245,7 @@ export function WorkspaceDirectory({
     );
   }, [
     accounts,
+    unmatchedAdminRoles,
     unmatchedQuery,
     unmatchedSort.sortDirection,
     unmatchedSort.sortKey,
@@ -233,6 +259,7 @@ export function WorkspaceDirectory({
         (account) =>
           account.personId !== null &&
           matchesSuspension(account, matchedSuspension) &&
+          matchesAdminRole(account, matchedAdminRoles) &&
           (!normalized ||
             account.accountEmail.toLocaleLowerCase("en").includes(normalized) ||
             account.personName?.toLocaleLowerCase("en").includes(normalized)),
@@ -242,6 +269,7 @@ export function WorkspaceDirectory({
     );
   }, [
     accounts,
+    matchedAdminRoles,
     matchedQuery,
     matchedSort.sortDirection,
     matchedSort.sortKey,
@@ -323,8 +351,22 @@ export function WorkspaceDirectory({
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            <SuspensionFilterMenu
+            <CheckboxFilterMenu
+              icon="badge"
+              labels={adminRoleLabels}
+              legend="Account type"
+              name="Account type"
+              onChange={setUnmatchedAdminRoles}
+              options={adminRoleOptions}
+              selected={unmatchedAdminRoles}
+            />
+            <CheckboxFilterMenu
+              icon="filter_alt"
+              labels={suspensionLabels}
+              legend="Account status"
+              name="Account status"
               onChange={setUnmatchedSuspension}
+              options={suspensionOptions}
               selected={unmatchedSuspension}
             />
           </div>
@@ -338,17 +380,18 @@ export function WorkspaceDirectory({
 
         {unmatched.length > 0 ? (
           <div className="mt-8 overflow-x-auto">
-            <table className="w-full min-w-[58rem] border-collapse">
+            <table className="w-full min-w-[64rem] border-collapse">
               <caption className="sr-only">
                 Google Workspace accounts with no matching person in the portal,
-                whether each is suspended, and the actions available on it
+                what each account is in Google, its status, and the actions available on it
               </caption>
               <thead>
                 <tr>
                   {(
                     [
                       ["account", "Email"],
-                      ["suspended", "Suspended"],
+                      ["accountType", "Account type"],
+                      ["suspended", "Account status"],
                     ] as const
                   ).map(([key, heading]) => (
                     <SortableTableHeader
@@ -381,15 +424,16 @@ export function WorkspaceDirectory({
                         </span>
                       )}
                     </td>
+                    <td className="py-3 pr-5">{adminRoleLabel(account)}</td>
                     <td className="py-3 pr-5">
                       {suspendedLabel(account.suspended)}
                     </td>
                     <td className="py-3 pr-4">
                       <div className="flex flex-wrap justify-end gap-3">
                         <SuspensionButton
+                          account={account}
                           busy={busy}
                           onClick={() => setPendingAccount(account)}
-                          suspended={account.suspended}
                         />
                         <AdminConsoleLink href={account.adminUrl} />
                       </div>
@@ -422,8 +466,22 @@ export function WorkspaceDirectory({
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            <SuspensionFilterMenu
+            <CheckboxFilterMenu
+              icon="badge"
+              labels={adminRoleLabels}
+              legend="Account type"
+              name="Account type"
+              onChange={setMatchedAdminRoles}
+              options={adminRoleOptions}
+              selected={matchedAdminRoles}
+            />
+            <CheckboxFilterMenu
+              icon="filter_alt"
+              labels={suspensionLabels}
+              legend="Account status"
+              name="Account status"
               onChange={setMatchedSuspension}
+              options={suspensionOptions}
               selected={matchedSuspension}
             />
           </div>
@@ -437,17 +495,18 @@ export function WorkspaceDirectory({
 
         {matched.length > 0 ? (
           <div className="mt-8 overflow-x-auto">
-            <table className="w-full min-w-[62rem] border-collapse">
+            <table className="w-full min-w-[68rem] border-collapse">
               <caption className="sr-only">
                 Google Workspace accounts linked to a person in the portal,
-                whether each is suspended, and the actions available on it
+                what each account is in Google, its status, and the actions available on it
               </caption>
               <thead>
                 <tr>
                   {(
                     [
                       ["person", "Name"],
-                      ["suspended", "Suspended"],
+                      ["accountType", "Account type"],
+                      ["suspended", "Account status"],
                     ] as const
                   ).map(([key, heading]) => (
                     <SortableTableHeader
@@ -486,15 +545,16 @@ export function WorkspaceDirectory({
                         </span>
                       </div>
                     </td>
+                    <td className="py-3 pr-5">{adminRoleLabel(account)}</td>
                     <td className="py-3 pr-5">
                       {suspendedLabel(account.suspended)}
                     </td>
                     <td className="py-3 pr-4">
                       <div className="flex flex-wrap justify-end gap-3">
                         <SuspensionButton
+                          account={account}
                           busy={busy}
                           onClick={() => setPendingAccount(account)}
-                          suspended={account.suspended}
                         />
                         <AdminConsoleLink href={account.adminUrl} />
                         <button
@@ -551,6 +611,28 @@ export function WorkspaceDirectory({
               ? `${pendingAccount.accountEmail} can sign in to Google and to this portal again, and reaches their mail and files as before.`
               : `${pendingAccount.accountEmail} is signed out of Google everywhere and cannot sign in — to Google or to this portal. Their mail and files are kept and nothing is deleted.`}
           </p>
+          {/* Suspending an administrator takes the Admin console away from
+              whoever was using it, which is not obvious from an address. Said
+              here rather than in the table, because this is the moment it
+              changes what somebody should do. */}
+          {!pendingAccount.suspended &&
+            pendingAccount.adminRole === "delegated_admin" && (
+              <p className="mt-3 font-medium">
+                This account holds a delegated administrator role in Google.
+                Suspending it removes whatever that role was being used for.
+              </p>
+            )}
+          {/* "Never" is the strongest signal of the three, so suppressing it
+              when the timestamp is null threw away the reason this is here.
+              An account nobody has ever signed in to is either abandoned or
+              brand new, and both are worth pausing over. */}
+          {!pendingAccount.suspended && (
+            <p className="mt-3 opacity-65">
+              {pendingAccount.lastLoginAt
+                ? `Last signed in ${lastSignInLabel(pendingAccount)}.`
+                : "Nobody has ever signed in to this account."}
+            </p>
+          )}
         </ConfirmDialog>
       )}
     </>

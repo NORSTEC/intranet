@@ -40,9 +40,22 @@ export class WorkspaceError extends Error {
   }
 }
 
+/**
+ * Google separates the two kinds of administrator, and the distinction matters
+ * here: a delegated role cannot change a super administrator, so the portal
+ * cannot suspend one no matter who asks.
+ */
+export type WorkspaceAdminRole = "delegated_admin" | "member" | "super_admin";
+
 export type WorkspaceUser = {
+  adminRole: WorkspaceAdminRole;
   displayName: string | null;
   id: string;
+  /**
+   * ISO timestamp, or null when the account has never been signed in to.
+   * Google reports "never" as the Unix epoch rather than by omitting the field.
+   */
+  lastLoginAt: string | null;
   primaryEmail: string;
   suspended: boolean;
 };
@@ -170,6 +183,19 @@ async function directoryRequest(
   return payload;
 }
 
+/**
+ * An account nobody has ever signed in to comes back as the Unix epoch rather
+ * than as a missing field. Read literally that is a sign-in in 1970, which
+ * would sort to the top of "least recently used" and read as the most
+ * abandoned account in the directory — when it is usually the newest one.
+ */
+function lastLoginFrom(value: unknown) {
+  if (typeof value !== "string" || value.length === 0) return null;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed) || parsed <= 0) return null;
+  return new Date(parsed).toISOString();
+}
+
 function toWorkspaceUser(payload: unknown): WorkspaceUser {
   const record = (payload ?? {}) as Record<string, unknown>;
   const id = typeof record.id === "string" ? record.id : null;
@@ -183,11 +209,21 @@ function toWorkspaceUser(payload: unknown): WorkspaceUser {
   const name = (record.name ?? {}) as Record<string, unknown>;
 
   return {
+    // Checked in this order because a super administrator is also reported as a
+    // delegated one; testing the weaker flag first would demote every super
+    // administrator in the workspace.
+    adminRole:
+      record.isAdmin === true
+        ? "super_admin"
+        : record.isDelegatedAdmin === true
+          ? "delegated_admin"
+          : "member",
     displayName:
       typeof name.fullName === "string" && name.fullName.length > 0
         ? name.fullName
         : null,
     id,
+    lastLoginAt: lastLoginFrom(record.lastLoginTime),
     primaryEmail: primaryEmail.toLocaleLowerCase("en"),
     suspended: record.suspended === true,
   };
