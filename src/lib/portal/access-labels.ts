@@ -37,24 +37,32 @@ export const accessLevelLabels: Record<RegistryAccessLevel, string> = {
 export function deriveAccessLevel({
   hasActiveMembership,
   hasAlumniAccess,
+  hasEndedMembership,
   isOrganizationAdmin,
   isPortalAdmin,
   isSuspended,
 }: {
   hasActiveMembership: boolean;
   hasAlumniAccess: boolean;
+  hasEndedMembership: boolean;
   isOrganizationAdmin: boolean;
   isPortalAdmin: boolean;
   isSuspended: boolean;
 }): RegistryAccessLevel {
   if (isSuspended) return "suspended";
   if (isPortalAdmin) return "portal_admin";
+  // Deliberately active-only, unlike the membership check below: an old
+  // administrator role is history, never current authorization.
   if (isOrganizationAdmin) return "organization_admin";
   // An alumnus reads the portal on the same terms a member does, so alumni
-  // access is member-level access. Without it, and without a membership that
-  // is still running, there is nothing to reach — "Member" was only ever the
-  // fallback branch talking.
-  if (hasActiveMembership || hasAlumniAccess) return "member";
+  // access is member-level access. An ended membership is the same thing said
+  // a different way — `is_portal_member()` and `requirePortalAccess` both
+  // admit `status in ('active', 'ended')`, so somebody whose membership ended
+  // still reads the portal, and calling that "No access" describes a person
+  // who is signing in right now as somebody who cannot.
+  if (hasActiveMembership || hasEndedMembership || hasAlumniAccess) {
+    return "member";
+  }
   return "none";
 }
 

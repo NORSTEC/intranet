@@ -175,6 +175,8 @@ function sourceLabel(source: string | null) {
   if (source === "self_service") return "Requested by the person themselves";
   if (source === "database_admin") return "Database administrator";
   if (source === "retention_expiry") return "Automatic, retention period expired";
+  if (source === "withdrawal_expiry")
+    return "Automatic, access request withdrawn and never renewed";
   if (source === "access_request") return "Access request";
   return source;
 }

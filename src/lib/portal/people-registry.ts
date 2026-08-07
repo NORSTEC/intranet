@@ -86,6 +86,7 @@ export async function loadRegistryPeople(): Promise<RegistryPerson[]> {
       accessLevel: deriveAccessLevel({
         hasActiveMembership: activeMemberships.length > 0,
         hasAlumniAccess: Boolean(row.alumni_access_granted_at),
+        hasEndedMembership: endedMemberships.length > 0,
         isOrganizationAdmin,
         isPortalAdmin: Boolean(row.portal_administrators),
         isSuspended: isBlocked,
