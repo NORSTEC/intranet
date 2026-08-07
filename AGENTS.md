@@ -16,7 +16,7 @@ pnpm check       # typecheck, lint, test, build — in order
 
 pnpm db:start    # local Supabase stack in Docker
 pnpm db:reset    # rebuild the local database from every migration
-pnpm db:test     # the 162-assertion pgTAP authorization suite
+pnpm db:test     # the 217-assertion pgTAP authorization suite
 pnpm db:stop
 ```
 
@@ -70,15 +70,19 @@ means a decision that rolls back sends nothing.
 
 **A new kind is two lists that have to agree**: the check constraint on
 `private.pending_notifications` and the `templates` record in
-`src/lib/email/templates.tsx`. `drainNotifications` skips a row it has no
+`src/lib/email/templates.ts`. `drainNotifications` skips a row it has no
 template for rather than settling it, so a mismatch strands rows instead of
 losing them — but it does strand them. Adding a kind also means adding a row
 to the `emails` section of `src/app/privacy/page.tsx`, which names all three
 emails and would otherwise be untrue.
 
-Templates are JSX and rendered with `renderToStaticMarkup` because every one of
-them interpolates something a person typed. Do not rewrite them as template
-literals.
+Templates build markup through the `html` tagged template in
+`src/lib/email/templates.ts`, which escapes every interpolation — all three
+messages carry a name, an organization name or an administrator's note. Do not
+rewrite them as plain string concatenation.
+
+Their layout and copy are decided in `docs/access-decision-notification.md`,
+which predates the sender. Change that document and the templates together.
 
 ## Auth model
 

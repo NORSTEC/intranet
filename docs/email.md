@@ -82,20 +82,58 @@ account.
 
 ## Templates
 
-`src/lib/email/templates.tsx`, as JSX rendered with `renderToStaticMarkup`.
+`src/lib/email/templates.ts`. Markup goes through `html`, a tagged template
+that escapes every interpolation and passes through only fragments built the
+same way.
 
-That is a safety decision, not a stylistic one. Every message interpolates
+That is a safety decision, not a stylistic one. All three messages interpolate
 something a person typed — a full name, an organization name, an
-administrator's decision note. JSX escapes those; string concatenation would
-not, and a rewrite to template literals would look tidier and be wrong.
-`templates.test.tsx` asserts the escaping for that reason.
+administrator's decision note — and a plain string concatenation would look
+tidier and be wrong. `templates.test.ts` asserts the escaping for that reason.
+(This was JSX and `renderToStaticMarkup` first. Next refuses `react-dom/server`
+inside the graph a server action runs in.)
 
 Both an HTML and a plain-text part are built. A message with no text
 alternative is a spam signal.
 
-There is no dark-mode variant on purpose. Email clients invert mail themselves
-and disagree about how, so a design that survives only one of the two outcomes
-is worse than a plain one that survives both.
+### The design is not invented here
+
+The layout and copy of the two decision emails come from
+[access-decision-notification.md](access-decision-notification.md), which was
+designed and reviewed for an in-portal version before there was a sender. The
+membership email reuses the same shell. Change the document and the templates
+together.
+
+The visual language is the portal's own, translated into what email can do:
+
+| Portal | Email |
+| --- | --- |
+| `--color-egg` page, `--color-moody` ink | Same hex, as literals — clients resolve no custom properties |
+| `LegalShell` masthead | Logo mark plus live `NORSTEC` / `Portal` text, so it still reads with images blocked |
+| `.portal-surface` | 2px moody border, 32px radius, egg fill |
+| `.text-h2` | Barlow 300, uppercase, 30px |
+| `.section-label` | 11px, 600, `0.12em`, uppercase |
+| `.portal-button` | Pill, moody fill, egg label. Outlook drops the radius |
+| `.portal-toast` + `bg-sun` | The membership warning, border and fill unchanged |
+
+Three places where email forced a decision:
+
+- **Muted text is a solid colour, not opacity.** The portal's `opacity-55` and
+  `opacity-45` render inconsistently, and both fall under 4.5:1 anyway. The
+  tones here are mixed from the ink and the canvas — warm rather than gray,
+  because the canvas is warm — and every one passes.
+- **Barlow is requested but not relied on.** Apple Mail and iOS Mail load it;
+  Gmail and Outlook ignore webfonts entirely. The fallback is the portal's own
+  `Arial Narrow, Arial`, so the second-choice rendering is still the design.
+- **`color-scheme: light` is declared.** Otherwise Apple Mail and Outlook
+  invent their own inversion, and their guess is not the portal's dark theme.
+
+To look at one, render it to a file and open it — there is no preview route,
+and adding one would put member-shaped copy on a public URL:
+
+```bash
+node --experimental-strip-types -e "import('./src/lib/email/templates.ts').then(({renderNotification})=>console.log(renderNotification('membership_ended',{payload:{organization_name:'Orbit NTNU',ended_on:'2026-08-07',workspace_sign_in_only:true},recipientName:'Ada Lovelace',siteUrl:'https://portal.norstec.no'}).html))" > /tmp/email.html
+```
 
 ## Adding a fourth email
 
