@@ -142,10 +142,22 @@ function text(value: unknown): string | null {
 }
 
 /**
- * The same format `access/page.tsx` and the review page use — "14 Jul 2026"
- * as `en` renders it. Those two pages show these same fields to these same
- * people, so the email has no business inventing a second date format.
+ * The same format `access/page.tsx` and the review page use — "Jul 14, 2026",
+ * as `en` renders these options. Those two pages show these same fields to
+ * these same people, so the email has no business inventing a second one.
+ *
+ * The zone is pinned, and it has to be. `ended_on` arrives as a bare date like
+ * `"2026-08-07"`, which `new Date` reads as UTC midnight; rendered in a zone
+ * behind UTC that becomes "Aug 6" and the email states the wrong day. The
+ * pages above run in the reader's browser, but this runs on a server whose
+ * region is not a design decision.
+ *
+ * Oslo rather than UTC, because the readers are here: a decision made at 01:00
+ * on the 8th is the 8th to them, not the 7th. It is also the safe direction —
+ * a zone ahead of UTC cannot move a bare date backwards.
  */
+const TIME_ZONE = "Europe/Oslo";
+
 function formatMoment(value: unknown) {
   if (typeof value !== "string" || value.trim() === "") return null;
   const moment = new Date(value);
@@ -153,6 +165,7 @@ function formatMoment(value: unknown) {
   return new Intl.DateTimeFormat("en", {
     day: "numeric",
     month: "short",
+    timeZone: TIME_ZONE,
     year: "numeric",
   }).format(moment);
 }

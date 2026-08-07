@@ -20,6 +20,12 @@
 
 const ENDPOINT = "https://api.resend.com/emails";
 
+// Node's `fetch` has no default request timeout, and this call runs inside the
+// drain loop under `after()`. A connection Resend accepts and never answers
+// would hold every later notification in the same drain behind it, until the
+// platform kills the invocation.
+const TIMEOUT_MS = 10_000;
+
 // The portal is served from `portal.norstec.no` and sends from it too, so the
 // address a member is written from matches the address they visit. Sending
 // from a subdomain rather than `norstec.no` keeps this reputation separate
@@ -90,10 +96,17 @@ export async function sendEmail(message: EmailMessage) {
 
   if (!config) {
     // Not an error, and deliberately loud: this is what a developer sees
-    // instead of an email, and the address is printed so the queue can be
-    // checked without a mail client.
+    // instead of an email.
+    //
+    // The address is printed only on a developer's own machine. This branch
+    // also runs on any deployment where the key is missing — including
+    // production before it is configured — and that deployment reads the real
+    // members' addresses. A platform log store is a different retention regime
+    // from the one `src/app/privacy/page.tsx` describes for the queue, and not
+    // one a member agreed to.
     console.info(
-      `[email] not configured — would have sent "${message.subject}" to ${message.to}`,
+      `[email] not configured — would have sent "${message.subject}"` +
+        (process.env.NODE_ENV === "development" ? ` to ${message.to}` : ""),
     );
     return;
   }
@@ -114,6 +127,7 @@ export async function sendEmail(message: EmailMessage) {
         "Content-Type": "application/json",
       },
       method: "POST",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (cause) {
     throw new EmailError(

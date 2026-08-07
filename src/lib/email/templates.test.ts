@@ -147,6 +147,17 @@ describe("an approved request", () => {
     expect(email.text).toContain("An organization approved");
   });
 
+  // `formatMoment` pins Europe/Oslo. Without it these assertions pass or fail
+  // depending on where the runner sits, and a member gets an email stating the
+  // wrong day.
+  it("reads a late-evening decision as the reader's next day", () => {
+    const email = approved({
+      decided_at: "2026-08-07T23:30:00Z",
+      organization_name: "Orbit NTNU",
+    });
+    expect(email.text).toContain("Decided: Aug 8, 2026");
+  });
+
   it("shows the decision date as a field", () => {
     const email = approved({
       decided_at: "2026-08-01T12:30:00Z",
@@ -265,7 +276,9 @@ describe("an ended membership", () => {
     expect(email.text).not.toContain(warning);
   });
 
-  it("shows when it ended", () => {
+  // A bare date is UTC midnight once `new Date` has read it. Rendered in a
+  // zone behind UTC that becomes the day before, and the email is wrong.
+  it("shows when it ended, on the day it actually ended", () => {
     const email = membershipEnded({
       ended_on: "2026-08-07",
       organization_name: "Orbit NTNU",

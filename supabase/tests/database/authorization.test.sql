@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(217);
+select plan(222);
 
 insert into public.people (
   full_name,
@@ -3735,6 +3735,64 @@ from private.pending_notifications
 where recipient_email = 'turned.down@example.com';
 
 grant select on rejected_notification to authenticated;
+
+-- The queue's real protection is that none of the machinery behind it is
+-- reachable from a session. `create or replace` restores the default `execute`
+-- grant to `public`, so a later migration that recreates one of these and
+-- forgets its `revoke` hands an authenticated caller the ability to queue an
+-- arbitrary email to an arbitrary address, or to read anyone's addresses.
+-- These assertions are what notices.
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.enqueue_notification(text,bigint,text,text,jsonb)',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot queue a notification of their own'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.notification_recipient(bigint,boolean)',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot ask which address a person would be written to'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.signs_in_only_with_workspace(bigint)',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot probe how a person signs in'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.discard_stale_notifications()',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot empty the queue'
+);
+
+select is(
+  (
+    select relrowsecurity
+    from pg_class
+    join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+    where pg_namespace.nspname = 'private'
+      and pg_class.relname = 'pending_notifications'
+  ),
+  true,
+  'row level security guards the queue, not only the schema it sits in'
+);
 
 -- Draining is scoped to the person who caused the row, plus portal
 -- administrators as the only retry path. The portal holds no privileged key,

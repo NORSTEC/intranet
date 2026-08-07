@@ -36,7 +36,7 @@ export async function drainNotifications(
 
   for (const notification of data ?? []) {
     if (!isNotificationKind(notification.kind)) {
-      // The check constraint on the table and the union in `templates.tsx`
+      // The check constraint on the table and the union in `templates.ts`
       // are two lists that have to agree. If they ever stop agreeing, leave
       // the row alone rather than settling it — an unsent row is visible in
       // the queue, a wrongly deleted one is gone.
@@ -73,8 +73,10 @@ export async function drainNotifications(
     });
 
     if (settleError) {
-      // The row keeps its claim and its attempt count, so the five-minute
-      // claim timeout releases it rather than it being sent twice in a row.
+      // The row keeps its claim, so the five-minute timeout releases it and a
+      // later drain picks it up. If the send had already succeeded, that is one
+      // duplicate — the cost of settling outside the transaction that sent, and
+      // the right way round: a decision told twice beats one never told.
       console.error("[email] could not settle notification", settleError.message);
     }
   }

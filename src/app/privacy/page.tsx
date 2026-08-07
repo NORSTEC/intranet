@@ -323,8 +323,8 @@ export default function PrivacyPolicyPage() {
 
             <Section id="emails">
               <p className="mt-6 leading-relaxed">
-                The portal writes to you three times, and only when somebody has
-                decided something that changes what you can do here. There is no
+                The portal sends three kinds of email, and only when somebody
+                has decided something that changes what you can do here. There is no
                 newsletter, no announcement list, and nothing to unsubscribe
                 from — turning these off would mean not being told that your
                 access changed.
@@ -385,7 +385,7 @@ export default function PrivacyPolicyPage() {
                   [
                     "Resend",
                     "Delivers the few emails the portal sends you",
-                    "Sent from Ireland; delivery records kept in the United States",
+                    "Sent from Ireland; delivery records kept in the United States for 30 days",
                   ],
                 ]}
               />
@@ -402,8 +402,15 @@ export default function PrivacyPolicyPage() {
                 it is going to, and what the message says — which may include an
                 administrator&rsquo;s written reason for a decision. It receives
                 nothing else about you, and the portal sends no newsletters and
-                no marketing. Its delivery records are kept in the United
-                States, under the same standard contractual clauses.
+                no marketing.
+              </p>
+              <p className="mt-7 leading-relaxed">
+                Choosing Ireland decides where the message is sent from, and
+                nothing else: Resend keeps its own record of what it delivered —
+                the address, the subject, and the delivery result — in the
+                United States for 30 days, under the same standard contractual
+                clauses. NORSTEC decides what is sent and why; Resend only
+                carries it.
               </p>
             </Section>
 

@@ -58,6 +58,14 @@ A row that is sent is **deleted**, not marked. Keeping it would mean keeping a
 record that we emailed this address about a declined application, for a person
 whose profile has just been erased. The audit log already records the decision.
 
+The deletion is a second call, though, and that is the one place the queue is
+not exactly-once. `sendEmail` runs before `settle_notification`, so a send that
+succeeds and a settle that fails leaves the row claimed until the five-minute
+timeout, and the next drain sends the same message again. One duplicate is the
+accepted cost: the alternative is settling first, and then a decision could go
+untold. A member told twice is a nuisance; a member never told is the bug this
+whole file exists to prevent.
+
 ## Sending
 
 Resend, over HTTPS, from `noreply@portal.norstec.no`. No SDK — one POST to one
@@ -139,10 +147,10 @@ node --experimental-strip-types -e "import('./src/lib/email/templates.ts').then(
 
 1. Add the kind to the check constraint on `private.pending_notifications` in a
    new migration.
-2. Add it to `NotificationKind` and the `templates` record in
-   `templates.tsx` — the constraint and the union are two lists that have to
-   agree, and `drainNotifications` skips rather than settles a row it has no
-   template for, so a mismatch strands rows rather than losing them.
+2. Add it to `NotificationKind` **and** the `templates` record in
+   `src/lib/email/templates.ts` — with the constraint that is three lists which
+   have to agree, and `drainNotifications` skips rather than settles a row it
+   has no template for, so a mismatch strands rows rather than losing them.
 3. Queue it with `private.enqueue_notification` from the function that makes
    the decision, never from the server action.
 4. Make sure the action that reaches that function calls `drainNotifications`

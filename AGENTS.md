@@ -68,8 +68,9 @@ the transition is knowable only between the update and the commit, and
 counting afterwards from the action races. Queueing in the transaction also
 means a decision that rolls back sends nothing.
 
-**A new kind is two lists that have to agree**: the check constraint on
-`private.pending_notifications` and the `templates` record in
+**A new kind is three contracts that have to agree**: the check constraint on
+`private.pending_notifications`, the `NotificationKind` union, and the
+`templates` record in
 `src/lib/email/templates.ts`. `drainNotifications` skips a row it has no
 template for rather than settling it, so a mismatch strands rows instead of
 losing them — but it does strand them. Adding a kind also means adding a row
