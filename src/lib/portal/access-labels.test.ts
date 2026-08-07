@@ -13,6 +13,7 @@ describe("deriveAccessLevel", () => {
   const base = {
     hasActiveMembership: false,
     hasAlumniAccess: false,
+    hasEndedMembership: false,
     isOrganizationAdmin: false,
     isPortalAdmin: false,
     isSuspended: false,
@@ -54,6 +55,15 @@ describe("deriveAccessLevel", () => {
 
   it("gives a plain active member access", () => {
     expect(deriveAccessLevel({ ...base, hasActiveMembership: true })).toBe("member");
+  });
+
+  it("treats an ended membership as member-level access", () => {
+    // The sign-in path admits `status in ('active', 'ended')`, so somebody
+    // whose only membership has ended reads the portal exactly as a member
+    // does. Manage people said "No access" about people who were signing in.
+    expect(deriveAccessLevel({ ...base, hasEndedMembership: true })).toBe(
+      "member",
+    );
   });
 
   it("gives someone with neither membership nor alumni access nothing", () => {
