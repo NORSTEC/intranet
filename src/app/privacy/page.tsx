@@ -27,6 +27,7 @@ const sections = [
   { id: "purposes", title: "Why we process it, and on what basis" },
   { id: "signing-in", title: "Signing in already creates a profile" },
   { id: "recipients", title: "Who can see your data" },
+  { id: "emails", title: "Emails the portal sends you" },
   { id: "processors", title: "Where it is stored, and who else touches it" },
   { id: "retention", title: "How long we keep it" },
   { id: "cookies", title: "Cookies and local storage" },
@@ -320,9 +321,45 @@ export default function PrivacyPolicyPage() {
               />
             </Section>
 
+            <Section id="emails">
+              <p className="mt-6 leading-relaxed">
+                The portal writes to you three times, and only when somebody has
+                decided something that changes what you can do here. There is no
+                newsletter, no announcement list, and nothing to unsubscribe
+                from — turning these off would mean not being told that your
+                access changed.
+              </p>
+              <Table
+                caption="The emails the portal sends, what causes each one, and where it is sent."
+                headers={["When", "What it says", "Sent to"]}
+                rows={[
+                  [
+                    "Your access request is approved",
+                    "That you were let in, and the reason the administrator wrote, if they wrote one",
+                    "The address you applied with",
+                  ],
+                  [
+                    "Your access request is declined",
+                    "That you were not let in, the reason if there was one, and that no profile has been kept for you",
+                    "The address you applied with",
+                  ],
+                  [
+                    "Your last active membership ends",
+                    "That you are now an alumnus and keep access. If a norstec.no account is the only way you sign in, it also warns that suspending it locks you out",
+                    "A personal address if you have one on file, so that the message does not depend on the account it is warning you about",
+                  ],
+                ]}
+              />
+              <p className="mt-7 leading-relaxed">
+                Nothing else is emailed. Administrators are not notified about
+                you by email, and the portal never mails the member directory or
+                anything from your profile to anyone.
+              </p>
+            </Section>
+
             <Section id="processors">
               <p className="mt-6 leading-relaxed">
-                Three suppliers process personal data on NORSTEC&rsquo;s behalf,
+                Four suppliers process personal data on NORSTEC&rsquo;s behalf,
                 under data processing agreements, and may not use it for their
                 own purposes.
               </p>
@@ -345,6 +382,11 @@ export default function PrivacyPolicyPage() {
                     "Authenticates you, and for norstec.no accounts provides the Workspace directory",
                     "Google Ireland Limited, with onward transfer to Google LLC",
                   ],
+                  [
+                    "Resend",
+                    "Delivers the few emails the portal sends you",
+                    "Sent from Ireland; delivery records kept in the United States",
+                  ],
                 ]}
               />
               <p className="mt-7 leading-relaxed">
@@ -354,6 +396,14 @@ export default function PrivacyPolicyPage() {
                 apply. Because you sign in with Google, Google also learns that
                 you signed in here, and processes that as its own controller
                 under its own privacy policy.
+              </p>
+              <p className="mt-7 leading-relaxed">
+                Resend receives only what an email needs: your name, the address
+                it is going to, and what the message says — which may include an
+                administrator&rsquo;s written reason for a decision. It receives
+                nothing else about you, and the portal sends no newsletters and
+                no marketing. Its delivery records are kept in the United
+                States, under the same standard contractual clauses.
               </p>
             </Section>
 
@@ -381,6 +431,10 @@ export default function PrivacyPolicyPage() {
                   [
                     "Audit log entries",
                     "Kept as the record of what administrators did. When a person is erased, the entries about them lose every reference to them",
+                  ],
+                  [
+                    "An email waiting to be sent to you",
+                    "Deleted the moment it is sent. One that cannot be delivered is given up on and deleted after seven days",
                   ],
                 ]}
               />

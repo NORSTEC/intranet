@@ -55,6 +55,31 @@ After adding/changing an RPC, add its signature to the `Functions` block in
 overwriting — the file is large and hand-maintained edits from other
 in-progress work can be present; don't clobber them.
 
+## Email is queued in the database, never sent from an action
+
+`docs/email.md` is the whole story; two rules matter when touching anything
+near a decision RPC.
+
+**Queue with `private.enqueue_notification` from inside the `security definer`
+function that makes the decision, not from the server action.** Only the
+function knows what was true before it. "Became an alumnus" is not a column —
+`derivePersonStatus` derives it from how many active memberships remain — so
+the transition is knowable only between the update and the commit, and
+counting afterwards from the action races. Queueing in the transaction also
+means a decision that rolls back sends nothing.
+
+**A new kind is two lists that have to agree**: the check constraint on
+`private.pending_notifications` and the `templates` record in
+`src/lib/email/templates.tsx`. `drainNotifications` skips a row it has no
+template for rather than settling it, so a mismatch strands rows instead of
+losing them — but it does strand them. Adding a kind also means adding a row
+to the `emails` section of `src/app/privacy/page.tsx`, which names all three
+emails and would otherwise be untrue.
+
+Templates are JSX and rendered with `renderToStaticMarkup` because every one of
+them interpolates something a person typed. Do not rewrite them as template
+literals.
+
 ## Auth model
 
 `src/lib/auth/access.ts` is the single source of truth for page-level access:
