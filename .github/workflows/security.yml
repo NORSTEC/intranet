@@ -28,6 +28,12 @@ jobs:
   dependency-review:
     name: Dependency review
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # `comment-summary-in-pr` below writes the failure summary as a pull
+      # request comment, and the read-only default token cannot. Scoped to
+      # this job rather than the workflow so nothing else inherits write.
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
