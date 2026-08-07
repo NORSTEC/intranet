@@ -91,11 +91,31 @@ changes arrive here often enough that half the pull requests would render
 against a schema that is not theirs. When that changes, delete `vercel.json` and
 add the preview-scoped variables in Vercel.
 
-Nothing therefore verifies a Vercel deployment before merge. What is verified is
-that the code builds: the `Types, lint, tests and build` check runs the same
-`next build` Vercel runs, and it is required. The safety net for the rest is
-**Deployments → ⋯ → Promote to Production** on the last good deployment, which
-takes seconds and does not rebuild. The database does not roll back with it,
+### Nothing tests the production deployment before merge
+
+It cannot. Deploying to production *is* the merge, and there is no hosted
+environment in between. A preview deployment would not have covered it either:
+a preview is built without the production variables, so a green Vercel check on
+a pull request means "a build with no environment succeeded" — which is exactly
+what the required `Types, lint, tests and build` check already proves, with the
+same `next build`.
+
+So the three failure modes are covered in three different places:
+
+| What goes wrong | Where you find out |
+| --- | --- |
+| The code does not build | `Types, lint, tests and build`, before merge |
+| The build fails on Vercel | red `Vercel` status on the merge commit. Production is unaffected — it keeps serving the previous deployment |
+| The build succeeds and the site is dead | `.github/workflows/smoke.yml`, within a minute of deploying |
+
+That last one is the one worth having. `NEXT_PUBLIC_*` variables are inlined at
+build time and `src/lib/supabase/client.ts` reads them with `!`, so removing one
+from the Vercel project would leave every check green, the build successful, and
+the browser holding `undefined`. The smoke test asks the deployment for a
+response as soon as Vercel reports it live, and goes red when there is not one.
+
+Recovery is **Deployments → ⋯ → Promote to Production** on the last good
+deployment: seconds, and no rebuild. The database does not roll back with it,
 which is the other reason to write migrations an older application survives.
 
 ### The three things called "environment"

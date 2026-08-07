@@ -1,0 +1,57 @@
+##
+# Asks the production deployment whether it is alive, right after Vercel says
+# it shipped.
+#
+# Nothing before a merge can test the production deployment, and that is not a
+# gap to be closed — deploying to production *is* the merge. There is no hosted
+# environment between a branch and the real one, deliberately (see
+# docs/operations.md). So the answer is not to test earlier but to find out
+# sooner.
+#
+# The failure this exists for: a build that succeeds and a site that does not
+# run. `NEXT_PUBLIC_*` variables are inlined at build time, and
+# `src/lib/supabase/client.ts` reads them with `!` — so if one were removed from
+# the Vercel project, every check on the pull request would still be green, the
+# build would still succeed, and the browser would get `undefined` as the
+# Supabase URL. Without this workflow, the first report would come from a member
+# who could not sign in.
+#
+# `deployment_status` fires from Vercel's GitHub integration, which needs
+# "deployment_status Events" left on under the project's Git settings. The
+# `environment` it reports is `Production` — capitalised, and Vercel's own
+# string, not the `production` that `migrate.yml` names.
+#
+# No secrets, no checkout, nothing to pin beyond the runner. It cannot fail in a
+# way that touches anything.
+##
+name: Smoke test
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  reachable:
+    name: Production answers
+    # A deployment reports several times as it progresses. Only the successful
+    # production one is worth asking, and asking a preview would be asking
+    # nothing — none are built.
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment_status.environment == 'Production'
+    runs-on: ubuntu-latest
+    steps:
+      - name: The deployment must answer
+        env:
+          # Through the environment rather than interpolated into the script. A
+          # `${{ }}` expression is pasted in before the shell runs, so a value
+          # containing shell syntax would execute as a command — the standard
+          # way script injection reaches a runner. This value comes from
+          # outside the repository, which is exactly when that matters.
+          URL: ${{ github.event.deployment_status.environment_url }}
+        # Retries because the alias can take a few seconds to point at the new
+        # deployment. `--fail` turns an HTTP error into a non-zero exit, which
+        # curl does not do on its own.
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 5 --max-time 30 --output /dev/null "$URL"
