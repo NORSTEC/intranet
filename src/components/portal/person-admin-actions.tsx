@@ -7,6 +7,8 @@ import {
   changePortalAccess,
   changePortalAdministrator,
   mergePeople,
+  removePersonAddress,
+  setPersonContactAddress,
   softDeletePerson,
   unlinkPersonAccount,
   type PortalManagementResult,
@@ -27,6 +29,18 @@ export type PersonSignInAccount = {
   isOnboarding: boolean;
 };
 
+/**
+ * An address and, when one exists, the Google account that signs in with it.
+ * They are one list because the operations on them are ordered: the address
+ * cannot be removed while an account still proves it, which reads as a sentence
+ * in one list and as an error message in two.
+ */
+export type PersonAddress = {
+  account: PersonSignInAccount | null;
+  email: string;
+  isPrimary: boolean;
+};
+
 export type MergeCandidate = {
   activeOrganizations: string[];
   avatarUrl?: string;
@@ -42,6 +56,7 @@ type PendingAction =
   | { kind: "administrator"; grant: boolean }
   | { kind: "merge" }
   | { kind: "unlink"; authUserId: string; email: string }
+  | { kind: "removeAddress"; email: string; isPrimary: boolean }
   | { kind: "delete" };
 
 export function PersonAdminActions({
@@ -51,7 +66,7 @@ export function PersonAdminActions({
   isSelf,
   mergeCandidates,
   norstecAccountStatus,
-  personAccounts,
+  personAddresses,
   personEmails,
   personId,
   personName,
@@ -69,12 +84,13 @@ export function PersonAdminActions({
    */
   norstecAccountStatus: "active" | "suspended" | null;
   /**
-   * Removing one on somebody's behalf is what a duplicate holding a third
-   * sign-in account needs before it can be merged at all — `merge_people`
-   * refuses two profiles holding three between them, and until this existed
-   * the only way under that limit was for the duplicate's owner to sign in.
+   * Every address on the profile, contact address first, each with the Google
+   * account that signs in with it when there is one. Removing an account on
+   * somebody's behalf is what a duplicate holding a second account on the same
+   * domain needs before it can be merged at all — until it existed, the only
+   * way under that limit was for the duplicate's owner to sign in.
    */
-  personAccounts: PersonSignInAccount[];
+  personAddresses: PersonAddress[];
   personEmails: string[];
   personId: number;
   personName: string;
@@ -161,6 +177,11 @@ export function PersonAdminActions({
     if (pendingAction.kind === "unlink") {
       const authUserId = pendingAction.authUserId;
       run(() => unlinkPersonAccount({ authUserId, personId }));
+      return;
+    }
+    if (pendingAction.kind === "removeAddress") {
+      const email = pendingAction.email;
+      run(() => removePersonAddress({ email, personId }));
       return;
     }
     if (pendingAction.kind === "delete") {
@@ -370,51 +391,108 @@ export function PersonAdminActions({
           </ActionCard>
 
           <ActionCard
-            description="Which Google accounts sign in to this profile. Removing one leaves the address on the profile and ends that account's sessions, so the person keeps their history and can still be reached. A profile has to keep one account."
+            description="Every address on this profile, and which Google account signs in with each. Removing a sign-in account ends its sessions and leaves the address, so the person keeps their history and can still be reached. Removing the address is the separate, deliberate step — and it has to come second."
             span="full"
-            title="Sign-in accounts"
+            title="Addresses and sign-in accounts"
           >
-            <ul className="grid gap-3">
-              {personAccounts.map((account) => (
+            <ul className="grid gap-4">
+              {personAddresses.map((address) => (
                 <li
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2"
-                  key={account.authUserId}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-moody/15 pb-4 last:border-b-0 last:pb-0"
+                  key={address.email}
                 >
-                  <span className="break-all font-medium">{account.email}</span>
-                  {account.isOnboarding && (
-                    <span className="text-sm opacity-55">onboarding</span>
+                  <span className="break-all font-medium">{address.email}</span>
+                  {address.isPrimary && (
+                    <span className="portal-pill">contact address</span>
                   )}
-                  {account.blockedReason ? (
-                    <span className="ml-auto text-sm leading-relaxed opacity-60">
-                      {account.blockedReason}
+                  {address.account && (
+                    <span className="portal-pill">
+                      {address.account.isOnboarding
+                        ? "signs in — onboarding"
+                        : "signs in"}
                     </span>
-                  ) : (
-                    <button
-                      className="portal-button ml-auto"
-                      disabled={busy}
-                      onClick={() =>
-                        setPendingAction({
-                          authUserId: account.authUserId,
-                          email: account.email,
-                          kind: "unlink",
-                        })
-                      }
-                      type="button"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="material-symbols-outlined text-[1.1rem]"
-                      >
-                        link_off
-                      </span>
-                      Remove account
-                    </button>
                   )}
+
+                  <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                    {!address.isPrimary && !address.account && (
+                      <button
+                        className="portal-button"
+                        disabled={busy}
+                        onClick={() =>
+                          run(() =>
+                            setPersonContactAddress({
+                              email: address.email,
+                              personId,
+                            }),
+                          )
+                        }
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.1rem]"
+                        >
+                          alternate_email
+                        </span>
+                        Make contact address
+                      </button>
+                    )}
+
+                    {address.account ? (
+                      address.account.blockedReason ? (
+                        <span className="max-w-[38ch] text-sm leading-relaxed opacity-60">
+                          {address.account.blockedReason}
+                        </span>
+                      ) : (
+                        <button
+                          className="portal-button"
+                          disabled={busy}
+                          onClick={() =>
+                            setPendingAction({
+                              authUserId: address.account!.authUserId,
+                              email: address.email,
+                              kind: "unlink",
+                            })
+                          }
+                          type="button"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="material-symbols-outlined text-[1.1rem]"
+                          >
+                            link_off
+                          </span>
+                          Remove sign-in
+                        </button>
+                      )
+                    ) : (
+                      <button
+                        className="portal-button portal-button-danger"
+                        disabled={busy}
+                        onClick={() =>
+                          setPendingAction({
+                            email: address.email,
+                            isPrimary: address.isPrimary,
+                            kind: "removeAddress",
+                          })
+                        }
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.1rem]"
+                        >
+                          delete
+                        </span>
+                        Remove address
+                      </button>
+                    )}
+                  </span>
                 </li>
               ))}
-              {personAccounts.length === 0 && (
+              {personAddresses.length === 0 && (
                 <li className="text-sm opacity-60">
-                  No Google account signs in to this profile.
+                  This profile has no addresses.
                 </li>
               )}
             </ul>
@@ -639,6 +717,32 @@ export function PersonAdminActions({
           <span className="font-medium">{pendingAction.email}</span> will no
           longer sign anybody in to {personName}&rsquo;s profile, and its
           sessions end immediately. The address stays on the profile.
+        </ConfirmDialog>
+      )}
+
+      {pendingAction?.kind === "removeAddress" && (
+        <ConfirmDialog
+          busy={busy}
+          confirmIcon="delete"
+          confirmLabel="Remove address"
+          danger
+          onCancel={() => setPendingAction(null)}
+          onConfirm={confirmPendingAction}
+          title="Remove this address?"
+        >
+          <p>
+            <span className="font-medium">{pendingAction.email}</span> stops
+            being one of {personName}&rsquo;s addresses. Nobody can reach them
+            there through the portal afterwards, and the address stops
+            identifying them — a Google account presenting it later lands on a
+            new profile rather than on this one.
+          </p>
+          {pendingAction.isPrimary && (
+            <p className="mt-3">
+              It is their contact address, so another one of their addresses
+              becomes it.
+            </p>
+          )}
         </ConfirmDialog>
       )}
 

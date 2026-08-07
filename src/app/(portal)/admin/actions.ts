@@ -90,7 +90,28 @@ function messageFor(error: { message: string }, fallback: string) {
     return "This deletion changed while the page was open. Reload and try again.";
   }
   if (error.message.includes("too_many_portal_accounts")) {
-    return "Together these two hold more than two sign-in accounts. Unlink one first.";
+    return "Together these two hold two accounts on the same organization domain. Unlink one first.";
+  }
+  if (error.message.includes("reserved_domain")) {
+    return "This domain belongs to a mailbox provider or a whole institution, so it cannot say which organization somebody is in.";
+  }
+  if (error.message.includes("domain_registered_elsewhere")) {
+    return "Another organization already answers for this domain.";
+  }
+  if (error.message.includes("domain_already_registered")) {
+    return "This organization already answers for that domain.";
+  }
+  if (error.message.includes("domain_not_found")) {
+    return "This domain is not registered.";
+  }
+  if (error.message.includes("invalid_domain")) {
+    return "That is not a domain name.";
+  }
+  if (error.message.includes("invalid_join_policy")) {
+    return "Pick one of the three joining rules.";
+  }
+  if (error.message.includes("organization_not_found")) {
+    return "This organization no longer exists.";
   }
   if (error.message.includes("primary_email_not_found")) {
     return "The chosen contact address does not belong to this person.";
@@ -679,6 +700,66 @@ export async function unlinkPersonAccount(input: {
   return { ok: true, message: "Sign-in account removed." };
 }
 
+/**
+ * The two address operations have existed as RPCs, with their guards and their
+ * audit events, since addresses stopped disappearing when an account was
+ * unlinked. Nothing called them, so the only way to correct an address was to
+ * talk to somebody with database access.
+ */
+export async function setPersonContactAddress(input: {
+  email: string;
+  personId: number;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isValidPersonId(input.personId)) {
+    return { ok: false, message: "That address could not be changed." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_person_primary_email", {
+    p_email: input.email,
+    p_person_id: input.personId,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "That address could not be changed."),
+    };
+  }
+
+  revalidatePersonViews(input.personId);
+  return { ok: true, message: "Contact address changed." };
+}
+
+export async function removePersonAddress(input: {
+  email: string;
+  personId: number;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  if (!isValidPersonId(input.personId)) {
+    return { ok: false, message: "That address could not be removed." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("remove_person_email", {
+    p_email: input.email,
+    p_person_id: input.personId,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "That address could not be removed."),
+    };
+  }
+
+  revalidatePersonViews(input.personId);
+  return { ok: true, message: "Address removed." };
+}
+
 type WorkspaceAccountRow = {
   accountEmail: string | null;
   externalId: string | null;
@@ -851,4 +932,124 @@ async function isSuperAdministrator(externalId: string) {
   return (
     (details as Record<string, unknown>).adminRole === "super_admin"
   );
+}
+
+type OrganizationAccessResult = PortalManagementResult & {
+  addressCount?: number;
+  reservedReason?: string | null;
+  wouldJoinCount?: number;
+};
+
+function revalidateOrganizationAccessViews() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/organizations");
+}
+
+/**
+ * What a domain would capture, before it captures anything. Registering one
+ * turns every address on it into an organization address — not the person's own
+ * to remove, and under an automatic policy a membership — so the number of
+ * addresses it would take is the difference between a domain being exactly
+ * right and being a typo.
+ */
+export async function previewOrganizationDomain(input: {
+  domain: string;
+  organizationId: number;
+}): Promise<OrganizationAccessResult> {
+  await requirePortalAdminAccess();
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("preview_organization_domain", {
+    p_domain: input.domain,
+    p_organization_id: input.organizationId,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "That domain could not be checked."),
+    };
+  }
+
+  const preview = (data ?? {}) as {
+    addressCount?: number;
+    registeredToOrganizationId?: number | null;
+    reservedReason?: string | null;
+    wouldJoinCount?: number;
+  };
+
+  return {
+    addressCount: preview.addressCount ?? 0,
+    message: "",
+    ok: true,
+    reservedReason: preview.reservedReason ?? null,
+    wouldJoinCount: preview.wouldJoinCount ?? 0,
+  };
+}
+
+export async function addOrganizationDomain(input: {
+  domain: string;
+  organizationId: number;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("add_organization_domain", {
+    p_domain: input.domain,
+    p_organization_id: input.organizationId,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "That domain could not be registered."),
+    };
+  }
+
+  revalidateOrganizationAccessViews();
+  return { ok: true, message: "Domain registered." };
+}
+
+export async function removeOrganizationDomain(input: {
+  domain: string;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("remove_organization_domain", {
+    p_domain: input.domain,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "That domain could not be removed."),
+    };
+  }
+
+  revalidateOrganizationAccessViews();
+  return { ok: true, message: "Domain removed. Existing memberships are untouched." };
+}
+
+export async function setOrganizationJoinPolicy(input: {
+  organizationId: number;
+  policy: string;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_organization_domain_join_policy", {
+    p_organization_id: input.organizationId,
+    p_policy: input.policy,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "The joining rule could not be changed."),
+    };
+  }
+
+  revalidateOrganizationAccessViews();
+  return { ok: true, message: "Joining rule changed." };
 }

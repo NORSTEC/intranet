@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(240);
+select plan(245);
 
 insert into public.people (
   full_name,
@@ -73,6 +73,13 @@ values ('claimed-history-organization', 'Claimed History Organization', 'active'
 
 insert into public.organizations (slug, name, status)
 values ('orbit-ntnu', 'Orbit NTNU', 'active');
+
+-- The fixtures below exercise what an organization account grants and what
+-- rests on it, so this one joins automatically the way Norstec does. The
+-- default is to ask, and the join-policy tests further down cover that.
+update public.organizations
+set domain_join_policy = 'auto'
+where slug = 'orbit-ntnu';
 
 insert into private.organization_domains (domain, organization_id)
 select 'orbitntnu.no', id
@@ -4261,6 +4268,101 @@ select lives_ok(
     )
   $$,
   'any other address of theirs is ordinary'
+);
+
+
+
+-- "Create profile" on the onboarding screen ran its own copy of the domain
+-- rule, so the policy and the returning-member guard were both one click wide.
+
+reset role;
+
+insert into public.organizations (slug, name, status)
+values ('slowlab', 'Slow Lab', 'active');
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'slowlab'),
+      'slowlab.no'
+    )
+  $$,
+  'the organization registers its domain and keeps the default policy'
+);
+
+reset role;
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values (
+  '77777777-7777-4777-8777-777777777778',
+  'authenticated',
+  'authenticated',
+  'newcomer@slowlab.no',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Slow Lab Newcomer","custom_claims":{"hd":"slowlab.no"}}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+select is(
+  (
+    select onboarding_status
+    from public.portal_accounts
+    where auth_user_id = '77777777-7777-4777-8777-777777777778'
+  ),
+  'pending',
+  'a new profile on an organization address is asked who it is first'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777778","role":"authenticated"}',
+  true
+);
+
+select is(
+  (select public.complete_own_organization_onboarding() ->> 'outcome'),
+  'request',
+  'creating the profile asks the same decision rather than granting membership'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.portal_accounts as account
+      on account.person_id = membership.person_id
+    where account.auth_user_id = '77777777-7777-4777-8777-777777777778'
+  ),
+  0::bigint,
+  'the onboarding button is not a way around the join policy'
+);
+
+select is(
+  (
+    select onboarding_status
+    from public.portal_accounts
+    where auth_user_id = '77777777-7777-4777-8777-777777777778'
+  ),
+  'complete',
+  'and the person is still let through onboarding to go and ask'
 );
 
 

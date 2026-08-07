@@ -501,8 +501,17 @@ account (UL2), and the domain confirmation step showing the affected count
    `onboarding` rather than `unproven`. The refusal is audited as
    `auth.address_claim_unproven`, which is the row an administrator needs to
    tell a conflicting account from a genuine one.
-5. UI: `/access` preselection, onboarding routing, the administration cards for
-   addresses, domains and policy.
+5. ~~UI~~ — done. `/access` reads the preselection the callback sends and says
+   why the person is there; onboarding routes on the outcome instead of
+   assuming a membership; the person page carries one list of addresses with
+   their sign-in accounts; and `/admin/organizations` is where domains and join
+   policies are administered, with the dry run in front of the registration.
+
+   One more backend hole surfaced while wiring the UI, and it was the reason to
+   do this step at all: `complete_own_organization_onboarding` — the "Create
+   profile" button — ran a *third* copy of the domain rule. The policy and the
+   returning-member guard were one click wide.
+   `20260819010700_onboarding_uses_join_decision.sql` closes it. Suite at 245.
 6. B7 and the profile page last, once no membership depends on an address
    surviving.
 

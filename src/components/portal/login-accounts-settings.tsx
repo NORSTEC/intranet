@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { unlinkLoginAccount } from "@/app/(portal)/profile/actions";
 import { Toast } from "@/components/portal/toast";
+import { PRIVACY_CONTACT_EMAIL } from "@/lib/legal/privacy";
 
 export type LinkedLoginAccount = {
   /** Why this account cannot be removed, already in the portal's words. */
@@ -165,13 +166,21 @@ export function LoginAccountsSettings({
               Remove this sign-in account?
             </h2>
             <p className="mt-4 leading-relaxed opacity-65">
-              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile. The address stays on your profile, so people can still reach you there — and signing in with this Google account again brings you back to this same profile rather than starting a new one. Removing the address itself is something a portal administrator does. An active organization membership that rests on this address has to be ended by an organization administrator first.
+              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile. The address stays on your profile, so people can still reach you there — and signing in with this Google account again brings you back to this same profile rather than starting a new one. An active organization membership that rests on this address has to be ended by an organization administrator first.
             </p>
             {unlinkTarget.isCurrentSession && (
               <p className="mt-3 leading-relaxed opacity-65">
                 You are signed in with this account right now, so you will be signed out. Sign back in with your other Google account.
               </p>
             )}
+            <p className="mt-3 leading-relaxed opacity-65">
+              Need this address moved to another profile, or off your profile
+              entirely? Write to{" "}
+              <a className="legal-link" href={`mailto:${PRIVACY_CONTACT_EMAIL}`}>
+                {PRIVACY_CONTACT_EMAIL}
+              </a>
+              .
+            </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <button
                 autoFocus
