@@ -4430,5 +4430,461 @@ select is(
 
 
 reset role;
+
+
+-- Notification queue.
+--
+-- Three decisions queue an email, and the interesting parts are all about
+-- *when* and *to whom* rather than about sending: only the last membership
+-- counts, the address chosen for it is deliberately not the primary one, and
+-- a declined applicant's row has to outlive the applicant.
+
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  is_sso_user,
+  is_anonymous
+)
+values (
+  'e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1',
+  'authenticated',
+  'authenticated',
+  'queued@norstec.no',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Queued Alumnus"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+-- The insert above is enough to make the person: `private.provision_portal_user`
+-- creates the profile, its primary address and the portal account. Only the
+-- second, personal address has to be added by hand.
+insert into public.person_emails (person_id, email, email_type, is_primary, source)
+select person.id, 'queued.personal@example.com', 'personal', false, 'manual'
+from public.people as person
+where person.full_name = 'Queued Alumnus';
+
+insert into public.memberships (
+  person_id, organization_id, role, status, provisioning_method
+)
+select person.id, organization.id, 'member', 'active', 'manual'
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Queued Alumnus'
+  and organization.slug in ('norstec', 'orbit-ntnu');
+
+select is(
+  private.notification_recipient(
+    (select id from public.people where full_name = 'Queued Alumnus'),
+    true
+  ),
+  'queued.personal@example.com',
+  'the membership email avoids the norstec.no address that is about to stop working'
+);
+
+select is(
+  private.notification_recipient(
+    (select id from public.people where full_name = 'Queued Alumnus'),
+    false
+  ),
+  'queued@norstec.no',
+  'a decision on a request goes to the address the request was made from'
+);
+
+select is(
+  private.signs_in_only_with_workspace(
+    (select id from public.people where full_name = 'Queued Alumnus')
+  ),
+  true,
+  'somebody whose only sign-in is a norstec.no account is warned'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_membership_status(
+      (
+        select membership.id
+        from public.memberships as membership
+        join public.people as person on person.id = membership.person_id
+        where person.full_name = 'Queued Alumnus'
+          and membership.organization_id = (
+            select id from public.organizations where slug = 'orbit-ntnu'
+          )
+      ),
+      'ended'
+    )
+  $$,
+  'an administrator ends one of two memberships'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from private.pending_notifications as notification
+    join public.people as person on person.id = notification.person_id
+    where person.full_name = 'Queued Alumnus'
+  ),
+  0::bigint,
+  'ending a membership while another is still active queues nothing'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_membership_status(
+      (
+        select membership.id
+        from public.memberships as membership
+        join public.people as person on person.id = membership.person_id
+        where person.full_name = 'Queued Alumnus'
+          and membership.organization_id = (
+            select id from public.organizations where slug = 'norstec'
+          )
+      ),
+      'ended'
+    )
+  $$,
+  'an administrator ends the last remaining membership'
+);
+
+reset role;
+
+select is(
+  (
+    select notification.kind
+    from private.pending_notifications as notification
+    join public.people as person on person.id = notification.person_id
+    where person.full_name = 'Queued Alumnus'
+  ),
+  'membership_ended',
+  'ending the last active membership queues the alumni email'
+);
+
+select is(
+  (
+    select notification.recipient_email
+    from private.pending_notifications as notification
+    join public.people as person on person.id = notification.person_id
+    where person.full_name = 'Queued Alumnus'
+  ),
+  'queued.personal@example.com',
+  'the alumni email is addressed somewhere the Workspace cannot suspend'
+);
+
+select is(
+  (
+    select notification.payload ->> 'workspace_sign_in_only'
+    from private.pending_notifications as notification
+    join public.people as person on person.id = notification.person_id
+    where person.full_name = 'Queued Alumnus'
+  ),
+  'true',
+  'the alumni email carries the sign-in warning when it applies'
+);
+
+-- A second, personal sign-in removes the reason for the warning: suspending
+-- the Workspace account no longer locks them out.
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at, raw_app_meta_data,
+  raw_user_meta_data, created_at, updated_at, is_sso_user, is_anonymous
+)
+values (
+  'e2e2e2e2-e2e2-4e2e-8e2e-e2e2e2e2e2e2',
+  'authenticated',
+  'authenticated',
+  'queued.personal@example.com',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Queued Alumnus"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+select is(
+  private.signs_in_only_with_workspace(
+    (select id from public.people where full_name = 'Queued Alumnus')
+  ),
+  false,
+  'a personal sign-in of their own removes the warning'
+);
+
+-- A declined applicant is erased by the same transaction that queues their
+-- rejection email. The row has to survive that, or nobody is ever told.
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at, raw_app_meta_data,
+  raw_user_meta_data, created_at, updated_at, is_sso_user, is_anonymous
+)
+values (
+  'e3e3e3e3-e3e3-4e3e-8e3e-e3e3e3e3e3e3',
+  'authenticated',
+  'authenticated',
+  'turned.down@example.com',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Turned Down"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+create temporary table declined_request as
+with requested as (
+  insert into public.access_requests (person_id, organization_id, status, request_type)
+  select
+    person.id,
+    (select id from public.organizations where slug = 'orbit-ntnu'),
+    'pending',
+    'organization'
+  from public.people as person
+  where person.full_name = 'Turned Down'
+  returning id
+)
+select id from requested;
+
+grant select on declined_request to authenticated;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.review_access_request(
+      (select id from declined_request),
+      'rejected',
+      'Not this year.'
+    )
+  $$,
+  'an administrator declines a request from somebody who is only an applicant'
+);
+
+reset role;
+
+select is(
+  (select count(*) from public.people where full_name = 'Turned Down'),
+  0::bigint,
+  'declining still erases the applicant'
+);
+
+select is(
+  (
+    select count(*)
+    from private.pending_notifications
+    where recipient_email = 'turned.down@example.com'
+      and kind = 'access_request_rejected'
+      and person_id is null
+  ),
+  1::bigint,
+  'the rejection email outlives the profile it is about'
+);
+
+-- `private.pending_notifications` is unreadable to `authenticated` — that is
+-- the point of putting it there — so the row under test is pinned here rather
+-- than looked up from inside each role, the same way `access_review_target` is.
+create temporary table rejected_notification as
+select id
+from private.pending_notifications
+where recipient_email = 'turned.down@example.com';
+
+grant select on rejected_notification to authenticated;
+
+-- The queue's real protection is that none of the machinery behind it is
+-- reachable from a session. `create or replace` restores the default `execute`
+-- grant to `public`, so a later migration that recreates one of these and
+-- forgets its `revoke` hands an authenticated caller the ability to queue an
+-- arbitrary email to an arbitrary address, or to read anyone's addresses.
+-- These assertions are what notices.
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.enqueue_notification(text,bigint,text,text,jsonb)',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot queue a notification of their own'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.notification_recipient(bigint,boolean)',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot ask which address a person would be written to'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.signs_in_only_with_workspace(bigint)',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot probe how a person signs in'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'private.discard_stale_notifications()',
+    'execute'
+  ),
+  false,
+  'an authenticated caller cannot empty the queue'
+);
+
+select is(
+  (
+    select relrowsecurity
+    from pg_class
+    join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+    where pg_namespace.nspname = 'private'
+      and pg_class.relname = 'pending_notifications'
+  ),
+  true,
+  'row level security guards the queue, not only the schema it sits in'
+);
+
+-- Draining is scoped to the person who caused the row, plus portal
+-- administrators as the only retry path. The portal holds no privileged key,
+-- so this boundary is the whole protection on a table of names and addresses.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+
+select is(
+  (select count(*) from public.claim_pending_notifications(20)),
+  0::bigint,
+  'an ordinary member is handed none of the queued notifications'
+);
+
+select throws_ok(
+  $$
+    select public.settle_notification(
+      (select id from rejected_notification)
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot settle somebody else''s notification'
+);
+
+reset role;
+set local role anon;
+
+select throws_ok(
+  $$ select public.claim_pending_notifications(20) $$,
+  '42501',
+  'permission denied for function claim_pending_notifications',
+  'a signed-out visitor cannot drain the queue'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select is(
+  (
+    select count(*)
+    from public.claim_pending_notifications(50) as claimed
+    where claimed.recipient_email in (
+      'queued.personal@example.com',
+      'turned.down@example.com'
+    )
+  ),
+  2::bigint,
+  'a portal administrator is handed the queue, which is the only retry there is'
+);
+
+select lives_ok(
+  $$
+    select public.settle_notification(
+      (select id from rejected_notification),
+      'Resend answered 503'
+    )
+  $$,
+  'a failed send records its error'
+);
+
+reset role;
+
+select is(
+  (
+    select notification.claimed_at
+    from private.pending_notifications as notification
+    where notification.recipient_email = 'turned.down@example.com'
+  ),
+  null,
+  'a failed send releases its claim so the next administrator picks it up'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.settle_notification(
+      (select id from rejected_notification)
+    )
+  $$,
+  'a successful send settles the notification'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from private.pending_notifications
+    where recipient_email = 'turned.down@example.com'
+  ),
+  0::bigint,
+  'a sent notification is deleted rather than kept, so no address outlives its send'
+);
+
+reset role;
 select * from finish();
 rollback;

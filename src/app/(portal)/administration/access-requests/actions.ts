@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireOrganizationAdminAccess } from "@/lib/auth/access";
+import { drainNotifications } from "@/lib/email/notifications";
 import { createClient } from "@/lib/supabase/server";
 
 export type ReviewActionResult =
@@ -40,6 +42,12 @@ export async function reviewAccessRequest(input: {
         : "The request could not be reviewed.";
     return { ok: false, message };
   }
+
+  // `review_access_request` queued the applicant's email inside the same
+  // transaction as the decision. Sending happens after the response, so a slow
+  // or unavailable email service delays nothing the administrator is waiting
+  // for — the decision is already committed either way.
+  after(() => drainNotifications(supabase));
 
   revalidatePath("/administration/access-requests");
   revalidatePath("/members");

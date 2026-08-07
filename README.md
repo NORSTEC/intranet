@@ -95,6 +95,8 @@ on it.
 - [Membership lifecycle and edge cases](docs/membership-lifecycle.md)
 - [Google Workspace integration](docs/google-workspace.md)
 - [Slack integration](docs/slack.md)
+- [Email](docs/email.md) — the three emails the portal sends, and why they are
+  queued in the database rather than sent from the server action
 
 ## Access
 
