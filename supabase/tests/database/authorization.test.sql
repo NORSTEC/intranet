@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(245);
+select plan(249);
 
 insert into public.people (
   full_name,
@@ -4363,6 +4363,69 @@ select is(
   ),
   'complete',
   'and the person is still let through onboarding to go and ask'
+);
+
+
+
+-- Unlinking your own account used to be a logout with extra steps: the address
+-- stayed, so signing in with the same Google account put you straight back on
+-- the profile you had just left. Now that a membership rests on the hosted
+-- domain rather than on an address surviving, a personal address can leave with
+-- its account — and an organization address still cannot.
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777775","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.unlink_own_portal_account(
+      '77777777-7777-4777-8777-777777777776',
+      true
+    )
+  $$,
+  'P0001',
+  'organization_email_requires_admin',
+  'an organization address is not the person''s own to release'
+);
+
+select is(
+  (
+    select public.unlink_own_portal_account(
+      '77777777-7777-4777-8777-777777777775',
+      true
+    ) ->> 'emailRemoved'
+  ),
+  'true',
+  'a personal account leaves and takes its address with it'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.person_emails
+    where email = 'returning.private@example.com'
+  ),
+  0::bigint,
+  'the address is gone, so signing in with it again starts somewhere new'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'person_email.removed'
+      and details ->> 'email' = 'returning.private@example.com'
+      and details ->> 'source' = 'profile'
+  ),
+  1::bigint,
+  'and the person releasing it is on the record as having done so'
 );
 
 

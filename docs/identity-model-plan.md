@@ -512,8 +512,15 @@ account (UL2), and the domain confirmation step showing the affected count
    profile" button — ran a *third* copy of the domain rule. The policy and the
    returning-member guard were one click wide.
    `20260819010700_onboarding_uses_join_decision.sql` closes it. Suite at 245.
-6. B7 and the profile page last, once no membership depends on an address
-   surviving.
+6. ~~B7 and the profile page~~ — done, in
+   `20260819010800_unlink_can_release_the_address.sql`. Removing a personal
+   sign-in account now takes its address with it, so the next sign-in with that
+   Google account starts a new profile — the Auth0 and Firebase behaviour, and
+   what people already believed the button did. An organization address stays
+   and points at `portal@norstec.no`. Suite at 249.
+
+The plan is implemented. What is deliberately not built, and why, is in the
+open questions and in the rows marked **accepted**.
 
 Steps 2 and 3 are worth landing separately even though they feel like one
 change. After step 2 the portal behaves identically and the data is in place;

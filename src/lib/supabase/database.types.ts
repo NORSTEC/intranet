@@ -1160,7 +1160,7 @@ export type Database = {
         Returns: number
       }
       unlink_own_portal_account: {
-        Args: { p_auth_user_id: string }
+        Args: { p_auth_user_id: string; p_remove_email?: boolean }
         Returns: Json
       }
       unlink_portal_account: {

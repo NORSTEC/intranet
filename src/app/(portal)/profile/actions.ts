@@ -17,6 +17,11 @@ const uuidPattern =
 
 export async function unlinkLoginAccount(
   authUserId: string,
+  // Removing the address with the account is what people already believe
+  // "remove this account" does. It is offered for personal addresses only; an
+  // organization address belongs to the organization, and the refusal below is
+  // the same rule stated by the database rather than trusted from the browser.
+  removeEmail = false,
 ): Promise<UnlinkLoginAccountResult> {
   const access = await requirePortalAccess();
 
@@ -27,6 +32,7 @@ export async function unlinkLoginAccount(
   const supabase = await createClient();
   const { error } = await supabase.rpc("unlink_own_portal_account", {
     p_auth_user_id: authUserId,
+    p_remove_email: removeEmail,
   });
 
   if (error) {
@@ -36,7 +42,11 @@ export async function unlinkLoginAccount(
         ? "Portal administrators must keep a norstec.no sign-in account. Hand over the role first."
         : error.message.includes("membership_requires_account")
           ? "An active organization membership rests on this account. Ask an organization administrator to end the membership first."
-          : "That sign-in account could not be removed.";
+          : error.message.includes("organization_email_requires_admin")
+            ? "This address belongs to an organization, so a portal administrator has to release it. Write to portal@norstec.no."
+            : error.message.includes("member_must_keep_email")
+              ? "An active member must keep at least one address, and this is your last one."
+              : "That sign-in account could not be removed.";
     return { ok: false, message };
   }
 
