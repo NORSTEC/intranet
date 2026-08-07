@@ -895,6 +895,16 @@ export type Database = {
         Args: { p_request_id: number }
         Returns: undefined
       }
+      claim_pending_notifications: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: number
+          kind: string
+          payload: Json
+          recipient_email: string
+          recipient_name: string
+        }[]
+      }
       complete_own_organization_onboarding: { Args: never; Returns: Json }
       complete_portal_account_link: {
         Args: { p_token_hash: string }
@@ -1117,6 +1127,10 @@ export type Database = {
       }
       set_workspace_account_suspended: {
         Args: { p_external_id: string; p_suspended: boolean }
+        Returns: undefined
+      }
+      settle_notification: {
+        Args: { p_error?: string | null; p_id: number }
         Returns: undefined
       }
       sign_in_block_reason: { Args: never; Returns: string | null }

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireOrganizationAdminAccess } from "@/lib/auth/access";
+import { drainNotifications } from "@/lib/email/notifications";
 import { createClient } from "@/lib/supabase/server";
 
 export type MemberStatusActionResult =
@@ -41,6 +43,11 @@ export async function changeMemberStatus(input: {
         : "The membership could not be updated.";
     return { ok: false, message };
   }
+
+  // Ending somebody's last active membership queues the alumni email, which
+  // carries the warning about losing a norstec.no sign-in. Reactivating queues
+  // nothing, so this is a no-op then.
+  after(() => drainNotifications(supabase));
 
   revalidatePath(`/administration/members/${input.organizationSlug}`);
   revalidatePath("/members");

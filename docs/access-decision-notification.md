@@ -6,10 +6,18 @@ portal itself, and a decline deletes the profile along with the request, so
 there is no account left to sign in to and read a message on. See
 `supabase/migrations/20260812000000_discard_declined_applicant_again.sql`.
 
-**The email is not built yet.** This document holds the layout and copy that
-were already designed and reviewed for the in-portal version, so the sender can
-be written against a decided design rather than an invented one. The decline
-dialog in Portal management states plainly that no notification goes out yet.
+**The email is built.** `src/lib/email/templates.ts` follows the layout and
+copy below — heading, the supporting sentence, the `dl` of *Decided* and an
+optional *Note from the reviewer*, then the closing line — and the third email
+the portal sends, for a membership that has ended, reuses the same shell so all
+three read as one voice. See [email.md](email.md) for how they are queued and
+sent. This document remains the authority on what they say: change it and the
+templates together, or neither.
+
+Two things the built version adds, both because an email is read outside the
+portal rather than inside it: a greeting line under the heading, and a decline
+that says the profile was deleted. The second is not decoration — it is the
+only sentence that explains why signing in will not work.
 
 ## What the sender reads
 

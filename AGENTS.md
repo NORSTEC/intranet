@@ -16,7 +16,7 @@ pnpm check       # typecheck, lint, test, build — in order
 
 pnpm db:start    # local Supabase stack in Docker
 pnpm db:reset    # rebuild the local database from every migration
-pnpm db:test     # the 162-assertion pgTAP authorization suite
+pnpm db:test     # the 217-assertion pgTAP authorization suite
 pnpm db:stop
 ```
 
@@ -54,6 +54,36 @@ After adding/changing an RPC, add its signature to the `Functions` block in
 `npx supabase gen types typescript --local`. If regenerating, `diff` before
 overwriting — the file is large and hand-maintained edits from other
 in-progress work can be present; don't clobber them.
+
+## Email is queued in the database, never sent from an action
+
+`docs/email.md` is the whole story; two rules matter when touching anything
+near a decision RPC.
+
+**Queue with `private.enqueue_notification` from inside the `security definer`
+function that makes the decision, not from the server action.** Only the
+function knows what was true before it. "Became an alumnus" is not a column —
+`derivePersonStatus` derives it from how many active memberships remain — so
+the transition is knowable only between the update and the commit, and
+counting afterwards from the action races. Queueing in the transaction also
+means a decision that rolls back sends nothing.
+
+**A new kind is three contracts that have to agree**: the check constraint on
+`private.pending_notifications`, the `NotificationKind` union, and the
+`templates` record in
+`src/lib/email/templates.ts`. `drainNotifications` skips a row it has no
+template for rather than settling it, so a mismatch strands rows instead of
+losing them — but it does strand them. Adding a kind also means adding a row
+to the `emails` section of `src/app/privacy/page.tsx`, which names all three
+emails and would otherwise be untrue.
+
+Templates build markup through the `html` tagged template in
+`src/lib/email/templates.ts`, which escapes every interpolation — all three
+messages carry a name, an organization name or an administrator's note. Do not
+rewrite them as plain string concatenation.
+
+Their layout and copy are decided in `docs/access-decision-notification.md`,
+which predates the sender. Change that document and the templates together.
 
 ## Auth model
 
