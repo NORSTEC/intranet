@@ -7,10 +7,12 @@ things that aren't obvious from reading the code once.
 ## Commands
 
 ```bash
+pnpm dev:all     # db:start, then dev
 pnpm lint        # eslint .
 pnpm typecheck   # tsc --noEmit
+pnpm test        # vitest, the pure rules
 pnpm build
-pnpm check       # all three of the above, in order
+pnpm check       # typecheck, lint, test, build — in order
 
 pnpm db:start    # local Supabase stack in Docker
 pnpm db:reset    # rebuild the local database from every migration
@@ -24,14 +26,18 @@ runs it on every pull request, and it has already caught a `security definer`
 function that lost three of its `delete` statements in a rewrite and broke
 access-request declines in production.
 
-## Supabase: local CLI, remote database
+## Supabase: local by default, hosted only from CI
 
-`supabase/.temp/project-ref` links this repo to a **hosted** Supabase project,
-and `.env.local` points `next dev` at that same hosted project — not the local
-Docker instance `supabase status` reports. `npx supabase db push` /
-`migration list` talk to that hosted project too. There is effectively no
-separate local dev database in normal use; treat the linked project as shared,
-real state.
+`.env.example` — and therefore `.env.local` — points at the **local** stack
+`pnpm db:start` boots, on `127.0.0.1:54321`. Develop against that. It is built
+from every migration in this repository and thrown away by `pnpm db:reset`,
+so nothing there is precious.
+
+`supabase/.temp/project-ref` may still link the checkout to the **hosted**
+project, which means `supabase db push` and `supabase migration list` talk to
+production, with real members' personal data and no undo. Do not run either
+by hand. `.github/workflows/migrate.yml` applies migrations on merge to `main`
+and is the only thing that should.
 
 **Migrations are append-only.** Editing the body of an already-applied
 migration file does nothing to the deployed database — it only replays on a
