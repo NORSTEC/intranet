@@ -490,7 +490,17 @@ account (UL2), and the domain confirmation step showing the affected count
    same reason. And `/auth/callback` now sends an unapproved organization
    account to `/access?organization=<slug>&returning=true`, which the request
    page does not read yet; it is inert until step 5.
-4. B5, B6, B9.
+4. ~~B5, B6, B9~~ — done, in `20260819010400_account_capacity_per_domain.sql`,
+   `20260819010500_address_claim_requires_proof.sql` and
+   `20260819010600_portal_admin_keeps_norstec_identity.sql`. Suite at 240.
+
+   B6 turned out to change more than the SI10 row predicted. An unproven
+   account presenting an organization address no longer claims the imported
+   profile, so it becomes a *new* person — and a new person on an organization
+   address goes through onboarding, which means the join decision returns
+   `onboarding` rather than `unproven`. The refusal is audited as
+   `auth.address_claim_unproven`, which is the row an administrator needs to
+   tell a conflicting account from a genuine one.
 5. UI: `/access` preselection, onboarding routing, the administration cards for
    addresses, domains and policy.
 6. B7 and the profile page last, once no membership depends on an address

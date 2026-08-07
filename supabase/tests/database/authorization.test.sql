@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(232);
+select plan(240);
 
 insert into public.people (
   full_name,
@@ -259,7 +259,7 @@ values
     'precreated@norstec.no',
     now(),
     '{"provider":"google","providers":["google"]}'::jsonb,
-    '{"full_name":"Pre-created Member"}'::jsonb,
+    '{"full_name":"Pre-created Member","custom_claims":{"hd":"norstec.no"}}'::jsonb,
     now(),
     now(),
     false,
@@ -272,7 +272,7 @@ values
     'orgonly@norstec.no',
     now(),
     '{"provider":"google","providers":["google"]}'::jsonb,
-    '{"full_name":"Organization Email Only"}'::jsonb,
+    '{"full_name":"Organization Email Only","custom_claims":{"hd":"norstec.no"}}'::jsonb,
     now(),
     now(),
     false,
@@ -3946,11 +3946,38 @@ select is(
   (
     select count(*)
     from public.memberships as membership
-    join public.people as person on person.id = membership.person_id
-    where person.full_name = 'Unproven Applicant'
+    join public.person_emails as address on address.person_id = membership.person_id
+    where address.email = 'unproven@joinlab.no'
   ),
   0::bigint,
   'an address on the domain is not enough without the claim that proves it'
+);
+
+-- The imported profile carries the history. Handing it to whoever presents the
+-- address is how a conflicting account inherits somebody else's membership.
+select isnt(
+  (
+    select account.person_id
+    from public.portal_accounts as account
+    where account.auth_user_id = '77777777-7777-4777-8777-777777777774'
+  ),
+  (
+    select address.person_id
+    from public.person_emails as address
+    where address.email = 'unproven@joinlab.no'
+  ),
+  'an unproven account does not claim the imported profile holding the address'
+);
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'auth.address_claim_unproven'
+      and details ->> 'email' = 'unproven@joinlab.no'
+  ),
+  1::bigint,
+  'the refused claim is on the record for somebody to look at'
 );
 
 set local role authenticated;
@@ -3960,10 +3987,12 @@ select set_config(
   true
 );
 
+-- A new profile on an organization address is asked first whether it is a new
+-- person at all, so the join decision waits for the answer.
 select is(
   (select public.apply_own_domain_join() ->> 'outcome'),
-  'unproven',
-  'an account that proved no hosted domain is told so rather than let in'
+  'onboarding',
+  'an unproven account is sent through onboarding rather than into the organization'
 );
 
 -- The rule a directory would enforce by not listing them. An ended member
@@ -4099,6 +4128,139 @@ select is(
   ),
   'ended',
   'the bypass through linking is closed'
+);
+
+
+
+-- One account per organization domain, plus one that is not on any of them.
+-- The old limit was the number two, which refused the ordinary case as soon as
+-- a second member organization existed.
+
+reset role;
+
+select throws_ok(
+  $$
+    select private.assert_account_capacity(
+      (
+        select account.person_id
+        from public.portal_accounts as account
+        where account.auth_user_id = '77777777-7777-4777-8777-777777777773'
+      ),
+      'second@joinlab.no',
+      'joinlab.no'
+    )
+  $$,
+  'P0001',
+  'too_many_portal_accounts',
+  'a second account on the same organization domain is refused'
+);
+
+select lives_ok(
+  $$
+    select private.assert_account_capacity(
+      (
+        select account.person_id
+        from public.portal_accounts as account
+        where account.auth_user_id = '77777777-7777-4777-8777-777777777773'
+      ),
+      'second@example.com',
+      null
+    )
+  $$,
+  'a private account alongside the organization account is allowed'
+);
+
+select throws_ok(
+  $$
+    select private.assert_merged_account_capacity(
+      (
+        select account.person_id
+        from public.portal_accounts as account
+        where account.auth_user_id = '77777777-7777-4777-8777-777777777773'
+      ),
+      (
+        select account.person_id
+        from public.portal_accounts as account
+        where account.auth_user_id = '77777777-7777-4777-8777-777777777775'
+      )
+    )
+  $$,
+  'P0001',
+  'too_many_portal_accounts',
+  'two profiles holding an account on the same domain cannot merge until one is unlinked'
+);
+
+select lives_ok(
+  $$
+    select private.assert_merged_account_capacity(
+      (
+        select account.person_id
+        from public.portal_accounts as account
+        where account.auth_user_id = '77777777-7777-4777-8777-777777777773'
+      ),
+      (select id from public.people where full_name = 'Ignite Import')
+    )
+  $$,
+  'a duplicate holding no sign-in account merges regardless of domain'
+);
+
+-- The portal administrator requirement had a door beside it: take the address
+-- rather than the account, and the role survives with nothing behind it.
+insert into public.people (full_name, portal_access_status, source)
+values ('Administrator Without Account', 'active', 'manual');
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select person.id, 'admin.only@norstec.no', 'organization', true, 'manual'
+from public.people as person
+where person.full_name = 'Administrator Without Account';
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select person.id, 'admin.private@example.com', 'personal', false, 'manual'
+from public.people as person
+where person.full_name = 'Administrator Without Account';
+
+insert into public.portal_administrators (person_id)
+select id from public.people where full_name = 'Administrator Without Account';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.remove_person_email(
+      (
+        select id
+        from public.people
+        where full_name = 'Administrator Without Account'
+      ),
+      'admin.only@norstec.no'
+    )
+  $$,
+  'P0001',
+  'portal_admin_requires_norstec_account',
+  'the last Norstec identity of a portal administrator cannot be removed as an address either'
+);
+
+select lives_ok(
+  $$
+    select public.remove_person_email(
+      (
+        select id
+        from public.people
+        where full_name = 'Administrator Without Account'
+      ),
+      'admin.private@example.com'
+    )
+  $$,
+  'any other address of theirs is ordinary'
 );
 
 
