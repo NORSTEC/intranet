@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(196);
+select plan(232);
 
 insert into public.people (
   full_name,
@@ -220,7 +220,7 @@ values
     'member@norstec.no',
     now(),
     '{"provider":"google","providers":["google"]}'::jsonb,
-    '{"full_name":"Norstec Member"}'::jsonb,
+    '{"full_name":"Norstec Member","custom_claims":{"hd":"norstec.no"}}'::jsonb,
     now(),
     now(),
     false,
@@ -2014,7 +2014,7 @@ values (
   'returning@norstec.no',
   now(),
   '{"provider":"google","providers":["google"]}'::jsonb,
-  '{"full_name":"Returning Member"}'::jsonb,
+  '{"full_name":"Returning Member","custom_claims":{"hd":"norstec.no"}}'::jsonb,
   now(),
   now(),
   false,
@@ -2115,7 +2115,7 @@ values
     'unlink.org@norstec.no',
     now(),
     '{"provider":"google","providers":["google"]}'::jsonb,
-    '{"full_name":"Unlink Member"}'::jsonb,
+    '{"full_name":"Unlink Member","custom_claims":{"hd":"norstec.no"}}'::jsonb,
     now(),
     now(),
     false,
@@ -2891,14 +2891,14 @@ values
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     'authenticated', 'authenticated', 'rename.subject@orbitntnu.no', now(),
     '{"provider":"google","providers":["google"]}'::jsonb,
-    '{"full_name":"Rename Subject","provider_id":"google-rename-subject"}'::jsonb,
+    '{"full_name":"Rename Subject","provider_id":"google-rename-subject","custom_claims":{"hd":"orbitntnu.no"}}'::jsonb,
     now(), now(), false, false
   ),
   (
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     'authenticated', 'authenticated', 'unlink.subject@orbitntnu.no', now(),
     '{"provider":"google","providers":["google"]}'::jsonb,
-    '{"full_name":"Unlink Subject","provider_id":"google-unlink-subject"}'::jsonb,
+    '{"full_name":"Unlink Subject","provider_id":"google-unlink-subject","custom_claims":{"hd":"orbitntnu.no"}}'::jsonb,
     now(), now(), false, false
   ),
   (
@@ -3002,7 +3002,7 @@ values (
   'ffffffff-ffff-4fff-8fff-ffffffffffff',
   'authenticated', 'authenticated', 'renamed.subject@orbitntnu.no', now(),
   '{"provider":"google","providers":["google"]}'::jsonb,
-  '{"full_name":"Address Successor","provider_id":"google-address-successor"}'::jsonb,
+  '{"full_name":"Address Successor","provider_id":"google-address-successor","custom_claims":{"hd":"orbitntnu.no"}}'::jsonb,
   now(), now(), false, false
 );
 
@@ -3132,7 +3132,7 @@ values (
   'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
   'authenticated', 'authenticated', 'unlink.subject@orbitntnu.no', now(),
   '{"provider":"google","providers":["google"]}'::jsonb,
-  '{"full_name":"Unlink Subject","provider_id":"google-unlink-subject"}'::jsonb,
+  '{"full_name":"Unlink Subject","provider_id":"google-unlink-subject","custom_claims":{"hd":"orbitntnu.no"}}'::jsonb,
   now(), now(), false, false
 );
 
@@ -3445,6 +3445,662 @@ select throws_ok(
   'permission denied for function sync_slack_directory',
   'a signed-out visitor cannot sync the Slack directory'
 );
+
+
+-- Hosted domain, domain administration and the join policy. The membership
+-- decision has not moved yet: these cover the columns and the operations that
+-- the move will read, plus the two guards that make registering a domain
+-- survivable — a reserved domain cannot be registered at all, and a domain
+-- already answering for one organization cannot be taken by another.
+
+reset role;
+
+insert into public.organizations (slug, name, status)
+values ('ignite', 'Ignite', 'active');
+
+insert into public.people (full_name, portal_access_status, source)
+values ('Ignite Import', 'unclaimed', 'manual');
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select person.id, 'imported@ignite.no', 'organization', true, 'manual'
+from public.people as person
+where person.full_name = 'Ignite Import';
+
+-- Google puts `hd` in the ID token only for accounts that belong to the hosted
+-- domain, and GoTrue lands it under `custom_claims`. An address suffix proves
+-- nothing on its own, so this is the column the membership decision will read.
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values (
+  '77777777-7777-4777-8777-777777777771',
+  'authenticated',
+  'authenticated',
+  'hosted@example.com',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Hosted Person","custom_claims":{"hd":"example.com"}}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+select is(
+  (
+    select hosted_domain
+    from public.portal_accounts
+    where auth_user_id = '77777777-7777-4777-8777-777777777771'
+  ),
+  'example.com',
+  'provisioning records the hosted domain the Google account proved'
+);
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values (
+  '77777777-7777-4777-8777-777777777772',
+  'authenticated',
+  'authenticated',
+  'unhosted@example.com',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Unhosted Person"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+select is(
+  (
+    select hosted_domain
+    from public.portal_accounts
+    where auth_user_id = '77777777-7777-4777-8777-777777777772'
+  ),
+  null,
+  'an account that proved no hosted domain records none'
+);
+
+-- GoTrue has a legacy path that answers from the userinfo endpoint and drops
+-- the claim. A later sign-in arriving without it must not erase what an
+-- earlier one established, or the account would silently stop being an
+-- organization account.
+update auth.users
+set raw_user_meta_data = '{"full_name":"Hosted Person"}'::jsonb,
+    raw_app_meta_data = '{"provider":"google","providers":["google"]}'::jsonb,
+    updated_at = now()
+where id = '77777777-7777-4777-8777-777777777771';
+
+select is(
+  (
+    select hosted_domain
+    from public.portal_accounts
+    where auth_user_id = '77777777-7777-4777-8777-777777777771'
+  ),
+  'example.com',
+  'a later sign-in without the claim keeps the hosted domain already proven'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'ignite.no'
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot register an organization domain'
+);
+
+select throws_ok(
+  $$
+    select public.list_organization_domains(
+      (select id from public.organizations where slug = 'ignite')
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot read which domains an organization answers to'
+);
+
+select throws_ok(
+  $$
+    select public.set_organization_domain_join_policy(
+      (select id from public.organizations where slug = 'ignite'),
+      'auto'
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot change the join policy'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select is(
+  (
+    select public.preview_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'gmail.com'
+    ) ->> 'reservedReason'
+  ),
+  'mailbox_provider',
+  'the dry run names why a mailbox provider is refused before anything happens'
+);
+
+select is(
+  (
+    select public.preview_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'ignite.no'
+    ) ->> 'addressCount'
+  ),
+  '1',
+  'the dry run counts the addresses a registration would capture'
+);
+
+-- One typo away from converting every personal address in the portal into an
+-- organization address, and under an automatic policy into a membership.
+select throws_ok(
+  $$
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'gmail.com'
+    )
+  $$,
+  'P0001',
+  'reserved_domain',
+  'a mailbox provider cannot be registered as an organization domain'
+);
+
+select throws_ok(
+  $$
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'ntnu.no'
+    )
+  $$,
+  'P0001',
+  'reserved_domain',
+  'a shared institution domain cannot be registered either'
+);
+
+select throws_ok(
+  $$
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'norstec.no'
+    )
+  $$,
+  'P0001',
+  'domain_registered_elsewhere',
+  'a domain already answering for one organization cannot be taken by another'
+);
+
+select is(
+  (
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'ignite.no'
+    ) ->> 'addressCount'
+  ),
+  '1',
+  'registering a domain reports how many addresses it captured'
+);
+
+select throws_ok(
+  $$
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'ignite'),
+      'ignite.no'
+    )
+  $$,
+  'P0001',
+  'domain_already_registered',
+  'the same domain cannot be registered twice'
+);
+
+select is(
+  (
+    select public.list_organization_domains(
+      (select id from public.organizations where slug = 'ignite')
+    ) -> 0 ->> 'domain'
+  ),
+  'ignite.no',
+  'a portal administrator can read the domains an organization answers to'
+);
+
+select throws_ok(
+  $$ select public.remove_organization_domain('nothing-here.example') $$,
+  'P0001',
+  'domain_not_found',
+  'removing a domain nobody registered is refused'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'organization_domain.added'
+      and details ->> 'domain' = 'ignite.no'
+  ),
+  1::bigint,
+  'registering a domain is on the record'
+);
+
+select is(
+  (
+    select domain_join_policy
+    from public.organizations
+    where slug = 'norstec'
+  ),
+  'auto',
+  'Norstec keeps the automatic join it already had'
+);
+
+select is(
+  (
+    select domain_join_policy
+    from public.organizations
+    where slug = 'ignite'
+  ),
+  'request',
+  'an organization the portal cannot check against a directory starts by asking'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.set_organization_domain_join_policy(
+      (select id from public.organizations where slug = 'ignite'),
+      'everyone'
+    )
+  $$,
+  'P0001',
+  'invalid_join_policy',
+  'a join policy outside the three the product has is refused'
+);
+
+select is(
+  (
+    select public.set_organization_domain_join_policy(
+      (select id from public.organizations where slug = 'ignite'),
+      'auto'
+    ) ->> 'changed'
+  ),
+  'true',
+  'a portal administrator can change the join policy'
+);
+
+select is(
+  (
+    select public.remove_organization_domain('ignite.no') ->> 'retainedMembershipCount'
+  ),
+  '0',
+  'removing a domain reports the memberships it leaves behind rather than ending them'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.audit_events
+    where action = 'organization.domain_join_policy_changed'
+      and details ->> 'policy' = 'auto'
+  ),
+  1::bigint,
+  'a join policy change is on the record'
+);
+
+set local role anon;
+
+select throws_ok(
+  $$ select public.add_organization_domain(1, 'example.com') $$,
+  '42501',
+  'permission denied for function add_organization_domain',
+  'a signed-out visitor cannot register an organization domain'
+);
+
+
+
+-- The membership decision, now that it lives in one function and keys on what
+-- the account proved rather than on the text after the `@`.
+
+reset role;
+
+insert into public.organizations (slug, name, status)
+values ('joinlab', 'Join Lab', 'active');
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.add_organization_domain(
+      (select id from public.organizations where slug = 'joinlab'),
+      'joinlab.no'
+    )
+  $$,
+  'a portal administrator registers a domain for a member organization'
+);
+
+reset role;
+
+insert into public.people (full_name, portal_access_status, source)
+values ('Join Applicant', 'unclaimed', 'manual');
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select person.id, 'applicant@joinlab.no', 'organization', true, 'manual'
+from public.people as person
+where person.full_name = 'Join Applicant';
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values (
+  '77777777-7777-4777-8777-777777777773',
+  'authenticated',
+  'authenticated',
+  'applicant@joinlab.no',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Join Applicant","custom_claims":{"hd":"joinlab.no"}}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+-- An organization whose Workspace directory the portal cannot read starts by
+-- asking. Proving the domain gets the person recognised, not admitted.
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Join Applicant'
+  ),
+  0::bigint,
+  'a proven domain grants nothing while the organization asks for approval'
+);
+
+-- The trigger on auth.users does not fire on an ordinary repeat sign-in, so a
+-- policy nobody can act on until each person is renamed in the Admin console
+-- is a policy that does nothing. The sign-in callback asks on every sign-in.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_domain_join_policy(
+      (select id from public.organizations where slug = 'joinlab'),
+      'auto'
+    )
+  $$,
+  'the organization switches to joining automatically'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated"}',
+  true
+);
+
+select is(
+  (select public.apply_own_domain_join() ->> 'outcome'),
+  'joined',
+  'a policy change reaches people already signed up, on their next sign-in'
+);
+
+select is(
+  (
+    select membership.provisioning_method
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Join Applicant'
+  ),
+  'domain',
+  'the membership records that a domain provisioned it'
+);
+
+-- A consumer Google account can carry a work address for years after the
+-- Workspace account behind it is gone. Without the claim it proves nothing,
+-- and the automatic policy is not for it.
+reset role;
+
+insert into public.people (full_name, portal_access_status, source)
+values ('Unproven Applicant', 'unclaimed', 'manual');
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select person.id, 'unproven@joinlab.no', 'organization', true, 'manual'
+from public.people as person
+where person.full_name = 'Unproven Applicant';
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values (
+  '77777777-7777-4777-8777-777777777774',
+  'authenticated',
+  'authenticated',
+  'unproven@joinlab.no',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Unproven Applicant"}'::jsonb,
+  now(),
+  now(),
+  false,
+  false
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Unproven Applicant'
+  ),
+  0::bigint,
+  'an address on the domain is not enough without the claim that proves it'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777774","role":"authenticated"}',
+  true
+);
+
+select is(
+  (select public.apply_own_domain_join() ->> 'outcome'),
+  'unproven',
+  'an account that proved no hosted domain is told so rather than let in'
+);
+
+-- The rule a directory would enforce by not listing them. An ended member
+-- whose Workspace account outlived the decision does not walk back in.
+reset role;
+
+update public.memberships
+set status = 'ended',
+    ended_at = now()
+where person_id = (
+  select id from public.people where full_name = 'Join Applicant'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated"}',
+  true
+);
+
+select is(
+  (select public.apply_own_domain_join() ->> 'outcome'),
+  'request',
+  'an ended membership outranks the automatic policy'
+);
+
+select is(
+  (select public.apply_own_domain_join() ->> 'returning'),
+  'true',
+  'and the answer says they are coming back rather than arriving'
+);
+
+reset role;
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Join Applicant'
+  ),
+  'ended',
+  'the ended membership is left as it is rather than quietly reactivated'
+);
+
+-- Linking used to run its own copy of the domain rule, so every guard on the
+-- sign-in path was a door standing open here. Same function, same answer.
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  is_sso_user, is_anonymous
+)
+values
+  (
+    '77777777-7777-4777-8777-777777777775',
+    'authenticated',
+    'authenticated',
+    'returning.private@example.com',
+    now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Returning Linker"}'::jsonb,
+    now(),
+    now(),
+    false,
+    false
+  ),
+  (
+    '77777777-7777-4777-8777-777777777776',
+    'authenticated',
+    'authenticated',
+    'returning.linker@joinlab.no',
+    now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Returning Linker","custom_claims":{"hd":"joinlab.no"}}'::jsonb,
+    now(),
+    now(),
+    false,
+    false
+  );
+
+insert into public.memberships (
+  person_id, organization_id, role, status, provisioning_method, ended_at
+)
+select
+  account.person_id,
+  organization.id,
+  'member',
+  'ended',
+  'domain',
+  now()
+from public.portal_accounts as account
+cross join public.organizations as organization
+where account.auth_user_id = '77777777-7777-4777-8777-777777777775'
+  and organization.slug = 'joinlab';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777775","role":"authenticated"}',
+  true
+);
+
+select lives_ok(
+  $$ select public.start_portal_account_link(repeat('b', 64), 'add_account') $$,
+  'the returning member starts linking the organization account'
+);
+
+reset role;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"77777777-7777-4777-8777-777777777776","role":"authenticated"}',
+  true
+);
+
+select is(
+  (
+    select public.complete_portal_account_link(repeat('b', 64)) -> 'join' ->> 'outcome'
+  ),
+  'request',
+  'linking the organization account does not hand back the membership either'
+);
+
+reset role;
+
+select is(
+  (
+    select membership.status
+    from public.memberships as membership
+    join public.portal_accounts as account
+      on account.person_id = membership.person_id
+    where account.auth_user_id = '77777777-7777-4777-8777-777777777775'
+  ),
+  'ended',
+  'the bypass through linking is closed'
+);
+
 
 reset role;
 select * from finish();

@@ -165,7 +165,7 @@ export function LoginAccountsSettings({
               Remove this sign-in account?
             </h2>
             <p className="mt-4 leading-relaxed opacity-65">
-              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile. The address stays on your profile, so people can still reach you there and the portal still recognises you by it. An active organization membership that rests on this address has to be ended by an organization administrator first.
+              <span className="font-medium">{unlinkTarget.email}</span> will no longer sign you in to this profile. The address stays on your profile, so people can still reach you there — and signing in with this Google account again brings you back to this same profile rather than starting a new one. Removing the address itself is something a portal administrator does. An active organization membership that rests on this address has to be ended by an organization administrator first.
             </p>
             {unlinkTarget.isCurrentSession && (
               <p className="mt-3 leading-relaxed opacity-65">

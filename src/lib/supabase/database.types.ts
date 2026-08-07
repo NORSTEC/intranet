@@ -409,6 +409,7 @@ export type Database = {
       organizations: {
         Row: {
           created_at: string
+          domain_join_policy: string
           id: number
           location: string | null
           logo_path: string | null
@@ -422,6 +423,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          domain_join_policy?: string
           id?: never
           location?: string | null
           logo_path?: string | null
@@ -435,6 +437,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          domain_join_policy?: string
           id?: never
           location?: string | null
           logo_path?: string | null
@@ -573,6 +576,7 @@ export type Database = {
         Row: {
           account_email: string
           auth_user_id: string
+          hosted_domain: string | null
           last_seen_at: string
           linked_at: string
           onboarding_status: string
@@ -583,6 +587,7 @@ export type Database = {
         Insert: {
           account_email: string
           auth_user_id: string
+          hosted_domain?: string | null
           last_seen_at?: string
           linked_at?: string
           onboarding_status?: string
@@ -593,6 +598,7 @@ export type Database = {
         Update: {
           account_email?: string
           auth_user_id?: string
+          hosted_domain?: string | null
           last_seen_at?: string
           linked_at?: string
           onboarding_status?: string
@@ -947,12 +953,36 @@ export type Database = {
         Returns: string
       }
       restore_person: { Args: { p_person_id: number }; Returns: undefined }
+      apply_own_domain_join: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      add_organization_domain: {
+        Args: { p_domain: string; p_organization_id: number }
+        Returns: Json
+      }
+      list_organization_domains: {
+        Args: { p_organization_id: number }
+        Returns: Json
+      }
+      set_organization_domain_join_policy: {
+        Args: { p_organization_id: number; p_policy: string }
+        Returns: Json
+      }
+      preview_organization_domain: {
+        Args: { p_domain: string; p_organization_id: number }
+        Returns: Json
+      }
       portal_account_unlink_block: {
         Args: { p_auth_user_id: string }
         Returns: string
       }
       remove_person_email: {
         Args: { p_email: string; p_person_id: number }
+        Returns: Json
+      }
+      remove_organization_domain: {
+        Args: { p_domain: string }
         Returns: Json
       }
       review_access_request: {
