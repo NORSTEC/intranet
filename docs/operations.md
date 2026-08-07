@@ -51,28 +51,52 @@ Nothing here mocks Supabase. A mocked database tests the mock.
 
 ## There is only one deployed environment
 
-`vercel.json` stops Vercel building anything that is not production. The
-deployment it would otherwise make for each pull request is skipped before the
-build starts.
+`main` deploys to production. Nothing else deploys at all.
 
 This is the honest shape of the setup rather than a limitation being worked
-around. A preview deployment is worth having when it can be clicked through,
-and that needs a database. The only hosted database here is production, which
-holds real members' personal data, so the Supabase variables are scoped to
-Production alone and previews have no credentials at all. What that produced
-was a preview URL that always built green and always died on the first click.
+around. A deployment is worth having when you can open it and use it, and this
+application is nothing without a database — every page reads from Supabase. The
+only hosted database here is production, holding real members' names, addresses
+and sign-in accounts, and pointing unreviewed branch code at it would mean pull
+requests writing to the member register. So the Supabase variables are scoped to
+Production alone, and a preview would come up with no credentials: green build,
+dead on the first click. That is not a deployment anybody wants; it is a URL
+that looks broken and costs somebody an hour.
 
-What replaces it is the local stack. `pnpm dev:all` gives every developer a
-full portal against a database built from the same migrations.
+What replaces it is the local stack. `pnpm dev:all` gives every developer a full
+portal against a database built from the same migrations, which is a better
+review environment than one shared preview would have been.
 
-Changing this needs a second database for previews to point at: either a free
+`vercel.json` says this twice, on purpose:
+
+- **`git.deploymentEnabled`** stops Vercel creating a deployment for any branch
+  but `main`. Nothing is queued, so nothing reports back and pull requests carry
+  no Vercel row at all. Note the `**` — minimatch's `*` does not cross a slash,
+  and every branch here is named `feat/…` or `fix/…`.
+- **`ignoreCommand`** is the backstop. If a deployment is started some other way
+  — a dashboard redeploy, a `vercel deploy` from a laptop, a branch pattern that
+  slips past the rule above — it exits 0 for anything that is not production and
+  the build is skipped. **The exit codes read backwards: 0 skips the build, 1
+  lets it run.**
+
+Either alone would do the job; together the second one means a mistake in the
+first fails safe rather than deploying a branch.
+
+Restoring previews needs a second database for them to point at: either a free
 Supabase project — the free plan allows two per organization and this uses one
 — or Supabase's branching feature, which creates a throwaway database per pull
 request and bills for as long as each lives. Neither is worth it at three
 developers, because a single shared preview database has one schema and schema
 changes arrive here often enough that half the pull requests would render
-against a schema that is not theirs. When that changes, delete `vercel.json`
-and add the preview-scoped variables in Vercel.
+against a schema that is not theirs. When that changes, delete `vercel.json` and
+add the preview-scoped variables in Vercel.
+
+Nothing therefore verifies a Vercel deployment before merge. What is verified is
+that the code builds: the `Types, lint, tests and build` check runs the same
+`next build` Vercel runs, and it is required. The safety net for the rest is
+**Deployments → ⋯ → Promote to Production** on the last good deployment, which
+takes seconds and does not rebuild. The database does not roll back with it,
+which is the other reason to write migrations an older application survives.
 
 ### The three things called "environment"
 
