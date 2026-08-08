@@ -402,11 +402,17 @@ export function PersonAdminActions({
                   key={address.email}
                 >
                   <span className="break-all font-medium">{address.email}</span>
+                  {/* Two facts about one address, told apart by colour rather
+                      than by reading: sun for the one that reaches the person,
+                      beachball for the account that signs in — the same
+                      beachball `YouPill` and the current session pill use. */}
                   {address.isPrimary && (
-                    <span className="portal-pill">contact address</span>
+                    <span className="portal-pill border-sun bg-sun text-moody-static">
+                      contact address
+                    </span>
                   )}
                   {address.account && (
-                    <span className="portal-pill">
+                    <span className="portal-pill border-beachball bg-beachball text-moody-static">
                       {address.account.isOnboarding
                         ? "signs in — onboarding"
                         : "signs in"}
