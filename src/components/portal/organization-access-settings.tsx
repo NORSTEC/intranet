@@ -15,28 +15,22 @@ import { Toast } from "@/components/portal/toast";
 export type OrganizationAccess = {
   domains: Array<{ domain: string; verifiedAt: string | null }>;
   id: number;
-  joinPolicy: "auto" | "request" | "off";
+  joinPolicy: "auto" | "request";
   name: string;
 };
 
 const joinPolicies = [
   {
     description:
-      "Signing in with an account on one of the domains below joins the organization, with nobody in the loop.",
+      "Anybody signing in with an account on one of the domains below is a member from that moment. Nobody has to let them in, and nobody has to remember to.",
     label: "Join automatically",
     value: "auto",
   },
   {
     description:
-      "The account is recognised as the organization's, and the person is sent to a request an administrator decides.",
-    label: "Ask for approval",
+      "The account is recognised as this organization's, and the person is sent to a request with it already filled in. Somebody has to work that queue.",
+    label: "Approve each person",
     value: "request",
-  },
-  {
-    description:
-      "The domain proves who somebody is and nothing more. Membership only ever comes from an approved request.",
-    label: "Prove identity only",
-    value: "off",
   },
 ] as const;
 
@@ -156,7 +150,7 @@ export function OrganizationAccessSettings({
                 <legend className="section-label opacity-45">
                   Accounts on its own domains
                 </legend>
-                <div className="mt-1 grid gap-3 lg:grid-cols-3">
+                <div className="mt-1 grid gap-3 sm:grid-cols-2">
                   {joinPolicies.map((policy) => {
                     const isSelected = organization.joinPolicy === policy.value;
                     return (

@@ -109,15 +109,30 @@ the single most destructive operation in this plan:
 
 ### B3. Join policy per organization
 
-`organizations.domain_join_policy text not null default 'request'`, check
-constraint `in ('auto', 'request', 'off')`.
+`organizations.domain_join_policy text not null default 'auto'`, check
+constraint `in ('auto', 'request')`.
 
-- `auto` — a verified domain match grants an active membership.
+- `auto` — a proven domain grants an active membership.
 - `request` — the person is sent to `/access` with the organization preselected.
-- `off` — the domain proves identity only.
 
-Norstec is set to `auto` in the same migration, which preserves today's
-behaviour. Orbit and Ignite start at `request`.
+Shipped as three values defaulting to `request`, and corrected in
+`20260821020000_join_by_default.sql` once the launch was concrete. Both halves
+of that are worth recording.
+
+`off` was meant to be "proves identity, promises nothing", which is what
+registering a domain already does — the address becomes the organization's, the
+account takes its domain's place in the capacity rule, and claiming an address
+on it needs the proof. None of that was ever the policy's to control. Next to
+`request`, all `off` did was send somebody to the same approval screen without
+the organization filled in, and the organization is known either way.
+
+The default flipped because the portal is about to ask every member
+organization to sign in and register themselves, and nobody is going to sit
+over an approval queue. A queue nobody works is not a safeguard. What is given
+up is real: for an organization whose Workspace the portal cannot read, a
+membership appears with nobody seeing it, and nothing tells the portal when
+somebody leaves. The guard that survives is the one that matters most — an
+ended membership is never reinstated by a domain.
 
 ### B4. One membership decision
 

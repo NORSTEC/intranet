@@ -29,8 +29,7 @@ flowchart TD
     E -- "none" --> G{"join policy"}
     G -- "auto, and no row exists" --> H["joined<br/>active membership created"]
     G -- "auto, but a row exists" --> I
-    G -- "request" --> I["request<br/>returning = true if ended"]
-    G -- "off" --> J["identity_only"]
+    G -- "approve each person" --> I["request<br/>organization preselected<br/>returning = true if ended"]
 ```
 
 Two rules inside it are worth stating on their own, because they are the ones
@@ -80,7 +79,7 @@ flowchart TD
     I --> J{"outcome"}
     J -- "joined or member" --> K["portal"]
     J -- "request" --> L["/access?organization=slug<br/>preselected, returning flagged"]
-    J -- "unproven, no_organization,<br/>identity_only" --> M["/access<br/>free choice"]
+    J -- "unproven or<br/>no_organization" --> M["/access<br/>free choice"]
 ```
 
 The **repeat sign-in** arrow is the one that is easy to miss. The trigger on
@@ -208,9 +207,8 @@ identifiers match the edge-case table in
 
 | # | Do this | Expect |
 |---|---|---|
-| SI1 | Set an organization to **Join automatically**, register its domain, sign in with an account on it that has never been seen | Straight into the portal, active membership on the person's admin page, `provisioning_method` domain |
-| SI2 | Same, with the organization on **Ask for approval** | `/access` with that organization preselected and a line saying it reviews who joins |
-| SI3 | Same, on **Prove identity only** | `/access` with a free choice, no preselection |
+| SI1 | Register a domain for an organization and sign in with an account on it that has never been seen — joining automatically is the default | Straight into the portal, active membership on the person's admin page, `provisioning_method` domain |
+| SI2 | Same, with the organization on **Approve each person** | `/access` with that organization preselected and a line saying it reviews who joins |
 | SI4 | End a member's membership, then have them sign in again with the organization account | They reach the portal — an ended membership makes them an alumnus, and that is unchanged. On their admin page the membership is still **ended**: the domain did not hand it back |
 | SI4b | Same, but with their portal access suspended and then reactivated with no membership at all | `/access`, that organization preselected, wording says they were a member before |
 | SI5 | Approve that request | The same membership row goes active again — check the person page shows one membership for that organization, not two |
@@ -224,7 +222,7 @@ identifiers match the edge-case table in
 
 | # | Do this | Expect |
 |---|---|---|
-| RS1 | With somebody sitting on `/access` for an organization, switch it to **Join automatically**, then have them sign in again | They land in the portal. This is the one that does not work without the callback asking |
+| RS1 | Put an organization behind a queue, leave somebody sitting on `/access` for it, switch it back to **Join automatically**, then have them sign in again | They land in the portal. This is the one that does not work without the callback asking |
 | RS3 | Switch an organization from auto to ask | Existing members keep everything; only new arrivals are gated |
 | RS4 | End somebody's membership while they have a tab open | Their next page load drops them out of the portal |
 
