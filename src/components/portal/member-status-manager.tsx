@@ -72,7 +72,7 @@ function MemberConfirmation({
           <div className="mt-5 rounded-2xl border border-copper p-4 text-sm leading-relaxed">
             <p className="font-medium">No personal email registered</p>
             <p className="mt-1 opacity-65">
-              Ending is still allowed, but this person may lose sign-in access when their organization account is disabled. No email will be sent during testing.
+              Ending is still allowed, but this person may lose sign-in access when their organization account is disabled.
             </p>
           </div>
         )}

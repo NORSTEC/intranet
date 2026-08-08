@@ -76,15 +76,16 @@ export default async function LoginPage({
             </p>
           )}
 
-          {/* GDPR article 13 wants this at the moment the data is collected,
-              and the collection starts on the next click: finishing Google
-              sign-in creates a profile whether or not access is ever
-              requested. It is a notice, not a consent — the processing rests
-              on article 6(1)(b), so there is nothing here to tick. */}
+          {/* Article 13 wants this at the moment the data is collected, and
+              the collection starts on the next click. It is a notice, not a
+              consent — the processing rests on article 6(1)(b), so there is
+              nothing here to tick. The detail belongs in the privacy policy;
+              a layered notice puts only the surprising part in front of the
+              button, and the surprise is that a profile exists before access
+              is ever requested. */}
           <p className="mt-5 text-sm leading-relaxed opacity-55">
-            Signing in creates a portal profile from the name and email address
-            on your Google account, before you request anything. If you never
-            request access, it is deleted automatically after 30 days.{" "}
+            Signing in creates a portal profile, deleted after 30 days if you
+            never request access.{" "}
             <a
               className="legal-link"
               href="/privacy"
