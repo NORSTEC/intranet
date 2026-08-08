@@ -38,10 +38,11 @@ that look surprising from outside:
 - **An absent `hd` means not proven, never proven personal.** GoTrue has a
   legacy path that drops the claim, so reading its absence as evidence would
   turn a Google hiccup into a portal-wide demotion.
-- **Any membership row outranks the policy.** `ended` is the one that matters —
-  somebody the organization has already let go does not walk back in because
-  their Workspace account outlived the decision, which is the rule a SCIM
-  directory enforces by not listing them. `planned`, `suspended` and `alumni`
+- **Any membership row outranks the policy** — for as long as the row exists.
+  `ended` is the one that matters: somebody the organization has already let go
+  does not walk back in because their Workspace account outlived the decision,
+  which is the rule a SCIM directory enforces by not listing them. A purge ends
+  that, because it ends the profile the row hangs on; see PL9. `planned`, `suspended` and `alumni`
   are equally not an invitation to insert, and equally cannot be reported as a
   join: the insert would do nothing while the caller was told a membership had
   been created.
@@ -271,3 +272,4 @@ Not bugs. Written down so they are not rediscovered as bugs.
 | CR3 | Gmail dot and plus variants count as different addresses | Google normalises them, the portal does not, so the same person can end up with two profiles without anybody making a mistake |
 | CR4 | A shared or role account can be linked to a person | Detecting one needs the organization's Workspace directory, which the portal cannot read for anyone but Norstec |
 | SI11 | An account that could not claim an imported profile leaves both profiles in place | Surfaced through the audit event rather than prevented, because the portal cannot tell which of the two is the real person |
+| PL9 | Somebody whose membership was ended deletes their own profile, and after the purge signs in again with a working organization account — they join as a new person, with no history | The ended-membership guard holds while the portal still remembers somebody, and a purge is the portal deliberately forgetting them. Keeping a list of erased people who may not return would retain exactly the personal data the erasure removed. What closes it in practice belongs to the organization: the Workspace account has to still work, so disabling it is the answer. For norstec.no the portal already does half of that itself — a soft delete suspends the Google account with it. The sequence also takes thirty days, because the purge runs on the retention deadline rather than on request |
