@@ -690,11 +690,10 @@ html.theme-switching *::after {
     background: var(--color-egg);
   }
 
-  /* A `.portal-surface` a radio input turns into a choice, carrying
-     `.portal-button`'s rest-and-hover inversion rather than the faint grey
-     wash it used before — that grey belonged to no other surface on the page.
-     The chosen card is the filled one, and hovering empties it, so the
-     pointer changes something wherever it lands. */
+  /* A `.portal-surface` a radio input turns into a choice. The chosen card is
+     the filled one, and the rest lift towards it on hover — there is nothing
+     to offer on the card already chosen, so it does not answer the pointer at
+     all. The faint grey wash this replaced belonged to no other surface. */
   .portal-choice {
     cursor: pointer;
     border-color: color-mix(in srgb, var(--color-moody) 20%, transparent);
@@ -708,16 +707,12 @@ html.theme-switching *::after {
     opacity: 1;
   }
 
-  .portal-choice-selected {
+  .portal-choice-selected,
+  .portal-choice-selected:hover {
     border-color: var(--color-moody);
     background: var(--color-moody);
     color: var(--color-egg);
     opacity: 1;
-  }
-
-  .portal-choice-selected:hover {
-    background: transparent;
-    color: var(--color-moody);
   }
 
   /* The native control cannot inherit the fill, so its accent flips with it. */
@@ -727,10 +722,6 @@ html.theme-switching *::after {
 
   .portal-choice-selected input[type="radio"] {
     accent-color: var(--color-egg);
-  }
-
-  .portal-choice-selected:hover input[type="radio"] {
-    accent-color: var(--color-moody);
   }
 
   .portal-surface-strong {
