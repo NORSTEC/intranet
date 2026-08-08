@@ -78,14 +78,17 @@ export async function GET(request: Request) {
     "apply_own_domain_join",
   );
 
-  // Treating a failed decision as an empty one would send somebody the policy
-  // admits straight to the request page, where they would ask for access they
-  // already had. Signing in again is the recovery, so the sign-in error is the
-  // honest answer.
+  // A failed decision is not a refusal, and it is not a reason to stop somebody
+  // signing in. It stops being able to *add* a membership, so the checks below
+  // still run and everybody who already has access keeps it; only a person who
+  // would have been admitted by their domain this very second lands on /access
+  // instead, and signing in again gives it to them.
+  //
+  // Blocking here was tried and produced exactly the failure it was meant to
+  // prevent: this function did not yet exist on the deployed database, so every
+  // sign-in in the portal failed at once.
   if (joinError) {
-    return NextResponse.redirect(
-      new URL("/login?error=authorization", requestUrl.origin),
-    );
+    console.error("apply_own_domain_join failed", joinError);
   }
 
   const join = (joinResult ?? {}) as {
