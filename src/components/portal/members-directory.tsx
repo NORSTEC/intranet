@@ -300,9 +300,16 @@ export function MembersDirectory({
                       </div>
                     </td>
                     <td className="py-3 pr-5">
-                      {member.organizations
-                        .map((organization) => organization.name)
-                        .join(", ")}
+                      {member.organizations.length > 0 ? (
+                        member.organizations
+                          .map((organization) => organization.name)
+                          .join(", ")
+                      ) : (
+                        <>
+                          <span aria-hidden="true">—</span>
+                          <span className="sr-only">No organization</span>
+                        </>
+                      )}
                     </td>
                     <td className="py-3 pr-5">{statusLabel(member.status)}</td>
                     <td className="py-3">

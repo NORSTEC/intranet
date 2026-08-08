@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(278);
+select plan(281);
 
 insert into public.people (
   full_name,
@@ -3749,8 +3749,8 @@ select is(
     from public.organizations
     where slug = 'ignite'
   ),
-  'request',
-  'an organization the portal cannot check against a directory starts by asking'
+  'auto',
+  'a new organization lets its own Workspace accounts in without a queue'
 );
 
 set local role authenticated;
@@ -3769,18 +3769,30 @@ select throws_ok(
   $$,
   'P0001',
   'invalid_join_policy',
-  'a join policy outside the three the product has is refused'
+  'a join policy the product does not have is refused'
 );
 
 select is(
   (
     select public.set_organization_domain_join_policy(
       (select id from public.organizations where slug = 'ignite'),
-      'auto'
+      'request'
     ) ->> 'changed'
   ),
   'true',
-  'a portal administrator can change the join policy'
+  'a portal administrator can put an organization behind a queue instead'
+);
+
+select throws_ok(
+  $$
+    select public.set_organization_domain_join_policy(
+      (select id from public.organizations where slug = 'ignite'),
+      'off'
+    )
+  $$,
+  'P0001',
+  'invalid_join_policy',
+  'the identity-only policy is gone, because withholding a preselection was all it did'
 );
 
 select is(
@@ -3798,7 +3810,7 @@ select is(
     select count(*)
     from public.audit_events
     where action = 'organization.domain_join_policy_changed'
-      and details ->> 'policy' = 'auto'
+      and details ->> 'policy' = 'request'
   ),
   1::bigint,
   'a join policy change is on the record'
@@ -3840,6 +3852,16 @@ select lives_ok(
   'a portal administrator registers a domain for a member organization'
 );
 
+select lives_ok(
+  $$
+    select public.set_organization_domain_join_policy(
+      (select id from public.organizations where slug = 'joinlab'),
+      'request'
+    )
+  $$,
+  'and puts this one behind an approval queue'
+);
+
 reset role;
 
 insert into public.people (full_name, portal_access_status, source)
@@ -3871,8 +3893,8 @@ values (
   false
 );
 
--- An organization whose Workspace directory the portal cannot read starts by
--- asking. Proving the domain gets the person recognised, not admitted.
+-- Put behind a queue on purpose, so proving the domain gets somebody
+-- recognised rather than admitted.
 select is(
   (
     select count(*)
@@ -4349,7 +4371,17 @@ select lives_ok(
       'slowlab.no'
     )
   $$,
-  'the organization registers its domain and keeps the default policy'
+  'the organization registers its domain'
+);
+
+select lives_ok(
+  $$
+    select public.set_organization_domain_join_policy(
+      (select id from public.organizations where slug = 'slowlab'),
+      'request'
+    )
+  $$,
+  'and asks to review who joins'
 );
 
 reset role;

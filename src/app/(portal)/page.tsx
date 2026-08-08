@@ -157,13 +157,16 @@ export default async function DashboardPage() {
 
       <RecommendedActions actions={actions} />
 
-      {dashboard.organizations.length > 0 && (
+      {/* Only the memberships that still hold. An ended one is history the
+          hero sentence already tells, and "Your organizations" claiming an
+          organization somebody left reads as a membership they still have. */}
+      {activeOrganizations.length > 0 && (
         <section aria-labelledby="organizations-heading" className="dashboard-rise">
           <h2 className="text-h2" id="organizations-heading">
             Your organizations
           </h2>
           <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {dashboard.organizations.map((organization) => (
+            {activeOrganizations.map((organization) => (
               <OrganizationCard key={organization.id} organization={organization} />
             ))}
           </div>

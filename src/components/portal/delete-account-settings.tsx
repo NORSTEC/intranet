@@ -1,23 +1,19 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { ConfirmDialog } from "@/components/portal/confirm-dialog";
 import { deleteOwnAccount } from "@/app/(portal)/profile/actions";
 
-export function DeleteAccountSettings() {
+export function DeleteAccountSettings({ name }: { name: string }) {
   const [confirming, setConfirming] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (!confirming) return;
-
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setConfirming(false);
-    }
-
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [confirming]);
+  function close() {
+    setConfirming(false);
+    setConfirmation("");
+  }
 
   function deleteAccount() {
     setError(null);
@@ -25,7 +21,7 @@ export function DeleteAccountSettings() {
       const result = await deleteOwnAccount();
       if (result && !result.ok) {
         setError(result.message);
-        setConfirming(false);
+        close();
       }
     });
   }
@@ -65,57 +61,39 @@ export function DeleteAccountSettings() {
       </div>
 
       {confirming && (
-        <div
-          aria-labelledby="delete-account-title"
-          aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(15,17,24,0.72)] p-5"
-          role="alertdialog"
+        <ConfirmDialog
+          busy={pending}
+          confirmDisabled={
+            confirmation.trim().toLocaleLowerCase("en") !==
+            name.toLocaleLowerCase("en")
+          }
+          confirmIcon="delete"
+          confirmLabel="Delete my account"
+          danger
+          onCancel={close}
+          onConfirm={deleteAccount}
+          title="Delete your account?"
         >
-          <div className="portal-surface w-full max-w-md p-7 sm:p-8">
-            <h2 className="text-2xl font-medium" id="delete-account-title">
-              Delete your account?
-            </h2>
-            <p className="mt-4 leading-relaxed opacity-65">
-              You are signed out on every device, your organization memberships
-              and team roles end, and you cannot sign in again.
-            </p>
-            <p className="mt-3 leading-relaxed opacity-65">
-              Your data is kept for 30 days and then erased permanently. Email
-              portal@norstec.no before then if you want the account back.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button
-                autoFocus
-                className="portal-button"
-                disabled={pending}
-                onClick={() => setConfirming(false)}
-                type="button"
-              >
-                <span
-                  aria-hidden="true"
-                  className="material-symbols-outlined text-[1.1rem]"
-                >
-                  close
-                </span>
-                Cancel
-              </button>
-              <button
-                className="portal-button portal-button-danger"
-                disabled={pending}
-                onClick={deleteAccount}
-                type="button"
-              >
-                <span
-                  aria-hidden="true"
-                  className="material-symbols-outlined text-[1.1rem]"
-                >
-                  {pending ? "progress_activity" : "delete"}
-                </span>
-                {pending ? "Deleting…" : "Delete my account"}
-              </button>
-            </div>
-          </div>
-        </div>
+          <p>
+            You are signed out on every device, your organization memberships
+            and team roles end, and you cannot sign in again.
+          </p>
+          <p className="mt-3">
+            Your data is kept for 30 days and then erased permanently. Email
+            portal@norstec.no before then if you want the account back.
+          </p>
+          <label className="mt-5 block">
+            <span className="section-label mb-2 block opacity-50">
+              Type &quot;{name}&quot; to confirm
+            </span>
+            <input
+              className="portal-field"
+              onChange={(event) => setConfirmation(event.target.value)}
+              type="text"
+              value={confirmation}
+            />
+          </label>
+        </ConfirmDialog>
       )}
     </section>
   );

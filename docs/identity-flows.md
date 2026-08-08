@@ -29,8 +29,7 @@ flowchart TD
     E -- "none" --> G{"join policy"}
     G -- "auto, and no row exists" --> H["joined<br/>active membership created"]
     G -- "auto, but a row exists" --> I
-    G -- "request" --> I["request<br/>returning = true if ended"]
-    G -- "off" --> J["identity_only"]
+    G -- "approve each person" --> I["request<br/>organization preselected<br/>returning = true if ended"]
 ```
 
 Two rules inside it are worth stating on their own, because they are the ones
@@ -39,10 +38,11 @@ that look surprising from outside:
 - **An absent `hd` means not proven, never proven personal.** GoTrue has a
   legacy path that drops the claim, so reading its absence as evidence would
   turn a Google hiccup into a portal-wide demotion.
-- **Any membership row outranks the policy.** `ended` is the one that matters —
-  somebody the organization has already let go does not walk back in because
-  their Workspace account outlived the decision, which is the rule a SCIM
-  directory enforces by not listing them. `planned`, `suspended` and `alumni`
+- **Any membership row outranks the policy** — for as long as the row exists.
+  `ended` is the one that matters: somebody the organization has already let go
+  does not walk back in because their Workspace account outlived the decision,
+  which is the rule a SCIM directory enforces by not listing them. A purge ends
+  that, because it ends the profile the row hangs on; see PL9. `planned`, `suspended` and `alumni`
   are equally not an invitation to insert, and equally cannot be reported as a
   join: the insert would do nothing while the caller was told a membership had
   been created.
@@ -80,7 +80,7 @@ flowchart TD
     I --> J{"outcome"}
     J -- "joined or member" --> K["portal"]
     J -- "request" --> L["/access?organization=slug<br/>preselected, returning flagged"]
-    J -- "unproven, no_organization,<br/>identity_only" --> M["/access<br/>free choice"]
+    J -- "unproven or<br/>no_organization" --> M["/access<br/>free choice"]
 ```
 
 The **repeat sign-in** arrow is the one that is easy to miss. The trigger on
@@ -208,9 +208,8 @@ identifiers match the edge-case table in
 
 | # | Do this | Expect |
 |---|---|---|
-| SI1 | Set an organization to **Join automatically**, register its domain, sign in with an account on it that has never been seen | Straight into the portal, active membership on the person's admin page, `provisioning_method` domain |
-| SI2 | Same, with the organization on **Ask for approval** | `/access` with that organization preselected and a line saying it reviews who joins |
-| SI3 | Same, on **Prove identity only** | `/access` with a free choice, no preselection |
+| SI1 | Register a domain for an organization and sign in with an account on it that has never been seen — joining automatically is the default | Straight into the portal, active membership on the person's admin page, `provisioning_method` domain |
+| SI2 | Same, with the organization on **Approve each person** | `/access` with that organization preselected and a line saying it reviews who joins |
 | SI4 | End a member's membership, then have them sign in again with the organization account | They reach the portal — an ended membership makes them an alumnus, and that is unchanged. On their admin page the membership is still **ended**: the domain did not hand it back |
 | SI4b | Same, but with their portal access suspended and then reactivated with no membership at all | `/access`, that organization preselected, wording says they were a member before |
 | SI5 | Approve that request | The same membership row goes active again — check the person page shows one membership for that organization, not two |
@@ -224,7 +223,7 @@ identifiers match the edge-case table in
 
 | # | Do this | Expect |
 |---|---|---|
-| RS1 | With somebody sitting on `/access` for an organization, switch it to **Join automatically**, then have them sign in again | They land in the portal. This is the one that does not work without the callback asking |
+| RS1 | Put an organization behind a queue, leave somebody sitting on `/access` for it, switch it back to **Join automatically**, then have them sign in again | They land in the portal. This is the one that does not work without the callback asking |
 | RS3 | Switch an organization from auto to ask | Existing members keep everything; only new arrivals are gated |
 | RS4 | End somebody's membership while they have a tab open | Their next page load drops them out of the portal |
 
@@ -273,3 +272,4 @@ Not bugs. Written down so they are not rediscovered as bugs.
 | CR3 | Gmail dot and plus variants count as different addresses | Google normalises them, the portal does not, so the same person can end up with two profiles without anybody making a mistake |
 | CR4 | A shared or role account can be linked to a person | Detecting one needs the organization's Workspace directory, which the portal cannot read for anyone but Norstec |
 | SI11 | An account that could not claim an imported profile leaves both profiles in place | Surfaced through the audit event rather than prevented, because the portal cannot tell which of the two is the real person |
+| PL9 | Somebody whose membership was ended deletes their own profile, and after the purge signs in again with a working organization account — they join as a new person, with no history | The ended-membership guard holds while the portal still remembers somebody, and a purge is the portal deliberately forgetting them. Keeping a list of erased people who may not return would retain exactly the personal data the erasure removed. What closes it in practice belongs to the organization: the Workspace account has to still work, so disabling it is the answer. For norstec.no the portal already does half of that itself — a soft delete suspends the Google account with it. The sequence also takes thirty days, because the purge runs on the retention deadline rather than on request |

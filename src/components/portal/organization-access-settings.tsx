@@ -15,28 +15,22 @@ import { Toast } from "@/components/portal/toast";
 export type OrganizationAccess = {
   domains: Array<{ domain: string; verifiedAt: string | null }>;
   id: number;
-  joinPolicy: "auto" | "request" | "off";
+  joinPolicy: "auto" | "request";
   name: string;
 };
 
 const joinPolicies = [
   {
     description:
-      "Signing in with an account on one of the domains below joins the organization, with nobody in the loop.",
+      "Signing in with an account on one of the domains below makes the person an active member straight away.",
     label: "Join automatically",
     value: "auto",
   },
   {
     description:
-      "The account is recognised as the organization's, and the person is sent to a request an administrator decides.",
-    label: "Ask for approval",
+      "The person is sent to Request access with this organization already filled in, and an administrator approves or declines it in Access review.",
+    label: "Approve each person",
     value: "request",
-  },
-  {
-    description:
-      "The domain proves who somebody is and nothing more. Membership only ever comes from an approved request.",
-    label: "Prove identity only",
-    value: "off",
   },
 ] as const;
 
@@ -156,22 +150,20 @@ export function OrganizationAccessSettings({
                 <legend className="section-label opacity-45">
                   Accounts on its own domains
                 </legend>
-                <div className="mt-1 grid gap-3 lg:grid-cols-3">
+                <div className="mt-1 grid gap-3 sm:grid-cols-2">
                   {joinPolicies.map((policy) => {
                     const isSelected = organization.joinPolicy === policy.value;
                     return (
                       <label
-                        className={`portal-surface cursor-pointer p-4 transition-all ${
-                          isSelected
-                            ? "bg-moody/[0.06]"
-                            : "border-moody/20 opacity-55 hover:border-moody/40 hover:opacity-90"
+                        className={`portal-surface portal-choice p-4 ${
+                          isSelected ? "portal-choice-selected" : ""
                         }`}
                         key={policy.value}
                       >
                         <span className="flex items-center gap-3">
                           <input
                             checked={isSelected}
-                            className="size-4 accent-moody"
+                            className="size-4"
                             disabled={busy}
                             name={`join-policy-${organization.id}`}
                             onChange={() => {
@@ -378,11 +370,11 @@ export function OrganizationAccessSettings({
               : `one of its ${pendingPolicy.domainCount} domains`}{" "}
             becomes an active member of {pendingPolicy.organizationName} at that
             moment, appears in its member directory, and sees everything a member
-            sees. Nobody is asked.
+            sees. No request is created and nothing reaches Access review.
           </p>
           <p className="mt-3">
-            People it has already let go stay out — an ended membership is never
-            reinstated this way. Everyone else on the domain is in.
+            People whose membership here has ended are the exception: they are
+            sent to Request access instead, and an administrator decides.
           </p>
         </ConfirmDialog>
       )}
