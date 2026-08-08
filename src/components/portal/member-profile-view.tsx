@@ -126,7 +126,10 @@ export function MemberProfileView({
                   the dash the member tables use, not "Not provided". */}
               <dd className="profile-value mt-2 font-medium">
                 {organizationName ?? (
-                  <span aria-label="No organization">—</span>
+                  <>
+                    <span aria-hidden="true">—</span>
+                    <span className="sr-only">No organization</span>
+                  </>
                 )}
               </dd>
             </div>

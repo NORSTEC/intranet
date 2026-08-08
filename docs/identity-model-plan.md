@@ -313,7 +313,6 @@ change, written down so the next person does not rediscover them as bugs.
 |---|---|---|
 | SI1 | New person, verified org account, policy `auto`, no history | Active membership, straight to the portal |
 | SI2 | Same, policy `request` | Person created, no membership, `/access` with the organization preselected |
-| SI3 | Same, policy `off` | Person created, address recorded as an organization address, no membership, no preselection |
 | SI4 | Ex-member, membership `ended`, Workspace account still live | No membership whatever the policy. `/access`, preselected, returning-member wording |
 | SI5 | SI4, then approved | The existing `ended` row reactivates. No second row |
 | SI6 | Verified org account, membership already `active` | Nothing happens. Idempotent |

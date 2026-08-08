@@ -305,7 +305,10 @@ export function MembersDirectory({
                           .map((organization) => organization.name)
                           .join(", ")
                       ) : (
-                        <span aria-label="No organization">—</span>
+                        <>
+                          <span aria-hidden="true">—</span>
+                          <span className="sr-only">No organization</span>
+                        </>
                       )}
                     </td>
                     <td className="py-3 pr-5">{statusLabel(member.status)}</td>
