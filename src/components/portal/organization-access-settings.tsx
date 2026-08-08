@@ -161,17 +161,15 @@ export function OrganizationAccessSettings({
                     const isSelected = organization.joinPolicy === policy.value;
                     return (
                       <label
-                        className={`portal-surface cursor-pointer p-4 transition-all ${
-                          isSelected
-                            ? "bg-moody/[0.06]"
-                            : "border-moody/20 opacity-55 hover:border-moody/40 hover:opacity-90"
+                        className={`portal-surface portal-choice p-4 ${
+                          isSelected ? "portal-choice-selected" : ""
                         }`}
                         key={policy.value}
                       >
                         <span className="flex items-center gap-3">
                           <input
                             checked={isSelected}
-                            className="size-4 accent-moody"
+                            className="size-4"
                             disabled={busy}
                             name={`join-policy-${organization.id}`}
                             onChange={() => {

@@ -690,6 +690,40 @@ html.theme-switching *::after {
     background: var(--color-egg);
   }
 
+  /* A `.portal-surface` a radio input turns into a choice. Hover fills it the
+     way `.portal-button` sits filled at rest, rather than the faint grey wash
+     it used before — that grey belonged to no other surface on the page. The
+     selected card is marked by the full-strength border instead of a fill, so
+     hovering it still reads as a change. */
+  .portal-choice {
+    cursor: pointer;
+    border-color: color-mix(in srgb, var(--color-moody) 20%, transparent);
+    opacity: 0.55;
+    transition: border-color 180ms ease, background-color 180ms ease,
+      color 180ms ease, opacity 180ms ease;
+  }
+
+  .portal-choice-selected {
+    border-color: var(--color-moody);
+    opacity: 1;
+  }
+
+  .portal-choice:hover {
+    border-color: var(--color-moody);
+    background: var(--color-moody);
+    color: var(--color-egg);
+    opacity: 1;
+  }
+
+  /* The native control cannot inherit the fill, so its accent flips with it. */
+  .portal-choice input[type="radio"] {
+    accent-color: var(--color-moody);
+  }
+
+  .portal-choice:hover input[type="radio"] {
+    accent-color: var(--color-egg);
+  }
+
   .portal-surface-strong {
     border-radius: 1.5rem;
     background: var(--color-moody);

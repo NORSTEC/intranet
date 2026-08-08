@@ -122,8 +122,12 @@ export function MemberProfileView({
             </div>
             <div>
               <dt className="section-label opacity-45">Organization</dt>
+              {/* An alumnus holds no organization — nothing was left out, so
+                  the dash the member tables use, not "Not provided". */}
               <dd className="profile-value mt-2 font-medium">
-                {organizationName ?? "Not provided"}
+                {organizationName ?? (
+                  <span aria-label="No organization">—</span>
+                )}
               </dd>
             </div>
             <div>

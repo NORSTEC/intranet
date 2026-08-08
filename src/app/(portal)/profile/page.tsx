@@ -207,7 +207,7 @@ export default async function ProfilePage({
         }
         avatarAlt={access.profile.avatarAlt}
         avatarUrl={avatarUrl}
-        dangerZone={<DeleteAccountSettings />}
+        dangerZone={<DeleteAccountSettings name={name} />}
         email={primaryEmail}
         experience={experience}
         fieldOfStudy={access.profile.fieldOfStudy}

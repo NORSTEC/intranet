@@ -81,17 +81,15 @@ export function AccessRequestForm({
             const isSelected = requestType === option.value;
             return (
               <label
-                className={`portal-surface cursor-pointer p-5 transition-all ${
-                  isSelected
-                    ? "bg-moody/[0.06]"
-                    : "border-moody/20 opacity-55 hover:opacity-90 hover:border-moody/40"
+                className={`portal-surface portal-choice p-5 ${
+                  isSelected ? "portal-choice-selected" : ""
                 }`}
                 key={option.value}
               >
                 <span className="flex items-center gap-3">
                   <input
                     checked={isSelected}
-                    className="size-4 accent-moody"
+                    className="size-4"
                     name="requestType"
                     onChange={() => setRequestType(option.value)}
                     type="radio"
