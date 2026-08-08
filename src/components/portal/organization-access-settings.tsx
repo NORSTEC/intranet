@@ -22,13 +22,13 @@ export type OrganizationAccess = {
 const joinPolicies = [
   {
     description:
-      "Anybody signing in with an account on one of the domains below is a member from that moment. Nobody has to let them in, and nobody has to remember to.",
+      "Signing in with an account on one of the domains below makes the person an active member straight away.",
     label: "Join automatically",
     value: "auto",
   },
   {
     description:
-      "The account is recognised as this organization's, and the person is sent to a request with it already filled in. Somebody has to work that queue.",
+      "The person is sent to Request access with this organization already filled in, and an administrator approves or declines it in Access review.",
     label: "Approve each person",
     value: "request",
   },
@@ -370,11 +370,11 @@ export function OrganizationAccessSettings({
               : `one of its ${pendingPolicy.domainCount} domains`}{" "}
             becomes an active member of {pendingPolicy.organizationName} at that
             moment, appears in its member directory, and sees everything a member
-            sees. Nobody is asked.
+            sees. No request is created and nothing reaches Access review.
           </p>
           <p className="mt-3">
-            People it has already let go stay out — an ended membership is never
-            reinstated this way. Everyone else on the domain is in.
+            People whose membership here has ended are the exception: they are
+            sent to Request access instead, and an administrator decides.
           </p>
         </ConfirmDialog>
       )}
