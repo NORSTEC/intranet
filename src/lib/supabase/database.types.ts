@@ -461,6 +461,7 @@ export type Database = {
           deleted_at: string | null
           deleted_by_person_id: number | null
           deletion_reason: string | null
+          directory_visible: boolean
           field_of_study: string | null
           first_name: string | null
           full_name: string | null
@@ -483,6 +484,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by_person_id?: number | null
           deletion_reason?: string | null
+          directory_visible?: boolean
           field_of_study?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -505,6 +507,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by_person_id?: number | null
           deletion_reason?: string | null
+          directory_visible?: boolean
           field_of_study?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -971,6 +974,14 @@ export type Database = {
         Args: { p_domain: string; p_organization_id: number }
         Returns: Json
       }
+      complete_organization_domain_verification: {
+        Args: {
+          p_domain: string
+          p_organization_id: number
+          p_token_hash: string
+        }
+        Returns: Json
+      }
       list_organization_domains: {
         Args: { p_organization_id: number }
         Returns: Json
@@ -1079,6 +1090,7 @@ export type Database = {
           p_avatar_path: string | null
           p_deleted_experiences: Json
           p_deleted_roles: Json
+          p_directory_visible: boolean
           p_expected_profile_updated_at: string
           p_experiences: Json
           p_field_of_study: string | null
@@ -1149,6 +1161,14 @@ export type Database = {
       start_portal_account_link: {
         Args: { p_mode: string; p_token_hash: string }
         Returns: undefined
+      }
+      start_organization_domain_verification: {
+        Args: {
+          p_domain: string
+          p_organization_id: number
+          p_token_hash: string
+        }
+        Returns: Json
       }
       submit_access_request: {
         Args: {

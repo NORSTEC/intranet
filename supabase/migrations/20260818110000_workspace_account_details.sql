@@ -1,22 +1,8 @@
 begin;
 
--- The Slack report gained an account type and the Workspace one wants the same
--- two questions answered: what is this account, and is anybody still using it.
---
--- Google can answer both from the directory snapshot the sync already reads,
--- and one of them closes a manual step this repo documents. `docs/
--- google-workspace.md` tells an administrator to open an unmatched account in
--- the Admin console and look at the last sign-in before suspending it, because
--- an account nobody signs in *as* looks exactly like an abandoned one. Storing
--- `lastLoginAt` puts that fact in the row instead of in a second browser tab.
---
--- The administrator flags matter for a different reason. A delegated role
--- cannot change a super administrator — Google refuses it — so the portal
--- cannot suspend one whoever asks, and knowing that before the click is better
--- than a 403 after it.
---
--- Both go in `provider_details`, the column the Slack sync introduced, for the
--- same reason: `is_super_admin` would be meaningless on every Slack row.
+-- Keep Google account type, last sign-in and administrator flags in the
+-- provider-specific payload. The portal needs them before suspension because
+-- Google will reject changes to some administrator accounts.
 create or replace function public.sync_workspace_directory(p_accounts jsonb)
 returns jsonb
 language plpgsql

@@ -1,82 +1,60 @@
-# Proposed architecture
+# Architecture
 
-This document describes a proposal, not a final decision.
+## System
 
-## Application structure
+| Component | Responsibility |
+| --- | --- |
+| Next.js | Pages, server actions, OAuth callback and integration clients |
+| Supabase Auth | Google authentication, sessions, MFA and identity records |
+| Postgres | People, memberships, roles, audit, RLS and mutation RPCs |
+| Supabase Storage | Private member avatars |
+| Vercel | Production runtime and deployment identity |
+| Google Workspace | NORSTEC account directory and suspension |
+| Slack | Read-only workspace inventory |
+| Resend | Transactional email delivery |
 
-The project should initially be one deployable Next.js application. Splitting
-the frontend and backend into separate applications would add another build,
-deployment, authentication boundary, and dependency lifecycle without solving a
-current requirement.
+The browser uses the Supabase publishable key and the signed-in user’s JWT.
+It never receives a service-role key. RLS and database functions therefore
+remain the authorization boundary even when a request bypasses the UI.
 
-Next.js Route Handlers and server-side modules can provide the backend-for-
-frontend functionality while keeping server secrets and privileged operations
-out of browser bundles.
+## Core records
 
-```text
-.
-├── src/
-│   ├── app/
-│   │   ├── (auth)/
-│   │   ├── (portal)/
-│   │   └── api/
-│   ├── components/
-│   │   └── ui/
-│   ├── lib/
-│   └── server/
-│       ├── auth/
-│       ├── db/
-│       ├── permissions/
-│       └── services/
-├── supabase/
-│   ├── migrations/
-│   └── tests/
-├── docs/
-├── tests/
-└── deploy/
-```
+| Record | Meaning |
+| --- | --- |
+| `auth.users` | Supabase login identity and session owner |
+| `auth.identities` | Stable Google subject and provider claims |
+| `portal_accounts` | One Google login connected to one person |
+| `people` | Portal profile and lifecycle state |
+| `person_emails` | Contact/organization addresses owned by a person record |
+| `memberships` | Current relationship between person and organization |
+| `membership_periods` | Immutable active intervals for a membership |
+| `portal_administrators` | System-wide administrator assignment |
+| `teams`, `team_memberships` | Authoritative organization team structure |
+| `profile_experiences`, `profile_experience_roles` | User-authored profile history |
+| `external_accounts` | Google Workspace and Slack directory snapshots |
+| `audit_events` | Security and lifecycle actions |
 
-A separate worker may be introduced if reliable Slack synchronization requires
-a durable job queue. The membership database, not Slack, must remain the source
-of truth.
+Authentication, person, email, membership and administrator role are separate
+facts. Code must not treat any one of them as a substitute for another.
 
-## System context
+## Request path
 
-![System context](diagrams/system-context.png)
+1. The proxy refreshes the Supabase session when required.
+2. `src/lib/auth/access.ts` resolves page-level access once per request.
+3. Reads use the signed-in Supabase client and RLS.
+4. Server actions validate browser input and call a database RPC.
+5. The RPC repeats validation, authorization and concurrency checks.
+6. Audit and notification rows are written in the same transaction as the
+   decision they describe.
 
-## Authentication and membership flow
+## Source of truth
 
-![Authentication and membership flow](diagrams/authentication-membership-flow.png)
+- Membership and roles: Postgres.
+- Google identity: `auth.identities.provider_id`, never editable user metadata.
+- NORSTEC Workspace account status: Google, copied into `external_accounts`.
+- Slack account status: Slack, copied read-only into `external_accounts`.
+- Contact address: the single primary `person_emails` row.
 
-Google establishes identity. A verified account from an approved Workspace
-domain receives the `member` role automatically. PostgreSQL membership records
-determine all subsequent access, and administrative roles are always assigned
-separately.
-
-## Conceptual data model
-
-![Conceptual data model](diagrams/conceptual-data-model.png)
-
-The diagram is intentionally conceptual. Columns and constraints will be
-finalized after the membership lifecycle and permission rules are approved.
-
-## Proposed technology choices
-
-| Area | Proposal | Status |
-| --- | --- | --- |
-| Web application | Next.js App Router, React, TypeScript | Preferred |
-| User interface | Tailwind CSS and Material Symbols | Selected |
-| Validation | Server-side validation and database constraints | Implemented for access requests |
-| Authentication | Google through Supabase Auth | Selected |
-| Database | Supabase Postgres | Selected |
-| Authorization | Membership tables plus PostgreSQL Row Level Security | Implemented foundation |
-| Unit testing | Vitest and React Testing Library | Proposed |
-| End-to-end testing | Playwright | Proposed |
-| Hosting | Docker on NTNU OpenStack | Preferred |
-| HTTPS termination | NTNU-provided ingress or self-managed reverse proxy | Undecided |
-| Automation | To be decided with the deployment design | Undecided |
-
-## References
-
-- [Next.js App Router](https://nextjs.org/docs/app)
-- [Next.js Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers)
+See [Access and identity](access-and-identity.md) for lifecycle rules and
+[Security](security.md) for enforcement. The [flow index](flows/README.md)
+connects these components across complete user and administrator operations.

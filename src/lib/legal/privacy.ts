@@ -31,4 +31,4 @@ export const PRIVACY_HOSTING_REGION =
  * material changes to be communicated, and this date is what tells a reader
  * whether what they were shown last time still holds.
  */
-export const PRIVACY_LAST_UPDATED = "6 August 2026";
+export const PRIVACY_LAST_UPDATED = "9 August 2026";

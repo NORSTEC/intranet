@@ -1,19 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
-  addOrganizationDomain,
+  completeOrganizationDomainVerification,
   previewOrganizationDomain,
   removeOrganizationDomain,
   setOrganizationJoinPolicy,
+  startOrganizationDomainVerification,
   type PortalManagementResult,
 } from "@/app/(portal)/admin/actions";
 import { ConfirmDialog } from "@/components/portal/confirm-dialog";
 import { Toast } from "@/components/portal/toast";
 
 export type OrganizationAccess = {
-  domains: Array<{ domain: string; verifiedAt: string | null }>;
+  domains: Array<{
+    domain: string;
+    verifiedAt: string | null;
+    verificationMethod: "legacy_admin_attestation" | "dns_txt";
+  }>;
   id: number;
   joinPolicy: "auto" | "request";
   name: string;
@@ -22,7 +27,7 @@ export type OrganizationAccess = {
 const joinPolicies = [
   {
     description:
-      "Signing in with an account on one of the domains below makes the person an active member straight away.",
+      "Signing in with an account on a DNS-verified domain makes the person an active member straight away.",
     label: "Join automatically",
     value: "auto",
   },
@@ -40,6 +45,23 @@ type Preview = {
   wouldJoinCount: number;
 };
 
+type DomainVerification = {
+  domain: string;
+  organizationId: number;
+  recordName: string;
+  recordValue: string;
+  token: string;
+};
+
+function verificationStatusLabel(
+  domain: OrganizationAccess["domains"][number],
+) {
+  if (!domain.verifiedAt) return "Not verified";
+  return domain.verificationMethod === "dns_txt"
+    ? "DNS verified"
+    : "Verified by administrator (legacy)";
+}
+
 export function OrganizationAccessSettings({
   organizations,
 }: {
@@ -48,6 +70,13 @@ export function OrganizationAccessSettings({
   const router = useRouter();
   const [domainDrafts, setDomainDrafts] = useState<Record<number, string>>({});
   const [previews, setPreviews] = useState<Record<number, Preview | null>>({});
+  const [verification, setVerification] =
+    useState<DomainVerification | null>(null);
+  const verificationPanelRef = useRef<HTMLDivElement>(null);
+  const [copiedField, setCopiedField] = useState<
+    "recordName" | "recordValue" | null
+  >(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<{
     domain: string;
     organizationName: string;
@@ -67,6 +96,22 @@ export function OrganizationAccessSettings({
     status: "success" | "error";
   } | null>(null);
   const [busy, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!verification) return;
+    const frame = window.requestAnimationFrame(() => {
+      const panel = verificationPanelRef.current;
+      if (!panel) return;
+      panel.focus({ preventScroll: true });
+      panel.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "nearest",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [verification]);
 
   function run(action: () => Promise<PortalManagementResult>) {
     startTransition(async () => {
@@ -123,6 +168,96 @@ export function OrganizationAccessSettings({
     });
   }
 
+  function beginVerification(organizationId: number, domain: string) {
+    const action = `start-verification:${organizationId}:${domain}`;
+    setPendingAction(action);
+    startTransition(async () => {
+      try {
+        const result = await startOrganizationDomainVerification({
+          domain,
+          organizationId,
+        });
+
+        if (
+          !result.ok ||
+          !result.domain ||
+          !result.recordName ||
+          !result.recordValue ||
+          !result.token
+        ) {
+          setToast({
+            id: Date.now(),
+            message: result.message,
+            status: "error",
+          });
+          return;
+        }
+
+        setCopiedField(null);
+        setVerification({
+          domain: result.domain,
+          organizationId,
+          recordName: result.recordName,
+          recordValue: result.recordValue,
+          token: result.token,
+        });
+        setToast({ id: Date.now(), message: result.message, status: "success" });
+      } finally {
+        setPendingAction(null);
+      }
+    });
+  }
+
+  function checkVerification() {
+    if (!verification) return;
+    setPendingAction("check-verification");
+    startTransition(async () => {
+      try {
+        const result = await completeOrganizationDomainVerification({
+          domain: verification.domain,
+          organizationId: verification.organizationId,
+          token: verification.token,
+        });
+        setToast({
+          id: Date.now(),
+          message: result.message,
+          status: result.ok ? "success" : "error",
+        });
+        if (!result.ok) return;
+
+        setDomainDrafts((current) => ({
+          ...current,
+          [verification.organizationId]: "",
+        }));
+        setPreviews((current) => ({
+          ...current,
+          [verification.organizationId]: null,
+        }));
+        setVerification(null);
+        router.refresh();
+      } finally {
+        setPendingAction(null);
+      }
+    });
+  }
+
+  async function copyDnsValue(
+    field: "recordName" | "recordValue",
+    value: string,
+  ) {
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+    } catch {
+      setToast((current) => ({
+        id: (current?.id ?? 0) + 1,
+        message: "The DNS value could not be copied. Select and copy it manually.",
+        status: "error",
+      }));
+    }
+  }
+
   return (
     <>
       {toast && (
@@ -169,7 +304,9 @@ export function OrganizationAccessSettings({
                             onChange={() => {
                               if (policy.value === "auto") {
                                 setPendingPolicy({
-                                  domainCount: organization.domains.length,
+                                  domainCount: organization.domains.filter(
+                                    (domain) => domain.verifiedAt,
+                                  ).length,
                                   organizationId: organization.id,
                                   organizationName: organization.name,
                                   policy,
@@ -208,14 +345,49 @@ export function OrganizationAccessSettings({
                 <ul className="mt-3 grid gap-2">
                   {organization.domains.map((domain) => (
                     <li
-                      className="flex flex-wrap items-center gap-x-3 gap-y-2"
+                      className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-moody/10 py-3 last:border-b-0"
                       key={domain.domain}
                     >
                       <span className="break-all font-medium">
                         {domain.domain}
                       </span>
+                      <span className="inline-flex items-center gap-1.5 text-sm opacity-60">
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.05rem]"
+                        >
+                          {domain.verifiedAt ? "verified" : "warning"}
+                        </span>
+                        {verificationStatusLabel(domain)}
+                      </span>
+                      {!domain.verifiedAt && (
+                        <button
+                          className="portal-button ml-auto"
+                          disabled={busy}
+                          onClick={() =>
+                            beginVerification(organization.id, domain.domain)
+                          }
+                          type="button"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="material-symbols-outlined text-[1.1rem]"
+                          >
+                            {pendingAction ===
+                            `start-verification:${organization.id}:${domain.domain}`
+                              ? "progress_activity"
+                              : "domain_verification"}
+                          </span>
+                          {pendingAction ===
+                          `start-verification:${organization.id}:${domain.domain}`
+                            ? "Preparing…"
+                            : "Verify ownership"}
+                        </button>
+                      )}
                       <button
-                        className="portal-button ml-auto"
+                        className={`portal-button ${
+                          domain.verifiedAt ? "ml-auto" : ""
+                        }`}
                         disabled={busy}
                         onClick={() =>
                           setPendingRemoval({
@@ -242,6 +414,112 @@ export function OrganizationAccessSettings({
                     </li>
                   )}
                 </ul>
+
+                {verification?.organizationId === organization.id && (
+                  <div
+                    className="mt-6 border-t border-moody/20 pt-6 outline-none"
+                    ref={verificationPanelRef}
+                    tabIndex={-1}
+                  >
+                    <h3 className="text-xl font-medium">
+                      Verify {verification.domain}
+                    </h3>
+                    <p className="mt-3 max-w-[65ch] text-sm leading-relaxed opacity-65">
+                      Add this TXT record in the domain&rsquo;s DNS. Nothing joins
+                      the organization until the exact value is visible publicly.
+                    </p>
+                    <dl className="mt-5 grid gap-4">
+                      <div>
+                        <dt className="section-label opacity-45">TXT name</dt>
+                        <dd className="mt-2 flex items-start gap-2 bg-moody/5 p-3">
+                          <code className="min-w-0 flex-1 break-all font-mono text-sm">
+                            {verification.recordName}
+                          </code>
+                          <button
+                            aria-label="Copy TXT name"
+                            className="portal-button shrink-0"
+                            onClick={() =>
+                              void copyDnsValue(
+                                "recordName",
+                                verification.recordName,
+                              )
+                            }
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              {copiedField === "recordName" ? "check" : "content_copy"}
+                            </span>
+                            {copiedField === "recordName" ? "Copied" : "Copy"}
+                          </button>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="section-label opacity-45">TXT value</dt>
+                        <dd className="mt-2 flex items-start gap-2 bg-moody/5 p-3">
+                          <code className="min-w-0 flex-1 break-all font-mono text-sm">
+                            {verification.recordValue}
+                          </code>
+                          <button
+                            aria-label="Copy TXT value"
+                            className="portal-button shrink-0"
+                            onClick={() =>
+                              void copyDnsValue(
+                                "recordValue",
+                                verification.recordValue,
+                              )
+                            }
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              {copiedField === "recordValue" ? "check" : "content_copy"}
+                            </span>
+                            {copiedField === "recordValue" ? "Copied" : "Copy"}
+                          </button>
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        className="portal-button"
+                        disabled={busy}
+                        onClick={checkVerification}
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.1rem]"
+                        >
+                          {pendingAction === "check-verification"
+                            ? "progress_activity"
+                            : "dns"}
+                        </span>
+                        {pendingAction === "check-verification"
+                          ? "Checking DNS…"
+                          : "Check DNS and verify"}
+                      </button>
+                      <button
+                        className="portal-button"
+                        disabled={busy}
+                        onClick={() => setVerification(null)}
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-[1.1rem]"
+                        >
+                          close
+                        </span>
+                        Close instructions
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-5 flex flex-wrap items-end gap-3">
                   <label className="grid min-w-56 flex-1 gap-2">
@@ -309,23 +587,7 @@ export function OrganizationAccessSettings({
                       className="portal-button mt-5"
                       disabled={busy}
                       onClick={() =>
-                        run(async () => {
-                          const result = await addOrganizationDomain({
-                            domain: preview.domain,
-                            organizationId: organization.id,
-                          });
-                          if (result.ok) {
-                            setDomainDrafts((current) => ({
-                              ...current,
-                              [organization.id]: "",
-                            }));
-                            setPreviews((current) => ({
-                              ...current,
-                              [organization.id]: null,
-                            }));
-                          }
-                          return result;
-                        })
+                        beginVerification(organization.id, preview.domain)
                       }
                       type="button"
                     >
@@ -333,9 +595,15 @@ export function OrganizationAccessSettings({
                         aria-hidden="true"
                         className="material-symbols-outlined text-[1.1rem]"
                       >
-                        add
+                        {pendingAction ===
+                        `start-verification:${organization.id}:${preview.domain}`
+                          ? "progress_activity"
+                          : "domain_verification"}
                       </span>
-                      Register {preview.domain}
+                      {pendingAction ===
+                      `start-verification:${organization.id}:${preview.domain}`
+                        ? `Preparing ${preview.domain}…`
+                        : `Verify ownership of ${preview.domain}`}
                     </button>
                   </div>
                 )}
@@ -365,9 +633,11 @@ export function OrganizationAccessSettings({
         >
           <p>
             Anybody signing in with a Google account on{" "}
-            {pendingPolicy.domainCount === 1
-              ? "its domain"
-              : `one of its ${pendingPolicy.domainCount} domains`}{" "}
+            {pendingPolicy.domainCount === 0
+              ? "a domain after it is DNS verified"
+              : pendingPolicy.domainCount === 1
+                ? "its verified domain"
+                : `one of its ${pendingPolicy.domainCount} verified domains`}{" "}
             becomes an active member of {pendingPolicy.organizationName} at that
             moment, appears in its member directory, and sees everything a member
             sees. No request is created and nothing reaches Access review.

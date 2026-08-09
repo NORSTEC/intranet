@@ -11,7 +11,11 @@ type OrganizationRow = {
   name: string;
 };
 
-type DomainRow = { domain: string; verifiedAt: string | null };
+type DomainRow = {
+  domain: string;
+  verifiedAt: string | null;
+  verificationMethod: "legacy_admin_attestation" | "dns_txt";
+};
 
 export default async function OrganizationAccessPage() {
   await requirePortalAdminAccess();
@@ -48,6 +52,7 @@ export default async function OrganizationAccessPage() {
         domains: ((data ?? []) as DomainRow[]).map((domain) => ({
           domain: domain.domain,
           verifiedAt: domain.verifiedAt ?? null,
+          verificationMethod: domain.verificationMethod,
         })),
         id: row.id,
         joinPolicy: row.domain_join_policy as OrganizationAccess["joinPolicy"],

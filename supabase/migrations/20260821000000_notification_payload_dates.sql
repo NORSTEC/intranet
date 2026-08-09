@@ -1,9 +1,7 @@
 begin;
 
--- The emails follow a layout that was designed and reviewed before the sender
--- existed, kept in `docs/access-decision-notification.md`. It shows the reader
--- when they asked and when it was decided, which the queued payload did not
--- carry — so the templates had nothing to put there.
+-- Decision emails show when a request was created and decided. Older queued
+-- payloads omitted those fields; the contract lives in docs/integrations.md.
 --
 -- Read from the row rather than formatted here. What a date looks like is a
 -- rendering decision, and `Intl.DateTimeFormat` already makes it in the two

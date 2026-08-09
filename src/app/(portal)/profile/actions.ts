@@ -320,6 +320,7 @@ export async function saveProfile(formData: FormData) {
     formData,
     "expectedProfileUpdatedAt",
   );
+  const directoryVisible = formData.get("directoryVisible") === "true";
   const studyYear = studyYearValue ? Number(studyYearValue) : null;
 
   let validLinkedIn = true;
@@ -490,6 +491,7 @@ export async function saveProfile(formData: FormData) {
     p_expected_profile_updated_at: expectedProfileUpdatedAt,
     p_deleted_experiences: deletedExperiences,
     p_deleted_roles: deletedRoles,
+    p_directory_visible: directoryVisible,
     p_field_of_study: fieldOfStudy || null,
     p_linkedin_url: linkedinUrl || null,
     p_new_roles: newRoles,

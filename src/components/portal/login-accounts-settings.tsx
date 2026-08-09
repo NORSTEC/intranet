@@ -47,7 +47,6 @@ export function LoginAccountsSettings({
     null,
   );
   const [unlinkPending, startUnlinkTransition] = useTransition();
-  const canLinkAlternativeAccount = accounts.length < 2;
   const hasOnlyOneOrganizationAccount =
     accounts.length === 1 && accounts[0].emailType === "organization";
 
@@ -63,11 +62,9 @@ export function LoginAccountsSettings({
   }, [unlinkTarget]);
 
   function linkGoogleAccount() {
-    if (!canLinkAlternativeAccount) return;
-
     setIsLinking(true);
     setError(null);
-    window.location.assign("/auth/account-link/start?mode=add_account");
+    router.push("/auth/account-link/start?mode=add_account");
   }
 
   function unlinkAccount(account: LinkedLoginAccount) {
@@ -99,7 +96,8 @@ export function LoginAccountsSettings({
 
       {accounts.length > 1 && (
         <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-65">
-          You can use either Google account to sign in to this profile.
+          You can use any listed Google account to sign in to this profile. The
+          portal allows one per organization domain and one personal account.
         </p>
       )}
 
@@ -154,19 +152,17 @@ export function LoginAccountsSettings({
         })}
       </div>
 
-      {canLinkAlternativeAccount && (
-        <button
-          className="portal-button mt-6"
-          disabled={isLinking}
-          onClick={linkGoogleAccount}
-          type="button"
-        >
-          <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">
-            {isLinking ? "progress_activity" : "add_link"}
-          </span>
-          {isLinking ? "Opening Google…" : "Add alternative Google account"}
-        </button>
-      )}
+      <button
+        className="portal-button mt-6"
+        disabled={isLinking}
+        onClick={linkGoogleAccount}
+        type="button"
+      >
+        <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">
+          {isLinking ? "progress_activity" : "add_link"}
+        </span>
+        {isLinking ? "Opening Google…" : "Add another Google account"}
+      </button>
       {error && (
         <Toast key={error.id} message={error.message} status="error" />
       )}

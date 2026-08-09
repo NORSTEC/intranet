@@ -17,7 +17,8 @@ import { createClient } from "@/lib/supabase/server";
 
 const accountLinkErrors: Record<string, string> = {
   expired: "The account-link request expired. Please try again.",
-  limit: "You can only connect one alternative Google account.",
+  limit:
+    "You already have a sign-in account in that domain group. Use one account per organization domain and one personal account.",
   oauth: "Google sign-in could not be completed. Please try again.",
   profile_has_data:
     "That account belongs to a portal profile with existing data. Contact NORSTEC IT to merge the profiles.",
@@ -91,7 +92,7 @@ export default async function ProfilePage({
     emailsResult.data.map((email) => [email.email, email]),
   );
   // Asked per account rather than guessed: the rule reads organization domains
-  // in the private schema, which a page cannot see. At most two calls.
+  // in the private schema, which a page cannot see.
   const unlinkBlocks = await Promise.all(
     accountsResult.data.map(async (account) => {
       const { data } = await supabase.rpc("portal_account_unlink_block", {
@@ -200,10 +201,26 @@ export default async function ProfilePage({
       <MemberProfileView
         accountSettings={<LoginAccountsSettings accounts={loginAccounts} />}
         action={
-          <Link className="portal-button" href="/profile/edit">
-            <span className="material-symbols-outlined text-[1.1rem]">edit</span>
-            Edit profile
-          </Link>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Link className="portal-button" href="/profile/security">
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[1.1rem]"
+              >
+                security
+              </span>
+              Sign-in security
+            </Link>
+            <Link className="portal-button" href="/profile/edit">
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[1.1rem]"
+              >
+                edit
+              </span>
+              Edit profile
+            </Link>
+          </div>
         }
         avatarAlt={access.profile.avatarAlt}
         avatarUrl={avatarUrl}

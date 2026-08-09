@@ -1,7 +1,9 @@
 import "server-only";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { safePortalReturnPath } from "@/lib/auth/return-path";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PortalAccessState,
@@ -23,6 +25,7 @@ type ProfileRow = {
   study_year: number | null;
   phone_number: string | null;
   linkedin_url: string | null;
+  directory_visible: boolean;
   portal_access_status: "unclaimed" | "active" | "suspended";
 };
 
@@ -75,6 +78,8 @@ export const getPortalAccess = cache(async function getPortalAccess(): Promise<
   const { data: claimsResult, error: claimsError } =
     await supabase.auth.getClaims();
   const authUserId = claimsResult?.claims.sub;
+  const assuranceLevel =
+    claimsResult?.claims.aal === "aal2" ? "aal2" : "aal1";
 
   if (claimsError || !authUserId) {
     return { status: "unauthenticated" };
@@ -83,7 +88,7 @@ export const getPortalAccess = cache(async function getPortalAccess(): Promise<
   const accountResult = await supabase
     .from("portal_accounts")
     .select(
-      "auth_user_id, person_id, account_email, onboarding_status, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, portal_access_status, alumni_access_granted_at)",
+      "auth_user_id, person_id, account_email, onboarding_status, people (id, full_name, first_name, last_name, field_of_study, study_year, phone_number, linkedin_url, avatar_path, avatar_alt, directory_visible, portal_access_status, alumni_access_granted_at)",
     )
     .eq("auth_user_id", authUserId)
     .maybeSingle();
@@ -147,6 +152,7 @@ export const getPortalAccess = cache(async function getPortalAccess(): Promise<
     studyYear: profileRow.study_year,
     phoneNumber: profileRow.phone_number,
     linkedinUrl: profileRow.linkedin_url,
+    directoryVisible: profileRow.directory_visible,
     onboardingStatus: accountRow.onboarding_status,
   };
 
@@ -177,6 +183,7 @@ export const getPortalAccess = cache(async function getPortalAccess(): Promise<
     membership: memberships[0] ?? null,
     memberships,
     isPortalAdmin: Boolean(portalAdministratorResult.data),
+    assuranceLevel,
     hasAlumniAccess: Boolean(profileRow.alumni_access_granted_at),
   };
 });
@@ -209,9 +216,32 @@ export async function requirePortalAccess() {
   return access;
 }
 
+async function requireAdministratorMfa(assuranceLevel: "aal1" | "aal2") {
+  if (assuranceLevel === "aal2") return;
+
+  const returnTo = safePortalReturnPath(
+    (await headers()).get("x-portal-pathname"),
+  );
+  const query = new URLSearchParams({ mfa: "required" });
+  if (returnTo) query.set("returnTo", returnTo);
+  redirect(`/profile/security?${query}`);
+}
+
 export async function requireOrganizationAdminAccess() {
   const access = await requirePortalAccess();
   let administeredOrganizations: AdministeredOrganization[];
+
+  const hasOrganizationAdminRole = access.memberships.some(
+    (membership) =>
+      membership.status === "active" &&
+      membership.role === "organization_admin",
+  );
+
+  if (!access.isPortalAdmin && !hasOrganizationAdminRole) {
+    redirect("/");
+  }
+
+  await requireAdministratorMfa(access.assuranceLevel);
 
   if (access.isPortalAdmin) {
     const supabase = await createClient();
@@ -257,6 +287,8 @@ export async function requirePortalAdminAccess() {
   if (!access.isPortalAdmin) {
     redirect("/");
   }
+
+  await requireAdministratorMfa(access.assuranceLevel);
 
   return access;
 }
