@@ -183,40 +183,43 @@ export function MfaSettings({
 
   if (!ready) {
     return (
-      <div className="portal-surface p-6 sm:p-7" role="status">
-        Loading security settings…
+      <div className="portal-surface p-6 sm:p-8" role="status">
+        Loading sign-in security…
       </div>
     );
   }
 
   return (
     <>
-      <section className="portal-surface p-6 sm:p-7">
-        {required && assuranceLevel !== "aal2" && (
-          <div className="mb-6 bg-copper/10 p-4 text-sm leading-relaxed">
-            Confirm a code before returning to administration. This protects
-            access decisions, member data, domains, and account changes.
-          </div>
-        )}
-
+      <section className="portal-surface p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-5">
-          <div>
+          <div className="max-w-3xl">
             <h2 className="text-h3">Authenticator app</h2>
-            <p className="mt-3 max-w-[60ch] text-sm leading-relaxed opacity-60">
+            <p className="mt-3 text-sm leading-relaxed opacity-60">
               Codes work offline in apps such as Google Authenticator, 1Password,
               or Microsoft Authenticator.
             </p>
           </div>
-          <span className="inline-flex items-center gap-2 text-sm font-medium">
+          {factor && (
             <span
-              aria-hidden="true"
-              className="material-symbols-outlined text-[1.15rem]"
+              className={
+                assuranceLevel === "aal2"
+                  ? "portal-pill border-beachball bg-beachball text-moody-static"
+                  : "portal-pill"
+              }
             >
-              {factor ? "verified_user" : "shield"}
+              {assuranceLevel === "aal2"
+                ? "Verified this session"
+                : "Authenticator added"}
             </span>
-            {factor ? "Enabled" : "Not enabled"}
-          </span>
+          )}
         </div>
+
+        {required && assuranceLevel !== "aal2" && (
+          <p className="mt-6 max-w-3xl text-sm font-medium leading-relaxed">
+            Complete the step below to return to administration.
+          </p>
+        )}
 
         {error && (
           <p className="mt-6 text-sm font-medium text-copper" role="alert">
@@ -293,7 +296,7 @@ export function MfaSettings({
         {factor && assuranceLevel === "aal2" && (
           <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-moody/20 pt-7">
             <p className="mr-auto text-sm font-medium">
-              This session is protected with two-step verification.
+              Administrator actions are unlocked for this session.
             </p>
             <button
               className="portal-button"
