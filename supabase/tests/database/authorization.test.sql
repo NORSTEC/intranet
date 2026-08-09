@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(318);
+select plan(319);
 
 -- DNS itself is checked by the server action. Database tests exercise the
 -- two guarded RPCs with a fixed hash so no test can use the retired direct-add
@@ -5483,6 +5483,26 @@ select is(
   ),
   (select updated_at from hosted_email_identity_version),
   'a repeat sign-in does not rewrite an unchanged email identity binding'
+);
+
+update public.person_emails
+set provider_id = 'stale-google-identity'
+where email = 'hosted@example.com';
+
+update auth.identities
+set last_sign_in_at = now(),
+    updated_at = now()
+where provider = 'google'
+  and provider_id = 'google-hosted-person';
+
+select is(
+  (
+    select provider_id
+    from public.person_emails
+    where email = 'hosted@example.com'
+  ),
+  'google-hosted-person',
+  'a repeat sign-in reconciles a stale email identity binding'
 );
 
 set local role authenticated;

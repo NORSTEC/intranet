@@ -9,7 +9,7 @@ pnpm db:test
 ```
 
 Pull requests run the application checks, a database reset from every
-migration, 318 authorization assertions and dependency review. Merge only when
+migration, 319 authorization assertions and dependency review. Merge only when
 all required checks pass.
 
 `main` triggers two independent production actions:

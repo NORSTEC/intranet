@@ -27,7 +27,7 @@ decision is enforced end to end.
 - Role changes, access decisions, lifecycle changes, linking and merge are
   audited in the same transaction.
 - Foreign-key indexes cover deletion, merge and queue cleanup paths.
-- The 318-assertion pgTAP suite runs against a real database in CI.
+- The 319-assertion pgTAP suite runs against a real database in CI.
 
 ## Authentication
 
