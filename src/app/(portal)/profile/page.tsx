@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DeleteAccountSettings } from "@/components/portal/delete-account-settings";
+import { DirectoryVisibilitySettings } from "@/components/portal/directory-visibility-settings";
 import {
   LoginAccountsSettings,
   type LinkedLoginAccount,
@@ -201,15 +202,23 @@ export default async function ProfilePage({
       <MemberProfileView
         accountSettings={<LoginAccountsSettings accounts={loginAccounts} />}
         action={
-          <Link className="portal-button" href="/profile/edit">
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined text-[1.1rem]"
+          <div className="flex min-h-11 flex-nowrap justify-end gap-3">
+            <DirectoryVisibilitySettings
+              initialVisible={access.profile.directoryVisible}
+            />
+            <Link
+              className="portal-button shrink-0 whitespace-nowrap"
+              href="/profile/edit"
             >
-              edit
-            </span>
-            Edit profile
-          </Link>
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[1.1rem]"
+              >
+                edit
+              </span>
+              Edit profile
+            </Link>
+          </div>
         }
         avatarAlt={access.profile.avatarAlt}
         avatarUrl={avatarUrl}
