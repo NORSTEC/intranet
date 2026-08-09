@@ -12,6 +12,36 @@ export type UnlinkLoginAccountResult =
   | { ok: true }
   | { ok: false; message: string };
 
+export type DirectoryVisibilityResult =
+  | { ok: true; visible: boolean }
+  | { ok: false; message: string };
+
+export async function setOwnDirectoryVisibility(
+  directoryVisible: boolean,
+): Promise<DirectoryVisibilityResult> {
+  await requirePortalAccess();
+
+  if (typeof directoryVisible !== "boolean") {
+    return { ok: false, message: "Choose whether other members can see you." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "set_own_directory_visibility",
+    { p_directory_visible: directoryVisible },
+  );
+
+  if (error || typeof data !== "boolean") {
+    return {
+      ok: false,
+      message: "Your directory visibility could not be saved. Try again.",
+    };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, visible: data };
+}
+
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -320,7 +350,6 @@ export async function saveProfile(formData: FormData) {
     formData,
     "expectedProfileUpdatedAt",
   );
-  const directoryVisible = formData.get("directoryVisible") === "true";
   const studyYear = studyYearValue ? Number(studyYearValue) : null;
 
   let validLinkedIn = true;
@@ -491,7 +520,6 @@ export async function saveProfile(formData: FormData) {
     p_expected_profile_updated_at: expectedProfileUpdatedAt,
     p_deleted_experiences: deletedExperiences,
     p_deleted_roles: deletedRoles,
-    p_directory_visible: directoryVisible,
     p_field_of_study: fieldOfStudy || null,
     p_linkedin_url: linkedinUrl || null,
     p_new_roles: newRoles,

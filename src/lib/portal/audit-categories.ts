@@ -24,6 +24,7 @@ export function categoryFor(action: string): AuditCategory {
   if (
     action.startsWith("portal_access.") ||
     action.startsWith("person.") ||
+    action.startsWith("profile.") ||
     action.startsWith("workspace_account.") ||
     action.startsWith("workspace_directory.")
   ) {
