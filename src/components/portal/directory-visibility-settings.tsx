@@ -22,6 +22,7 @@ export function DirectoryVisibilitySettings({
   const descriptionId = useId();
   const switchLabelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(initialVisible);
   const [draftVisible, setDraftVisible] = useState(initialVisible);
   const [open, setOpen] = useState(false);
@@ -48,12 +49,42 @@ export function DirectoryVisibilitySettings({
   useEffect(() => {
     if (!open) return;
 
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape" && !pending) closeDialog();
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    focusable?.[0]?.focus();
+
+    function trapFocus(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (!pending) closeDialog();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialog) return;
+
+      const nodes = dialog.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (nodes.length === 0) return;
+
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey) {
+        if (active === first || !dialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", trapFocus);
+    return () => window.removeEventListener("keydown", trapFocus);
   }, [closeDialog, open, pending]);
 
   function save() {
@@ -105,6 +136,7 @@ export function DirectoryVisibilitySettings({
           aria-labelledby={titleId}
           aria-modal="true"
           className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(15,17,24,0.72)] p-5"
+          ref={dialogRef}
           role="dialog"
         >
           <div className="portal-surface max-h-[90vh] w-full max-w-md overflow-y-auto p-7 sm:p-8">
@@ -170,7 +202,6 @@ export function DirectoryVisibilitySettings({
 
             <div className="mt-7 flex flex-wrap gap-3">
               <button
-                autoFocus
                 className="portal-button"
                 disabled={pending}
                 onClick={closeDialog}
