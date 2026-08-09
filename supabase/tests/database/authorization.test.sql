@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(307);
+select plan(308);
 
 -- DNS itself is checked by the server action. Database tests exercise the
 -- two guarded RPCs with a fixed hash so no test can use the retired direct-add
@@ -509,6 +509,16 @@ values
     now(),
     now()
   );
+
+select is(
+  (
+    select binding.provider_id
+    from private.google_identity_bindings as binding
+    where binding.user_id = '11111111-1111-4111-8111-111111111111'
+  ),
+  'google-member-primary',
+  'the Google subject is reserved in a portal-owned binding table'
+);
 
 select ok(
   exists (

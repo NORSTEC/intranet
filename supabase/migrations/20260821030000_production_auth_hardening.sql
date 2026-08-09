@@ -98,12 +98,59 @@ grant select (account_email, auth_user_id, provider_id)
 -- connected to one person. A second Google identity on the same Auth user is
 -- therefore never legitimate and is the exact shape produced by Supabase's
 -- automatic email linking when a Workspace address is reassigned.
+--
+-- Supabase owns auth.identities, so portal migrations must not add indexes or
+-- constraints to it. This private mirror owns the invariant instead. Its
+-- primary key serializes concurrent claims for one Auth user, while the
+-- foreign key removes the binding only when that Auth user is deleted.
+create table private.google_identity_bindings (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  provider_id text not null,
+  constraint google_identity_bindings_provider_id_not_blank
+    check (nullif(btrim(provider_id), '') is not null)
+);
+
+revoke all on table private.google_identity_bindings
+  from public, anon, authenticated, service_role;
+
+do $$
+begin
+  if exists (
+    select 1
+    from auth.identities as identity
+    where identity.provider = 'google'
+      and nullif(btrim(identity.provider_id), '') is null
+  ) then
+    raise exception using errcode = 'P0001', message = 'google_subject_missing';
+  end if;
+
+  if exists (
+    select identity.user_id
+    from auth.identities as identity
+    where identity.provider = 'google'
+    group by identity.user_id
+    having count(distinct identity.provider_id) > 1
+  ) then
+    raise exception using errcode = 'P0001',
+      message = 'unsafe_google_identity_link';
+  end if;
+end;
+$$;
+
+insert into private.google_identity_bindings (user_id, provider_id)
+select identity.user_id, min(identity.provider_id)
+from auth.identities as identity
+where identity.provider = 'google'
+group by identity.user_id;
+
 create or replace function private.guard_google_identity_subject()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  accepted_provider_id text;
 begin
   if new.provider is distinct from 'google' then
     return new;
@@ -114,7 +161,19 @@ begin
       message = 'google_subject_missing';
   end if;
 
-  if exists (
+  insert into private.google_identity_bindings as binding (
+    user_id,
+    provider_id
+  ) values (
+    new.user_id,
+    new.provider_id
+  )
+  on conflict (user_id) do update
+  set provider_id = binding.provider_id
+  where binding.provider_id = excluded.provider_id
+  returning binding.provider_id into accepted_provider_id;
+
+  if accepted_provider_id is null or exists (
     select 1
     from auth.identities as existing_identity
     where existing_identity.user_id = new.user_id
@@ -138,13 +197,6 @@ $$;
 
 revoke all on function private.guard_google_identity_subject()
   from public, anon, authenticated;
-
--- Also closes the concurrent-insert race that a trigger alone cannot close.
--- Migration failure here deliberately exposes any pre-existing unsafe link;
--- it must be reviewed rather than silently deleting an Auth identity.
-create unique index identities_one_google_per_user_idx
-  on auth.identities (user_id)
-  where provider = 'google';
 
 drop trigger if exists guard_google_identity_subject on auth.identities;
 create trigger guard_google_identity_subject
