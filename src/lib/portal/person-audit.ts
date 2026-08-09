@@ -253,6 +253,8 @@ function describe(action: string, details: Record<string, unknown> | null) {
       return "Data purged";
     case "person.abandoned_discarded":
       return "Abandoned profile discarded";
+    case "profile.directory_visibility_changed":
+      return "Directory visibility changed";
     case "workspace_account.suspended":
       return "Norstec account suspended";
     case "workspace_account.reactivated":
@@ -469,6 +471,14 @@ function buildFields(
       add("Folded-in profile", sourceId === null ? null : `Person #${sourceId}`);
       break;
     }
+
+    case "profile.directory_visibility_changed":
+      add(
+        "Visible to other members",
+        `${yesNo(flag(details, "from"))} → ${yesNo(flag(details, "to"))}`,
+      );
+      add("Requested by", sourceLabel(text(details, "source")));
+      break;
 
     case "person.soft_deleted":
     case "person.self_deleted":

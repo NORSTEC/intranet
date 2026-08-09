@@ -1090,7 +1090,7 @@ export type Database = {
           p_avatar_path: string | null
           p_deleted_experiences: Json
           p_deleted_roles: Json
-          p_directory_visible: boolean
+          p_directory_visible?: boolean
           p_expected_profile_updated_at: string
           p_experiences: Json
           p_field_of_study: string | null
@@ -1120,6 +1120,10 @@ export type Database = {
       set_organization_membership_status: {
         Args: { p_membership_id: number; p_status: string }
         Returns: undefined
+      }
+      set_own_directory_visibility: {
+        Args: { p_directory_visible: boolean }
+        Returns: boolean
       }
       set_person_portal_access: {
         Args: { p_person_id: number; p_status: string }

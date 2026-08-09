@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(319);
+select plan(327);
 
 -- DNS itself is checked by the server action. Database tests exercise the
 -- two guarded RPCs with a fixed hash so no test can use the retired direct-add
@@ -5585,6 +5585,34 @@ select is(
   'profile role deletes cannot bypass the validated profile RPC'
 );
 
+select is(
+  has_function_privilege(
+    'anon',
+    'public.set_own_directory_visibility(boolean)',
+    'execute'
+  ),
+  false,
+  'signed-out callers cannot change directory visibility'
+);
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'public.set_own_directory_visibility(boolean)',
+    'execute'
+  ),
+  true,
+  'signed-in callers can use the narrow self-visibility RPC'
+);
+
+select is(
+  has_column_privilege(
+    'authenticated', 'public.people', 'directory_visible', 'update'
+  ),
+  false,
+  'directory visibility cannot bypass the narrow self-visibility RPC'
+);
+
 create temporary table privacy_target as
 select id
 from public.people
@@ -5598,9 +5626,75 @@ insert into public.profile_experiences (
 select id, 'Privacy Regression', 'user'
 from privacy_target;
 
-update public.people
-set directory_visible = false
-where id = (select id from privacy_target);
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal1"}',
+  true
+);
+
+select is(
+  public.set_own_directory_visibility(false),
+  false,
+  'an ordinary member can hide their own directory entry without MFA'
+);
+
+select throws_ok(
+  $$ select public.set_own_directory_visibility(null) $$,
+  'P0001',
+  'invalid_visibility',
+  'the self-visibility RPC rejects a missing decision'
+);
+
+select lives_ok(
+  $$
+    select public.save_own_profile_v6(
+      person.profile_updated_at,
+      person.phone_number,
+      person.field_of_study,
+      person.study_year,
+      person.linkedin_url,
+      person.avatar_path,
+      person.avatar_alt,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb
+    )
+    from public.people as person
+    where person.id = (select private.current_person_id())
+  $$,
+  'saving ordinary profile fields does not require a visibility value'
+);
+
+select is(
+  (
+    select person.directory_visible
+    from public.people as person
+    where person.id = (select private.current_person_id())
+  ),
+  false,
+  'saving ordinary profile fields preserves the separate privacy decision'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.audit_events as event
+    where event.action = 'profile.directory_visibility_changed'
+      and event.actor_person_id = (select id from privacy_target)
+      and event.target_person_id = (select id from privacy_target)
+      and event.details ->> 'from' = 'true'
+      and event.details ->> 'to' = 'false'
+      and event.details ->> 'source' = 'self_service'
+  ),
+  1::bigint,
+  'a directory visibility change records its actor, target, and decision'
+);
 
 set local role authenticated;
 select set_config(

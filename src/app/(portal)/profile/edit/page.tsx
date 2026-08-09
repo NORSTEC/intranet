@@ -67,7 +67,7 @@ export default async function EditProfilePage({
   ] = await Promise.all([
       supabase
         .from("people")
-        .select("profile_updated_at, directory_visible")
+        .select("profile_updated_at")
         .eq("id", access.profile.personId)
         .single(),
       supabase
@@ -240,24 +240,6 @@ export default async function EditProfilePage({
               placeholder="LinkedIn profile URL"
               type="url"
             />
-          </label>
-
-          <label className="portal-surface mt-6 flex max-w-2xl cursor-pointer items-start gap-4 p-5">
-            <input
-              className="mt-1 size-4 shrink-0"
-              defaultChecked={personResult.data.directory_visible}
-              name="directoryVisible"
-              type="checkbox"
-              value="true"
-            />
-            <span>
-              <span className="block font-medium">Show me to other members</span>
-              <span className="mt-1 block text-sm leading-relaxed opacity-60">
-                Turn this off to hide your profile, memberships, teams, roles,
-                and contact details from member directories. You and authorized
-                administrators can still see them.
-              </span>
-            </span>
           </label>
         </div>
       </section>
