@@ -75,11 +75,34 @@ describe("every notification", () => {
 
   // Apple Mail and Outlook invert an undeclared palette themselves, and their
   // guess is not the portal's dark theme.
-  it("pins the colour scheme and the portal's own canvas", () => {
+  it("pins the colour scheme to the portal's dark canvas", () => {
     for (const email of rendered) {
-      expect(email.html).toContain('name="color-scheme" content="light"');
+      expect(email.html).toContain('name="color-scheme" content="dark"');
+      expect(email.html).toContain('name="supported-color-schemes" content="dark"');
+      expect(email.html).toContain("background:#0f1118");
       expect(email.html).toContain("#ede8da");
-      expect(email.html).toContain("Barlow, 'Arial Narrow', Arial, sans-serif");
+      expect(email.html).toContain("Barlow, Arial, Helvetica, sans-serif");
+    }
+  });
+
+  it("uses an open layout instead of wrapping the message in a bordered card", () => {
+    for (const email of rendered) {
+      expect(email.html).not.toContain("border-radius:32px");
+      expect(email.html).not.toContain("class=\"card\"");
+    }
+  });
+
+  it("gives every call to action a visible hover state", () => {
+    for (const email of rendered) {
+      expect(email.html).toContain('class="portal-button"');
+      expect(email.html).toContain(".portal-button:hover");
+      expect(email.html).toContain("background:#ede8da");
+    }
+  });
+
+  it("does not introduce a decorative stripe below the logo", () => {
+    for (const email of rendered) {
+      expect(email.html).not.toContain('height="3"');
     }
   });
 
@@ -237,10 +260,11 @@ describe("an ended membership", () => {
     expect(email.text).toContain(warning);
     expect(email.text).toContain("Add a personal Google account");
     expect(email.html).toContain(`${site}/profile`);
-    // `portal-toast` with `bg-sun` — the portal's own warning, not an accent
-    // rule invented for email. Ink on sun is 9.9:1.
-    expect(email.html).toContain("background:#f3ad78");
-    expect(email.html).toContain("border:2px solid #0f1118");
+    // `portal-surface` in dark mode: dark canvas with the portal's light
+    // outline and 2rem radius, not a new colored callout treatment.
+    expect(email.html).not.toContain("background:#f3ad78");
+    expect(email.html).toContain("border:2px solid #ede8da");
+    expect(email.html).toContain("border-radius:32px");
   });
 
   it("says so in the preheader, where an inbox list will show it", () => {

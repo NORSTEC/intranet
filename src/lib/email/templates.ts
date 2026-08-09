@@ -9,20 +9,19 @@
 const EGG = "#ede8da";
 const MOODY = "#0f1118";
 
-// Mixed from MOODY over EGG, because a gray on a warm canvas reads as dirt.
-// 6.5:1, 5.9:1 and 5.4:1 against the canvas.
-const INK_SECONDARY = "#54504a";
-const INK_LABEL = "#5c574f";
-const INK_FOOTER = "#625c53";
-// `--color-sun`, the fill `portal-toast` uses for a warning. Ink on it is
-// 9.9:1.
-const SUN = "#f3ad78";
+// Dark mode is deliberate rather than client-controlled. These are warm
+// tints of EGG, so secondary copy stays in the portal's palette instead of
+// becoming a cold email-client gray.
+const INK_SECONDARY = "#c9c4b6";
+const INK_FOOTER = "#9f9b91";
+const DIVIDER = "#45464d";
 
-// `--font-sans`, verbatim. Barlow reaches the clients that honour the webfont
-// link; the rest land on the same fallback the portal itself uses.
-const FONT_STACK_VALUE = "Barlow, 'Arial Narrow', Arial, sans-serif";
+// Barlow is the portal's face. Clients which block webfonts get a proportional
+// sans rather than Arial Narrow, whose condensed metrics made the email look
+// unlike the portal even when everything else was correct.
+const FONT_STACK_VALUE = "Barlow, Arial, Helvetica, sans-serif";
 
-const LOGO_SIZE = 40;
+const LOGO_SIZE = 44;
 
 export type NotificationKind =
   | "access_request_approved"
@@ -160,7 +159,7 @@ function masthead(siteUrl: string) {
     style="border-collapse:collapse;width:100%"
   >
     <tr>
-      <td style="padding:0 0 20px;border-bottom:1px solid ${MOODY}">
+      <td style="padding:0">
         <table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse">
           <tr>
             <td style="padding-right:16px" valign="middle">
@@ -174,12 +173,12 @@ function masthead(siteUrl: string) {
             </td>
             <td valign="middle">
               <div
-                style="font-size:19px;font-weight:300;letter-spacing:0.14em;line-height:1.1;text-transform:uppercase;color:${MOODY}"
+                style="font-family:${FONT_STACK};font-size:20px;font-weight:300;letter-spacing:0.14em;line-height:1.1;text-transform:uppercase;color:${EGG}"
               >
                 NORSTEC
               </div>
               <div
-                style="padding-top:3px;font-size:11px;font-weight:500;letter-spacing:0.34em;line-height:1.1;text-transform:uppercase;color:${INK_LABEL}"
+                style="padding-top:4px;font-family:${FONT_STACK};font-size:11px;font-weight:500;letter-spacing:0.34em;line-height:1.1;text-transform:uppercase;color:${INK_SECONDARY}"
               >
                 Portal
               </div>
@@ -191,12 +190,11 @@ function masthead(siteUrl: string) {
   </table>`;
 }
 
-// `text-h2`: Barlow, 300, uppercase. The portal clamps it to 2.5rem at the
-// top; 30px is that scale at an email's fixed 540px measure. The card owns the
-// space above it, so the heading carries no top margin of its own.
+// `text-h2`: Barlow, 300, uppercase. At an email's fixed measure it can reach
+// 36px without competing with the portal's larger page-level display type.
 function heading(content: string) {
   return html`<h1
-    style="margin:0;font-family:${FONT_STACK};font-size:30px;font-weight:300;line-height:1.1;text-transform:uppercase;color:${MOODY}"
+    style="margin:0;font-family:${FONT_STACK};font-size:36px;font-weight:300;letter-spacing:-0.02em;line-height:1.05;text-transform:uppercase;color:${EGG}"
   >
     ${content}
   </h1>`;
@@ -204,7 +202,7 @@ function heading(content: string) {
 
 function lead(content: string) {
   return html`<p
-    style="margin:16px 0 0;font-size:16px;font-weight:400;line-height:1.75;color:${INK_SECONDARY}"
+    style="margin:18px 0 0;font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${INK_SECONDARY}"
   >
     ${content}
   </p>`;
@@ -215,7 +213,7 @@ function lead(content: string) {
 // reviewer's note instead.
 function body(content: string, gap = 16) {
   return html`<p
-    style="margin:${gap}px 0 0;font-size:16px;font-weight:400;line-height:1.75;color:${MOODY}"
+    style="margin:${gap}px 0 0;font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${EGG}"
   >
     ${content}
   </p>`;
@@ -226,12 +224,12 @@ function field(label: string, value: string) {
   return html`<tr>
     <td style="padding:24px 0 0">
       <div
-        style="font-size:11px;font-weight:600;letter-spacing:0.12em;line-height:1.4;text-transform:uppercase;color:${INK_LABEL}"
+        style="font-family:${FONT_STACK};font-size:11px;font-weight:600;letter-spacing:0.12em;line-height:1.4;text-transform:uppercase;color:${INK_FOOTER}"
       >
         ${label}
       </div>
       <div
-        style="padding-top:6px;font-size:15px;font-weight:400;line-height:1.6;color:${MOODY}"
+        style="padding-top:6px;font-family:${FONT_STACK};font-size:15px;font-weight:400;line-height:1.6;color:${EGG}"
       >
         ${value}
       </div>
@@ -252,18 +250,20 @@ function fields(rows: (SafeHtml | null)[]) {
   </table>`;
 }
 
-// `portal-button`: pill, moody fill, egg label. Outlook's Word engine drops
-// the radius and leaves a filled rectangle, which is a fair trade against the
-// VML scaffolding the alternative needs.
+// `portal-button` in dark mode: egg fill and dark label, then a transparent
+// hover with egg type. Clients without `:hover` keep the high-contrast default;
+// Outlook's Word engine keeps the same readable fallback.
 function button(href: string, label: string) {
   return html`<table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse">
     <tr>
       <td
-        style="border-radius:999px;background:${MOODY}"
+        class="portal-button-shell"
+        style="border-radius:999px;background:${EGG}"
       >
         <a
+          class="portal-button"
           href="${href}"
-          style="display:inline-block;padding:13px 26px;border:2px solid ${MOODY};border-radius:999px;font-family:${FONT_STACK};font-size:15px;font-weight:500;line-height:1.2;color:${EGG};text-decoration:none"
+          style="display:inline-block;min-height:18px;padding:11px 20px;border:2px solid ${EGG};border-radius:999px;background:${EGG};font-family:${FONT_STACK};font-size:15px;font-weight:500;line-height:1.2;color:${MOODY};text-decoration:none;transition:background-color 180ms ease,color 180ms ease"
           >${label}</a
         >
       </td>
@@ -271,26 +271,23 @@ function button(href: string, label: string) {
   </table>`;
 }
 
-// The portal's own warning is `portal-toast` with `bg-sun`: a 2px moody
-// border, a 1rem radius and a solid `--color-sun` fill. Reusing that rather
-// than inventing an accent rule means a member has already seen this exact
-// object inside the portal, and it is the only alert vocabulary the design
-// system actually has.
+// `portal-surface` in dark mode: dark canvas, egg outline and the same 2rem
+// radius as the account and action cards this message points to.
 function warning(headline: string, detail: string) {
   return html`<table
     cellpadding="0"
     cellspacing="0"
     role="presentation"
-    style="border-collapse:collapse;width:100%;margin-top:30px"
+    style="border-collapse:separate;border-spacing:0;width:100%;margin-top:30px"
   >
     <tr>
       <td
-        style="border:2px solid ${MOODY};border-radius:16px;background:${SUN};padding:18px 20px"
+        style="border:2px solid ${EGG};border-radius:32px;background:${MOODY};padding:22px 24px"
       >
-        <p style="margin:0;font-size:15px;font-weight:600;line-height:1.6;color:${MOODY}">
+        <p style="margin:0;font-family:${FONT_STACK};font-size:18px;font-weight:400;line-height:1.4;color:${EGG}">
           ${headline}
         </p>
-        <p style="margin:8px 0 0;font-size:15px;font-weight:400;line-height:1.7;color:${MOODY}">
+        <p style="margin:10px 0 0;font-family:${FONT_STACK};font-size:15px;font-weight:400;line-height:1.7;color:${INK_SECONDARY}">
           ${detail}
         </p>
       </td>
@@ -306,11 +303,11 @@ function footer(siteUrl: string) {
     style="border-collapse:collapse;width:100%"
   >
     <tr>
-      <td style="padding:28px 8px 0">
-        <p style="margin:0;font-size:13px;font-weight:400;line-height:1.7;color:${INK_FOOTER}">
+      <td style="padding:28px 0 0;border-top:1px solid ${DIVIDER}">
+        <p style="margin:0;font-family:${FONT_STACK};font-size:13px;font-weight:400;line-height:1.7;color:${INK_FOOTER}">
           Sent by the NORSTEC Portal because a decision changed your access. It
           is not a newsletter and there is nothing to unsubscribe from.
-          <a href="${siteUrl}/privacy" style="color:${INK_FOOTER}">How we handle your data</a>.
+          <a class="email-link" href="${siteUrl}/privacy" style="color:${INK_SECONDARY};text-decoration:underline">How we handle your data</a>.
         </p>
       </td>
     </tr>
@@ -323,35 +320,53 @@ function emailDocument(preheader: string, content: SafeHtml) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="color-scheme" content="light" />
-    <meta name="supported-color-schemes" content="light" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="supported-color-schemes" content="dark" />
     <link
       href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600&amp;display=swap"
       rel="stylesheet"
     />
     <style>
+      :root {
+        color-scheme: dark;
+        supported-color-schemes: dark;
+      }
       body {
         margin: 0;
         padding: 0;
         width: 100% !important;
+        background: ${MOODY} !important;
       }
       a {
-        color: ${MOODY};
+        color: ${EGG};
+      }
+      .portal-button:hover,
+      .portal-button:focus {
+        background: ${MOODY} !important;
+        color: ${EGG} !important;
+      }
+      .portal-button-shell:hover,
+      .portal-button-shell:focus-within {
+        background: ${MOODY} !important;
+      }
+      .email-link:hover,
+      .email-link:focus {
+        color: ${EGG} !important;
       }
       @media (max-width: 600px) {
         .shell {
-          padding: 24px 16px !important;
+          padding: 28px 18px !important;
         }
-        .card {
-          padding: 28px 22px !important;
+        .main {
+          padding: 34px 0 38px !important;
         }
-        .display {
-          font-size: 26px !important;
+        .display h1 {
+          font-size: 30px !important;
         }
       }
     </style>
   </head>
-  <body style="margin:0;padding:0;background:${EGG}">
+  <body style="margin:0;padding:0;background:${MOODY}">
     <div
       style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px"
     >
@@ -361,7 +376,7 @@ function emailDocument(preheader: string, content: SafeHtml) {
       cellpadding="0"
       cellspacing="0"
       role="presentation"
-      style="border-collapse:collapse;width:100%;background:${EGG}"
+      style="border-collapse:collapse;width:100%;background:${MOODY}"
     >
       <tr>
         <td align="center" class="shell" style="padding:40px 20px">
@@ -369,12 +384,12 @@ function emailDocument(preheader: string, content: SafeHtml) {
             cellpadding="0"
             cellspacing="0"
             role="presentation"
-            style="border-collapse:collapse;width:100%;max-width:540px;text-align:left"
-            width="540"
+            style="border-collapse:collapse;width:100%;max-width:600px;text-align:left"
+            width="600"
           >
             <tr>
               <td
-                style="font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${MOODY}"
+                style="font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${EGG}"
               >
                 ${content}
               </td>
@@ -415,15 +430,15 @@ function shell({
         cellpadding="0"
         cellspacing="0"
         role="presentation"
-        style="border-collapse:collapse;width:100%;margin-top:28px;border:2px solid ${MOODY};border-radius:32px;background:${EGG}"
+        style="border-collapse:collapse;width:100%"
       >
         <tr>
-          <td class="card" style="padding:36px 34px 38px">
+          <td class="main" style="padding:48px 0 52px">
             <div class="display">${heading(headline)}</div>
             ${lead(greeting)} ${lead(intro)} ${detail}
             ${closing
               ? html`<p
-                  style="margin:28px 0 0;font-size:15px;font-weight:400;line-height:1.7;color:${INK_SECONDARY}"
+                  style="margin:28px 0 0;font-family:${FONT_STACK};font-size:15px;font-weight:400;line-height:1.7;color:${INK_SECONDARY}"
                 >
                   ${closing}
                 </p>`
