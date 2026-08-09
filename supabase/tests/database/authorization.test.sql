@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(330);
+select plan(333);
 
 -- DNS itself is checked by the server action. Database tests exercise the
 -- two guarded RPCs with a fixed hash so no test can use the retired direct-add
@@ -5694,6 +5694,67 @@ select is(
   ),
   1::bigint,
   'a directory visibility change records its actor, target, and decision'
+);
+
+-- save_own_profile_v6's explicit-visibility overload must not be a way to
+-- change directory_visible without the audit trail set_own_directory_
+-- visibility records: it has to route through that same audited path.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal1"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.save_own_profile_v6(
+      person.profile_updated_at,
+      person.phone_number,
+      person.field_of_study,
+      person.study_year,
+      person.linkedin_url,
+      person.avatar_path,
+      person.avatar_alt,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      true
+    )
+    from public.people as person
+    where person.id = (select private.current_person_id())
+  $$,
+  'saving with an explicit visibility argument succeeds'
+);
+
+select is(
+  (
+    select person.directory_visible
+    from public.people as person
+    where person.id = (select private.current_person_id())
+  ),
+  true,
+  'the explicit-visibility overload still applies the requested decision'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.audit_events as event
+    where event.action = 'profile.directory_visibility_changed'
+      and event.actor_person_id = (select id from privacy_target)
+      and event.target_person_id = (select id from privacy_target)
+      and event.details ->> 'from' = 'false'
+      and event.details ->> 'to' = 'true'
+      and event.details ->> 'source' = 'self_service'
+  ),
+  1::bigint,
+  'the explicit-visibility overload records an audit event through the same audited path'
 );
 
 set local role authenticated;
