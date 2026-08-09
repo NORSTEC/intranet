@@ -195,7 +195,7 @@ export default function PrivacyPolicyPage() {
                   ],
                   [
                     "Profile",
-                    "Name, phone number, field of study, study year, LinkedIn address, profile picture",
+                    "Name, phone number, field of study, study year, LinkedIn address, profile picture, and whether other members may find you in the directory",
                     "You, on your profile page. All of it optional except your name",
                   ],
                   [
@@ -307,7 +307,7 @@ export default function PrivacyPolicyPage() {
                 rows={[
                   [
                     "Other members of the portal",
-                    "Your name, profile picture, field of study, study year, LinkedIn address, phone number if you entered one, your organization and team memberships, and your primary email address",
+                    "If you choose to be visible: your name, profile picture, field of study, study year, LinkedIn address, phone number if you entered one, your organization and team memberships, and your primary email address",
                   ],
                   [
                     "Administrators of your organization",
@@ -319,6 +319,12 @@ export default function PrivacyPolicyPage() {
                   ],
                 ]}
               />
+              <p className="mt-7 leading-relaxed">
+                You can hide yourself from other members in profile settings.
+                This removes you from member, team, and organization views.
+                Administrators can still see the records they need to manage
+                access, memberships, and security.
+              </p>
             </Section>
 
             <Section id="emails">
@@ -510,7 +516,7 @@ export default function PrivacyPolicyPage() {
                   ],
                   [
                     "Rectification — correcting what is wrong",
-                    "Edit your profile yourself. Ask an administrator for membership and role data",
+                    "Edit your profile and directory visibility yourself. Ask an administrator for membership and role data",
                   ],
                   [
                     "Erasure — being deleted",

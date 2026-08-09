@@ -150,11 +150,8 @@ export default async function AccessPage({
         )
       : listedOrganizations;
   const latestRequest = requestsResult.data as AccessRequest | null;
-  // Only a pending request is ever read here. A declined one cannot reach this
-  // page: the decision discards the applicant's profile, and the request row
-  // goes with it, so the decline is told by email instead. The card that used
-  // to say it here is kept, layout and copy, in
-  // docs/access-decision-notification.md for the sender to be built from.
+  // Declined applicants are deleted and notified by email, so only pending
+  // requests can be shown here. See docs/integrations.md.
   const pendingRequest =
     latestRequest?.status === "pending" ? latestRequest : null;
 

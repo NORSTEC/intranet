@@ -2,7 +2,211 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(281);
+select plan(307);
+
+-- DNS itself is checked by the server action. Database tests exercise the
+-- two guarded RPCs with a fixed hash so no test can use the retired direct-add
+-- function by accident.
+create function pg_temp.verify_organization_domain(
+  p_organization_id bigint,
+  p_domain text
+)
+returns jsonb
+language plpgsql
+as $$
+declare
+  result jsonb;
+  address_count integer;
+begin
+  address_count := (
+    public.preview_organization_domain(p_organization_id, p_domain)
+      ->> 'addressCount'
+  )::integer;
+  perform public.start_organization_domain_verification(
+    p_organization_id,
+    p_domain,
+    repeat('a', 64)
+  );
+  result := public.complete_organization_domain_verification(
+    p_organization_id,
+    p_domain,
+    repeat('a', 64)
+  );
+  return result || jsonb_build_object(
+    'addressCount',
+    address_count
+  );
+end;
+$$;
+
+-- Legacy profile test cases run through the single production write path.
+-- These adapters keep the fixtures readable without re-exposing retired RPCs.
+create function pg_temp.save_profile_v4(
+  p_expected_updated_at timestamptz,
+  p_phone_number text,
+  p_field_of_study text,
+  p_study_year smallint,
+  p_linkedin_url text,
+  p_avatar_path text,
+  p_avatar_alt text,
+  p_experiences jsonb,
+  p_roles jsonb,
+  p_new_roles jsonb,
+  p_deleted_experiences jsonb,
+  p_deleted_roles jsonb
+)
+returns timestamptz
+language plpgsql
+as $$
+declare
+  expected_profile_version timestamptz;
+begin
+  expected_profile_version := case
+    when p_expected_updated_at < '2001-01-01'::timestamptz
+      then p_expected_updated_at
+    else (
+      select profile_updated_at
+      from public.people
+      where id = (select private.current_person_id())
+    )
+  end;
+
+  return public.save_own_profile_v6(
+    expected_profile_version,
+    p_phone_number,
+    p_field_of_study,
+    p_study_year,
+    p_linkedin_url,
+    p_avatar_path,
+    p_avatar_alt,
+    p_experiences,
+    p_roles,
+    p_new_roles,
+    '[]'::jsonb,
+    p_deleted_experiences,
+    p_deleted_roles,
+    (
+      select directory_visible
+      from public.people
+      where id = (select private.current_person_id())
+    )
+  );
+end;
+$$;
+
+create function pg_temp.save_profile_v5(
+  p_expected_profile_updated_at timestamptz,
+  p_phone_number text,
+  p_field_of_study text,
+  p_study_year smallint,
+  p_linkedin_url text,
+  p_avatar_path text,
+  p_avatar_alt text,
+  p_experiences jsonb,
+  p_roles jsonb,
+  p_new_roles jsonb,
+  p_deleted_experiences jsonb,
+  p_deleted_roles jsonb
+)
+returns timestamptz
+language sql
+as $$
+  select public.save_own_profile_v6(
+    p_expected_profile_updated_at,
+    p_phone_number,
+    p_field_of_study,
+    p_study_year,
+    p_linkedin_url,
+    p_avatar_path,
+    p_avatar_alt,
+    p_experiences,
+    p_roles,
+    p_new_roles,
+    '[]'::jsonb,
+    p_deleted_experiences,
+    p_deleted_roles,
+    (
+      select directory_visible
+      from public.people
+      where id = (select private.current_person_id())
+    )
+  );
+$$;
+
+create function pg_temp.create_profile_experience_v2(
+  p_organization_name text,
+  p_organization_id bigint,
+  p_starts_on date,
+  p_ends_on date,
+  p_description text,
+  p_roles jsonb
+)
+returns timestamptz
+language sql
+as $$
+  select public.save_own_profile_v6(
+    person.profile_updated_at,
+    person.phone_number,
+    person.field_of_study,
+    person.study_year,
+    person.linkedin_url,
+    person.avatar_path,
+    person.avatar_alt,
+    '[]'::jsonb,
+    '[]'::jsonb,
+    '[]'::jsonb,
+    jsonb_build_array(jsonb_build_object(
+      'organizationName', p_organization_name,
+      'organizationId', p_organization_id,
+      'startsOn', coalesce(p_starts_on::text, ''),
+      'endsOn', coalesce(p_ends_on::text, ''),
+      'description', coalesce(p_description, ''),
+      'roles', coalesce(p_roles, '[]'::jsonb)
+    )),
+    '[]'::jsonb,
+    '[]'::jsonb,
+    person.directory_visible
+  )
+  from public.people as person
+  where person.id = (select private.current_person_id());
+$$;
+
+create function pg_temp.create_profile_experience(
+  p_organization_name text,
+  p_organization_id bigint,
+  p_team_name text,
+  p_role_title text,
+  p_starts_on date,
+  p_ends_on date,
+  p_description text
+)
+returns timestamptz
+language sql
+as $$
+  select pg_temp.create_profile_experience_v2(
+    p_organization_name,
+    p_organization_id,
+    p_starts_on,
+    p_ends_on,
+    p_description,
+    case when nullif(btrim(coalesce(p_team_name, '')), '') is null
+      and nullif(btrim(coalesce(p_role_title, '')), '') is null
+      then '[]'::jsonb
+      else jsonb_build_array(jsonb_build_object(
+        'teamName', coalesce(p_team_name, 'Experience'),
+        'roleTitle', coalesce(p_role_title, ''),
+        'startsOn', coalesce(p_starts_on::text, ''),
+        'endsOn', coalesce(p_ends_on::text, '')
+      ))
+    end
+  );
+$$;
+
+-- The fixture domain predates DNS verification. Production requires a real
+-- TXT proof; the database suite marks its controlled fixture explicitly.
+update private.organization_domains
+set verified_at = now(),
+    verification_method = 'dns_txt';
 
 insert into public.people (
   full_name,
@@ -81,8 +285,10 @@ update public.organizations
 set domain_join_policy = 'auto'
 where slug = 'orbit-ntnu';
 
-insert into private.organization_domains (domain, organization_id)
-select 'orbitntnu.no', id
+insert into private.organization_domains (
+  domain, organization_id, verified_at, verification_method
+)
+select 'orbitntnu.no', id, now(), 'dns_txt'
 from public.organizations
 where slug = 'orbit-ntnu';
 
@@ -298,7 +504,7 @@ values
   (
     'google-member-primary',
     '11111111-1111-4111-8111-111111111111',
-    '{"email":"member@norstec.no","email_verified":true}'::jsonb,
+    '{"email":"member@norstec.no","email_verified":true,"custom_claims":{"hd":"norstec.no"}}'::jsonb,
     'google',
     now(),
     now()
@@ -364,7 +570,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -493,17 +699,17 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',
+  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated","aal":"aal2"}',
   true
 );
 
 select lives_ok(
   $$
     select public.submit_access_request(
-      (select id from public.organizations where slug = 'norstec'),
+      (select id from public.organizations where slug = 'orbit-ntnu'),
       'Personal',
       'User',
-      'Computer Science',
+      'Information Technology and Informatics',
       3::smallint,
       'Please review my request',
       'organization'
@@ -537,17 +743,19 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
-select lives_ok(
+select throws_ok(
   $$
     update public.people
     set phone_number = '+47 900 00 000'
     where id = (select private.current_person_id())
   $$,
-  'a member can update their own phone number'
+  '42501',
+  'permission denied for table people',
+  'a member cannot bypass the validated profile RPC'
 );
 
 select is(
@@ -556,13 +764,13 @@ select is(
     from public.people
     where id = (select private.current_person_id())
   ),
-  '+47 900 00 000',
-  'the updated phone number is stored on the member'
+  null::text,
+  'the rejected direct update stores nothing'
 );
 
 select lives_ok(
   $$
-    select public.save_own_profile_v4(
+    select pg_temp.save_profile_v4(
       (select updated_at from public.people where id = (select private.current_person_id())),
       '+47 922 22 222',
       'Technology, Engineering and Architecture',
@@ -627,7 +835,7 @@ select is(
 
 select lives_ok(
   $$
-    select public.save_own_profile_v5(
+    select pg_temp.save_profile_v5(
       (select profile_updated_at from public.people where id = (select private.current_person_id())),
       (select phone_number from public.people where id = (select private.current_person_id())),
       (select field_of_study from public.people where id = (select private.current_person_id())),
@@ -647,7 +855,7 @@ select lives_ok(
 
 select throws_ok(
   $$
-    select public.save_own_profile_v5(
+    select pg_temp.save_profile_v5(
       '2000-01-01T00:00:00Z'::timestamptz,
       (select phone_number from public.people where id = (select private.current_person_id())),
       (select field_of_study from public.people where id = (select private.current_person_id())),
@@ -775,7 +983,7 @@ select is(
 
 select throws_ok(
   $$
-    select public.save_own_profile_v4(
+    select pg_temp.save_profile_v4(
       '2000-01-01T00:00:00Z'::timestamptz,
       '+47 933 33 333',
       'Technology, Engineering and Architecture',
@@ -795,9 +1003,16 @@ select throws_ok(
   'a stale profile version is rejected instead of overwriting newer data'
 );
 
-update public.people
-set phone_number = '+47 911 11 111'
-where full_name = 'Pre-created Member';
+select throws_ok(
+  $$
+    update public.people
+    set phone_number = '+47 911 11 111'
+    where full_name = 'Pre-created Member'
+  $$,
+  '42501',
+  'permission denied for table people',
+  'a member cannot directly update another person profile'
+);
 
 select is(
   (
@@ -866,7 +1081,7 @@ select ok(
 
 select lives_ok(
   $$
-    select public.create_own_profile_experience(
+    select pg_temp.create_profile_experience(
       'Independent Space Company',
       null,
       'Payload project',
@@ -892,7 +1107,7 @@ select is(
 
 select lives_ok(
   $$
-    select public.create_own_profile_experience_v2(
+    select pg_temp.create_profile_experience_v2(
       'Multi-role Space Company',
       null,
       '2020-01-01'::date,
@@ -934,7 +1149,7 @@ select is(
 
 select lives_ok(
   $$
-    select public.save_own_profile_v4(
+    select pg_temp.save_profile_v4(
       (select updated_at from public.people where id = (select private.current_person_id())),
       (select phone_number from public.people where id = (select private.current_person_id())),
       (select field_of_study from public.people where id = (select private.current_person_id())),
@@ -980,7 +1195,7 @@ select is(
 
 select lives_ok(
   $$
-    select public.save_own_profile_v4(
+    select pg_temp.save_profile_v4(
       (select updated_at from public.people where id = (select private.current_person_id())),
       (select phone_number from public.people where id = (select private.current_person_id())),
       (select field_of_study from public.people where id = (select private.current_person_id())),
@@ -1023,7 +1238,7 @@ select is(
 
 select throws_ok(
   $$
-    select public.save_own_profile_v4(
+    select pg_temp.save_profile_v4(
       (select updated_at from public.people where id = (select private.current_person_id())),
       '+47 955 55 555',
       (select field_of_study from public.people where id = (select private.current_person_id())),
@@ -1051,7 +1266,7 @@ select isnt(
 
 select lives_ok(
   $$
-    select public.create_own_profile_experience_v2(
+    select pg_temp.create_profile_experience_v2(
       'Disposable Experience', null, null, null, null, '[]'::jsonb
     )
   $$,
@@ -1060,7 +1275,7 @@ select lives_ok(
 
 select lives_ok(
   $$
-    select public.save_own_profile_v4(
+    select pg_temp.save_profile_v4(
       (select updated_at from public.people where id = (select private.current_person_id())),
       (select phone_number from public.people where id = (select private.current_person_id())),
       (select field_of_study from public.people where id = (select private.current_person_id())),
@@ -1142,7 +1357,7 @@ where full_name = 'Pre-created Member';
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -1179,7 +1394,7 @@ where email = 'precreated.alternate@norstec.no';
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -1277,7 +1492,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -1328,7 +1543,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -1506,7 +1721,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -1578,7 +1793,7 @@ select lives_ok(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}',
+  '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -1637,16 +1852,46 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
 select lives_ok(
   $$
-    update public.profile_experiences
-    set organization_name = 'Edited Space Company'
-    where person_id = (select private.current_person_id())
-      and organization_name = 'Independent Space Company'
+    select pg_temp.save_profile_v4(
+      (select profile_updated_at from public.people
+       where id = (select private.current_person_id())),
+      (select phone_number from public.people
+       where id = (select private.current_person_id())),
+      (select field_of_study from public.people
+       where id = (select private.current_person_id())),
+      (select study_year from public.people
+       where id = (select private.current_person_id())),
+      (select linkedin_url from public.people
+       where id = (select private.current_person_id())),
+      (select avatar_path from public.people
+       where id = (select private.current_person_id())),
+      (select avatar_alt from public.people
+       where id = (select private.current_person_id())),
+      jsonb_build_array((
+        select jsonb_build_object(
+          'id', experience.id,
+          'expectedUpdatedAt', experience.updated_at,
+          'organizationId', experience.organization_id,
+          'organizationName', 'Edited Space Company',
+          'description', coalesce(experience.description, ''),
+          'startsOn', coalesce(experience.starts_on::text, ''),
+          'endsOn', coalesce(experience.ends_on::text, '')
+        )
+        from public.profile_experiences as experience
+        where experience.person_id = (select private.current_person_id())
+          and experience.organization_name = 'Independent Space Company'
+      )),
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb,
+      '[]'::jsonb
+    )
   $$,
   'a member can freely edit their own profile experience'
 );
@@ -1846,7 +2091,7 @@ values (
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -1859,7 +2104,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"66666666-6666-4666-8666-666666666666","role":"authenticated"}',
+  '{"sub":"66666666-6666-4666-8666-666666666666","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2132,7 +2377,7 @@ values
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2161,7 +2406,7 @@ where person_id = (
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2194,7 +2439,7 @@ grant select on access_review_target to authenticated;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2286,7 +2531,7 @@ values (
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}',
+  '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2294,7 +2539,7 @@ select public.submit_access_request(
   null,
   'Withdrawing',
   'Applicant',
-  'Computer Science',
+  'Information Technology and Informatics',
   null::smallint,
   'Requesting alumni access',
   'alumni'
@@ -2314,7 +2559,7 @@ grant select on access_withdraw_target to authenticated;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777777","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2333,7 +2578,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}',
+  '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2416,7 +2661,7 @@ grant select on portal_management_people to authenticated;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2448,7 +2693,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2513,7 +2758,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2540,7 +2785,7 @@ select lives_ok(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2572,7 +2817,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2590,7 +2835,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2641,7 +2886,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2750,7 +2995,7 @@ grant select on duplicate_people to authenticated;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2771,7 +3016,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2801,7 +3046,7 @@ select keeper_id from duplicate_people;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -2921,7 +3166,7 @@ values
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}',
+  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated","aal":"aal2"}',
   true
 );
 select public.complete_own_organization_onboarding();
@@ -3046,7 +3291,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}',
+  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3078,7 +3323,7 @@ where person_id = (select unlink_person_id from identity_people);
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}',
+  '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3168,7 +3413,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3211,7 +3456,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3303,7 +3548,7 @@ grant select on contact_people to authenticated;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3344,7 +3589,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3387,7 +3632,7 @@ where full_name = 'Named Duplicate';
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3432,7 +3677,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3559,13 +3804,13 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal2"}',
   true
 );
 
 select throws_ok(
   $$
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'ignite'),
       'ignite.no'
     )
@@ -3616,7 +3861,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3646,7 +3891,7 @@ select is(
 -- organization address, and under an automatic policy into a membership.
 select throws_ok(
   $$
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'ignite'),
       'gmail.com'
     )
@@ -3658,7 +3903,7 @@ select throws_ok(
 
 select throws_ok(
   $$
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'ignite'),
       'ntnu.no'
     )
@@ -3670,7 +3915,7 @@ select throws_ok(
 
 select throws_ok(
   $$
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'ignite'),
       'norstec.no'
     )
@@ -3682,7 +3927,7 @@ select throws_ok(
 
 select is(
   (
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'ignite'),
       'ignite.no'
     ) ->> 'addressCount'
@@ -3693,14 +3938,14 @@ select is(
 
 select throws_ok(
   $$
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'ignite'),
       'ignite.no'
     )
   $$,
   'P0001',
-  'domain_already_registered',
-  'the same domain cannot be registered twice'
+  'domain_already_verified',
+  'the same domain cannot be verified twice'
 );
 
 select is(
@@ -3726,7 +3971,7 @@ select is(
   (
     select count(*)
     from public.audit_events
-    where action = 'organization_domain.added'
+    where action = 'organization_domain.verified'
       and details ->> 'domain' = 'ignite.no'
   ),
   1::bigint,
@@ -3756,7 +4001,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3819,9 +4064,9 @@ select is(
 set local role anon;
 
 select throws_ok(
-  $$ select public.add_organization_domain(1, 'example.com') $$,
+  $$ select pg_temp.verify_organization_domain(1, 'example.com') $$,
   '42501',
-  'permission denied for function add_organization_domain',
+  'permission denied for function preview_organization_domain',
   'a signed-out visitor cannot register an organization domain'
 );
 
@@ -3838,13 +4083,13 @@ values ('joinlab', 'Join Lab', 'active');
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
 select lives_ok(
   $$
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'joinlab'),
       'joinlab.no'
     )
@@ -3912,7 +4157,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -3930,7 +4175,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4026,7 +4271,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777774","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777774","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4052,7 +4297,7 @@ where person_id = (
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4093,7 +4338,7 @@ where person_id = (
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777773","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4175,7 +4420,7 @@ where account.auth_user_id = '77777777-7777-4777-8777-777777777775'
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777775","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777775","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4188,7 +4433,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777776","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777776","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4313,7 +4558,7 @@ select id from public.people where full_name = 'Administrator Without Account';
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4360,13 +4605,13 @@ values ('slowlab', 'Slow Lab', 'active');
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
 select lives_ok(
   $$
-    select public.add_organization_domain(
+    select pg_temp.verify_organization_domain(
       (select id from public.organizations where slug = 'slowlab'),
       'slowlab.no'
     )
@@ -4418,7 +4663,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777778","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777778","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4464,7 +4709,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"77777777-7777-4777-8777-777777777775","role":"authenticated"}',
+  '{"sub":"77777777-7777-4777-8777-777777777775","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4599,7 +4844,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4637,7 +4882,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4761,7 +5006,7 @@ grant select on declined_request to authenticated;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4870,7 +5115,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4905,7 +5150,7 @@ reset role;
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4947,7 +5192,7 @@ select is(
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
 );
 
@@ -4970,6 +5215,420 @@ select is(
   ),
   0::bigint,
   'a sent notification is deleted rather than kept, so no address outlives its send'
+);
+
+-- Production identity, MFA, privacy and merge regressions.
+reset role;
+
+select is(
+  private.before_user_created(
+    jsonb_build_object(
+      'user', jsonb_build_object(
+        'email', 'member@norstec.no',
+        'app_metadata', jsonb_build_object('provider', 'google'),
+        'user_metadata', jsonb_build_object(
+          'provider_id', 'google-member-primary'
+        )
+      )
+    )
+  ),
+  '{}'::jsonb,
+  'the Auth hook accepts the same stable Google identity'
+);
+
+select is(
+  private.before_user_created(
+    jsonb_build_object(
+      'user', jsonb_build_object(
+        'email', 'member@norstec.no',
+        'app_metadata', jsonb_build_object('provider', 'google'),
+        'user_metadata', jsonb_build_object(
+          'provider_id', 'recycled-google-subject'
+        )
+      )
+    )
+  ) -> 'error' ->> 'http_code',
+  '403',
+  'the Auth hook blocks a recycled address with a different Google identity'
+);
+
+select throws_ok(
+  $$
+    insert into auth.identities (
+      provider_id,
+      user_id,
+      identity_data,
+      provider,
+      created_at,
+      updated_at
+    ) values (
+      'recycled-google-subject',
+      '11111111-1111-4111-8111-111111111111',
+      '{"email":"member@norstec.no","email_verified":true}'::jsonb,
+      'google',
+      now(),
+      now()
+    )
+  $$,
+  'P0001',
+  'unsafe_google_identity_link',
+  'the database blocks automatic email linking to a different Google subject'
+);
+
+insert into auth.identities (
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  created_at,
+  updated_at
+) values (
+  'google-hosted-person',
+  '77777777-7777-4777-8777-777777777771',
+  '{"email":"hosted@example.com","email_verified":true,"custom_claims":{"hd":"example.com"}}'::jsonb,
+  'google',
+  now(),
+  now()
+);
+
+update auth.identities
+set identity_data = '{"email":"hosted@example.com","email_verified":true}'::jsonb,
+    updated_at = now()
+where provider = 'google'
+  and provider_id = 'google-hosted-person';
+
+select is(
+  (
+    select hosted_domain
+    from public.portal_accounts
+    where auth_user_id = '77777777-7777-4777-8777-777777777771'
+  ),
+  null,
+  'losing the latest signed hosted-domain claim removes stale membership proof'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal1"}',
+  true
+);
+
+select is(
+  private.is_portal_admin(),
+  false,
+  'a portal administrator at AAL1 has no administrator authorization'
+);
+
+select is(
+  private.is_organization_admin(
+    (select id from public.organizations where slug = 'norstec')
+  ),
+  false,
+  'an organization administrator at AAL1 has no administrator authorization'
+);
+
+select throws_ok(
+  $$
+    select public.list_organization_domains(
+      (select id from public.organizations where slug = 'norstec')
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an AAL1 session cannot read the domain trust boundary'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
+  true
+);
+
+select is(
+  private.is_portal_admin(),
+  true,
+  'the same portal administrator regains authorization at AAL2'
+);
+
+reset role;
+
+select is(
+  has_function_privilege(
+    'authenticated',
+    'public.add_organization_domain(bigint,text)',
+    'execute'
+  ),
+  false,
+  'the direct domain-registration RPC is retired'
+);
+
+select is(
+  has_column_privilege(
+    'authenticated', 'public.people', 'full_name', 'update'
+  ),
+  false,
+  'profile fields can only be changed through the validated profile RPC'
+);
+
+select is(
+  has_table_privilege(
+    'authenticated', 'public.profile_experiences', 'insert'
+  ),
+  false,
+  'profile experience inserts cannot bypass the validated profile RPC'
+);
+
+select is(
+  has_table_privilege(
+    'authenticated', 'public.profile_experience_roles', 'delete'
+  ),
+  false,
+  'profile role deletes cannot bypass the validated profile RPC'
+);
+
+create temporary table privacy_target as
+select id
+from public.people
+where full_name = 'Pre-created Member';
+
+grant select on privacy_target to authenticated;
+
+insert into public.profile_experiences (
+  person_id, organization_name, source
+)
+select id, 'Privacy Regression', 'user'
+from privacy_target;
+
+update public.people
+set directory_visible = false
+where id = (select id from privacy_target);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated","aal":"aal2"}',
+  true
+);
+
+select is(
+  (select count(*) from public.people
+   where id = (select id from privacy_target)),
+  0::bigint,
+  'a hidden person is absent from another member profile query'
+);
+
+select is(
+  (select count(*) from public.memberships
+   where person_id = (select id from privacy_target)),
+  0::bigint,
+  'a hidden person memberships are absent from another member directory'
+);
+
+select is(
+  (select count(*) from public.team_memberships
+   where person_id = (select id from privacy_target)),
+  0::bigint,
+  'a hidden person teams are absent from another member directory'
+);
+
+select is(
+  (select count(*) from public.person_emails
+   where person_id = (select id from privacy_target)),
+  0::bigint,
+  'a hidden person contact address is absent from another member query'
+);
+
+select is(
+  (select count(*) from public.profile_experiences
+   where person_id = (select id from privacy_target)
+     and organization_name = 'Privacy Regression'),
+  0::bigint,
+  'a hidden person experience is absent from another member profile'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated","aal":"aal2"}',
+  true
+);
+
+select is(
+  (select count(*) from public.people
+   where id = (select id from privacy_target)),
+  1::bigint,
+  'a hidden person can still see their own profile'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
+  true
+);
+
+select is(
+  (select count(*) from public.people
+   where id = (select id from privacy_target)),
+  1::bigint,
+  'an MFA-confirmed portal administrator can manage a hidden profile'
+);
+
+reset role;
+
+insert into public.people (full_name, portal_access_status, source)
+values
+  ('Merge Admin Target', 'active', 'manual'),
+  ('Merge Admin Source', 'active', 'manual');
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select id, lower(replace(full_name, ' ', '.')) || '@example.com',
+  'personal', true, 'manual'
+from public.people
+where full_name in ('Merge Admin Target', 'Merge Admin Source');
+
+insert into public.memberships (
+  person_id, organization_id, role, status, provisioning_method
+)
+select person.id, organization.id, 'organization_admin', 'active', 'manual'
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Merge Admin Source'
+  and organization.slug = 'history-organization';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.merge_people(
+      (select id from public.people where full_name = 'Merge Admin Target'),
+      (select id from public.people where full_name = 'Merge Admin Source')
+    )
+  $$,
+  'P0001',
+  'source_is_organization_administrator',
+  'merging cannot grant the source organization-admin role to the target'
+);
+
+reset role;
+
+insert into public.people (full_name, portal_access_status, source)
+values
+  ('Merge Data Target', 'active', 'manual'),
+  ('Merge Data Source', 'active', 'manual');
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select id, lower(replace(full_name, ' ', '.')) || '@example.com',
+  'personal', true, 'manual'
+from public.people
+where full_name in ('Merge Data Target', 'Merge Data Source');
+
+insert into public.historical_membership_requests (
+  person_id, organization_id, ends_on, status
+)
+select person.id, organization.id, '2024-06-30'::date, 'pending'
+from public.people as person
+cross join public.organizations as organization
+where person.full_name in ('Merge Data Target', 'Merge Data Source')
+  and organization.slug = 'history-organization';
+
+insert into public.external_accounts (
+  person_id, organization_id, provider, external_id, status,
+  last_synced_at, provider_details
+)
+select
+  person.id,
+  organization.id,
+  'slack',
+  case when person.full_name = 'Merge Data Source'
+    then 'merge-data-new' else 'merge-data-old' end,
+  case when person.full_name = 'Merge Data Source'
+    then 'suspended' else 'active' end,
+  case when person.full_name = 'Merge Data Source'
+    then now() else now() - interval '2 days' end,
+  jsonb_build_object(
+    'snapshot',
+    case when person.full_name = 'Merge Data Source'
+      then 'new' else 'old' end
+  )
+from public.people as person
+cross join public.organizations as organization
+where person.full_name in ('Merge Data Target', 'Merge Data Source')
+  and organization.slug = 'history-organization';
+
+create temporary table merge_data_target as
+select id from public.people where full_name = 'Merge Data Target';
+grant select on merge_data_target to authenticated;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
+  true
+);
+
+select lives_ok(
+  $$
+    select public.merge_people(
+      (select id from merge_data_target),
+      (select id from public.people where full_name = 'Merge Data Source')
+    )
+  $$,
+  'a merge resolves duplicate pending history and provider snapshots'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.historical_membership_requests
+    where person_id = (select id from merge_data_target)
+      and status = 'pending'
+  ),
+  1::bigint,
+  'a merge keeps only one pending history request per organization'
+);
+
+select is(
+  (
+    select status
+    from public.external_accounts
+    where person_id = (select id from merge_data_target)
+      and provider = 'slack'
+  ),
+  'suspended',
+  'a merge keeps the freshest provider status'
+);
+
+select is(
+  (
+    select external_id
+    from public.external_accounts
+    where person_id = (select id from merge_data_target)
+      and provider = 'slack'
+  ),
+  'merge-data-new',
+  'a merge keeps the freshest provider identifier without a unique conflict'
+);
+
+select is(
+  (
+    select provider_details ->> 'snapshot'
+    from public.external_accounts
+    where person_id = (select id from merge_data_target)
+      and provider = 'slack'
+  ),
+  'new',
+  'a merge keeps the freshest provider details'
 );
 
 reset role;

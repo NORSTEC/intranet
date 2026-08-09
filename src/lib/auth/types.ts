@@ -28,6 +28,7 @@ export type PortalProfile = {
   studyYear: number | null;
   phoneNumber: string | null;
   linkedinUrl: string | null;
+  directoryVisible: boolean;
   onboardingStatus: "pending" | "complete";
 };
 
@@ -44,6 +45,7 @@ export type PortalAccessState =
       membership: PortalMembership | null;
       memberships: PortalMembership[];
       isPortalAdmin: boolean;
+      assuranceLevel: "aal1" | "aal2";
       // Portal access granted to an alumnus who belongs to no organization.
       hasAlumniAccess: boolean;
     };

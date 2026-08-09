@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash, randomBytes } from "node:crypto";
+import { resolveTxt } from "node:dns/promises";
 import { revalidatePath } from "next/cache";
 import {
   isWorkspaceConfigured,
@@ -101,6 +103,12 @@ function messageFor(error: { message: string }, fallback: string) {
   if (error.message.includes("domain_already_registered")) {
     return "This organization already answers for that domain.";
   }
+  if (error.message.includes("domain_already_verified")) {
+    return "This domain is already verified.";
+  }
+  if (error.message.includes("domain_verification_expired")) {
+    return "This verification expired. Start again to create a new DNS value.";
+  }
   if (error.message.includes("domain_not_found")) {
     return "This domain is not registered.";
   }
@@ -142,6 +150,9 @@ function messageFor(error: { message: string }, fallback: string) {
   }
   if (error.message.includes("source_is_portal_administrator")) {
     return "A portal administrator cannot be folded into someone else. Merge the duplicate into them instead, or revoke the role first.";
+  }
+  if (error.message.includes("source_is_organization_administrator")) {
+    return "This profile is an organization administrator. Hand over that role before merging it into another person.";
   }
   if (error.message.includes("source_is_norstec_account")) {
     return "A Norstec account cannot be folded into someone else. Merge the duplicate into them instead.";
@@ -987,27 +998,104 @@ export async function previewOrganizationDomain(input: {
   };
 }
 
-export async function addOrganizationDomain(input: {
+export type DomainVerificationResult = PortalManagementResult & {
+  domain?: string;
+  recordName?: string;
+  recordValue?: string;
+  token?: string;
+};
+
+export async function startOrganizationDomainVerification(input: {
   domain: string;
   organizationId: number;
-}): Promise<PortalManagementResult> {
+}): Promise<DomainVerificationResult> {
   await requirePortalAdminAccess();
 
+  const domain = input.domain.trim().toLowerCase();
+  const token = randomBytes(24).toString("hex");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
   const supabase = await createClient();
-  const { error } = await supabase.rpc("add_organization_domain", {
-    p_domain: input.domain,
-    p_organization_id: input.organizationId,
-  });
+  const { error } = await supabase.rpc(
+    "start_organization_domain_verification",
+    {
+      p_domain: domain,
+      p_organization_id: input.organizationId,
+      p_token_hash: tokenHash,
+    },
+  );
 
   if (error) {
     return {
       ok: false,
-      message: messageFor(error, "That domain could not be registered."),
+      message: messageFor(error, "Domain verification could not be started."),
+    };
+  }
+
+  return {
+    domain,
+    message: "DNS verification started.",
+    ok: true,
+    recordName: `_norstec-domain.${domain}`,
+    recordValue: `norstec-domain-verification=${token}`,
+    token,
+  };
+}
+
+export async function completeOrganizationDomainVerification(input: {
+  domain: string;
+  organizationId: number;
+  token: string;
+}): Promise<PortalManagementResult> {
+  await requirePortalAdminAccess();
+
+  const domain = input.domain.trim().toLowerCase();
+  if (!/^[0-9a-f]{48}$/.test(input.token)) {
+    return { ok: false, message: "This verification is invalid. Start again." };
+  }
+
+  const recordName = `_norstec-domain.${domain}`;
+  const expectedValue = `norstec-domain-verification=${input.token}`;
+  let records: string[][];
+
+  try {
+    records = await resolveTxt(recordName);
+  } catch {
+    return {
+      ok: false,
+      message: `No TXT record was found at ${recordName}. DNS changes can take a while; check the name and try again.`,
+    };
+  }
+
+  if (!records.some((parts) => parts.join("") === expectedValue)) {
+    return {
+      ok: false,
+      message: `The TXT record at ${recordName} does not contain the expected value.`,
+    };
+  }
+
+  const tokenHash = createHash("sha256").update(input.token).digest("hex");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "complete_organization_domain_verification",
+    {
+      p_domain: domain,
+      p_organization_id: input.organizationId,
+      p_token_hash: tokenHash,
+    },
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      message: messageFor(error, "That domain could not be verified."),
     };
   }
 
   revalidateOrganizationAccessViews();
-  return { ok: true, message: "Domain registered." };
+  return {
+    ok: true,
+    message: "Domain verified. Automatic membership remains enabled.",
+  };
 }
 
 export async function removeOrganizationDomain(input: {

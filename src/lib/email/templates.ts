@@ -1,49 +1,7 @@
 /**
- * The three emails the portal sends, each as an HTML part and a plain-text
- * part. Both are required: a message with no text alternative is a spam
- * signal, and some people genuinely read mail as text.
- *
- * ## Where the design comes from
- *
- * Not invented here. `docs/access-decision-notification.md` holds the layout
- * and copy that were designed and reviewed for the in-portal version of the
- * two decision messages before there was a sender — heading, the supporting
- * sentence, a `dl` of *Decided* and an optional *Note from the reviewer*, then
- * a closing line. The membership email follows the same shell so the three
- * read as one voice.
- *
- * The visual language is the portal's own, translated: `--color-egg` canvas,
- * a `portal-surface` card (2px `--color-moody` border, 2rem radius, egg fill),
- * `text-h2` headings (Barlow, 300, uppercase), and a `portal-button` pill.
- * `LegalShell`'s masthead — logo, `NORSTEC` tracked at 0.14em, `Portal` at
- * 0.34em beneath — is reproduced above the card, because the privacy policy
- * these emails link to is the surface a recipient is most likely to see next.
- *
- * ## What email costs
- *
- * Every value is a literal. Email clients resolve no custom properties, so
- * `--color-moody` cannot travel; the constants below are the same hex the
- * theme defines, and they have to be changed together.
- *
- * The portal's muted text is `opacity-55` and `opacity-45`. Opacity is
- * unreliable across clients and both fall under 4.5:1 anyway, so the secondary
- * tones here are solid colours mixed from the ink and the canvas — warm rather
- * than gray, because the canvas is warm — and every one of them passes.
- *
- * Barlow is requested and will arrive in Apple Mail and iOS Mail. Gmail and
- * Outlook ignore webfonts entirely and fall back, so the stack is the portal's
- * own `Arial Narrow, Arial` rather than a generic sans: the fallback is part
- * of the design, not an accident.
- *
- * `color-scheme: light` is declared so that Apple Mail and Outlook stop
- * inverting the palette themselves. The egg canvas *is* the portal's default
- * appearance, and a client-invented dark version of it is not the dark theme.
- *
- * Markup is built through {@link html}, a tagged template that escapes each
- * interpolation and passes through only fragments built the same way. All
- * three messages interpolate something a person typed — a full name, an
- * organization name, an administrator's note — so this is a safety decision
- * rather than a stylistic one, and `templates.test.ts` asserts it.
+ * Transactional email templates in HTML and plain text.
+ * The delivery contract is documented in `docs/integrations.md`.
+ * All interpolated values are escaped by the `html` tag below.
  */
 
 // The theme, from `globals.css`. Changing one of these means changing both.
