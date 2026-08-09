@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { withdrawAccessRequest } from "@/app/access/actions";
 import { AccessRequestForm } from "@/components/portal/access-request-form";
@@ -20,6 +21,9 @@ type AccessRequest = {
 const errorMessages: Record<string, string> = {
   invalid_request: "Check the information and try again.",
   already_pending: "You already have a pending request.",
+  captcha_failed: "The security check failed. Please try again.",
+  captcha_unavailable:
+    "The security check is temporarily unavailable. Please try again.",
   request_failed: "The request could not be submitted. Please try again.",
   withdraw_failed: "The request could not be withdrawn. Please try again.",
 };
@@ -52,6 +56,7 @@ export default async function AccessPage({
   }>;
 }) {
   const access = await getPortalAccess();
+  const requestHeaders = await headers();
   const {
     error,
     organization: provenOrganizationSlug,
@@ -227,6 +232,10 @@ export default async function AccessPage({
               lastName={access.profile.lastName ?? ""}
               organizations={organizations}
               provenOrganization={provenOrganization}
+              recaptchaSiteKey={
+                process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? ""
+              }
+              scriptNonce={requestHeaders.get("x-nonce") ?? undefined}
               studyYear={access.profile.studyYear}
             />
           </>

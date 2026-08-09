@@ -1,8 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import Script from "next/script";
+import { type FormEvent, useRef, useState } from "react";
 import { submitAccessRequest } from "@/app/access/actions";
 import { STUDY_FIELDS } from "@/lib/profile/study-fields";
+import { RECAPTCHA_ACTION } from "@/lib/security/recaptcha-constants";
+
+declare global {
+  interface Window {
+    grecaptcha?: {
+      execute: (
+        siteKey: string,
+        options: { action: string },
+      ) => Promise<string>;
+      ready: (callback: () => void) => void;
+    };
+  }
+}
 
 type Organization = { id: number; name: string };
 
@@ -28,6 +42,8 @@ export function AccessRequestForm({
   lastName,
   organizations,
   provenOrganization,
+  recaptchaSiteKey,
+  scriptNonce,
   studyYear,
 }: {
   errorMessage?: string;
@@ -36,6 +52,8 @@ export function AccessRequestForm({
   lastName: string;
   organizations: Organization[];
   provenOrganization?: Organization | null;
+  recaptchaSiteKey: string;
+  scriptNonce?: string;
   studyYear: number | null;
 }) {
   // Arriving with an organization account already answers the first question
@@ -45,12 +63,77 @@ export function AccessRequestForm({
     provenOrganization ? "organization" : "alumni",
   );
   const isOrganizationRequest = requestType === "organization";
+  const formRef = useRef<HTMLFormElement>(null);
+  const tokenRef = useRef<HTMLInputElement>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (!recaptchaSiteKey || tokenRef.current?.value) return;
+
+    event.preventDefault();
+    setCaptchaError(null);
+    setIsChecking(true);
+
+    try {
+      const grecaptcha = window.grecaptcha;
+
+      if (!grecaptcha) throw new Error("reCAPTCHA has not loaded");
+
+      const token = await new Promise<string>((resolve, reject) => {
+        const timeout = window.setTimeout(
+          () => reject(new Error("reCAPTCHA timed out")),
+          8_000,
+        );
+
+        grecaptcha.ready(() => {
+          grecaptcha
+            .execute(recaptchaSiteKey, { action: RECAPTCHA_ACTION })
+            .then((value) => {
+              window.clearTimeout(timeout);
+              resolve(value);
+            })
+            .catch((error: unknown) => {
+              window.clearTimeout(timeout);
+              reject(error);
+            });
+        });
+      });
+
+      if (!tokenRef.current || !formRef.current) {
+        throw new Error("Form is unavailable");
+      }
+
+      tokenRef.current.value = token;
+      formRef.current.requestSubmit();
+    } catch {
+      setCaptchaError(
+        "The security check could not run. Check your connection or content blocker, then try again.",
+      );
+      setIsChecking(false);
+    }
+  }
 
   return (
     <form
       action={submitAccessRequest}
       className="mt-8 grid max-w-4xl gap-6 sm:grid-cols-2"
+      onSubmit={handleSubmit}
+      ref={formRef}
     >
+      {recaptchaSiteKey && (
+        <Script
+          nonce={scriptNonce}
+          onError={() =>
+            setCaptchaError(
+              "The security check could not load. Check your connection or content blocker, then try again.",
+            )
+          }
+          src={`https://www.recaptcha.net/recaptcha/api.js?render=${encodeURIComponent(recaptchaSiteKey)}&hl=en`}
+          strategy="afterInteractive"
+        />
+      )}
+      <input name="recaptchaToken" ref={tokenRef} type="hidden" />
       {errorMessage && (
         <p className="text-sm text-[#a33b2b] sm:col-span-2" role="alert">
           {errorMessage}
@@ -261,11 +344,50 @@ export function AccessRequestForm({
         </p>
       </div>
 
-      <div className="sm:col-span-2">
-        <button className="portal-button" type="submit">
-          Send request
-          <span className="material-symbols-outlined">arrow_right_alt</span>
+      <div className="grid justify-items-start gap-3 sm:col-span-2">
+        {captchaError && (
+          <p className="max-w-[65ch] text-sm text-[#a33b2b]" role="alert">
+            {captchaError}
+          </p>
+        )}
+        <button
+          className="portal-button"
+          disabled={isChecking}
+          type="submit"
+        >
+          {isChecking ? "Checking…" : "Send request"}
+          <span
+            aria-hidden="true"
+            className={`material-symbols-outlined${isChecking ? " animate-spin" : ""}`}
+          >
+            {isChecking ? "progress_activity" : "arrow_right_alt"}
+          </span>
         </button>
+        {recaptchaSiteKey && (
+          <p className="max-w-[65ch] text-sm leading-relaxed opacity-65">
+            This site is protected by reCAPTCHA and the Google{" "}
+            <a
+              className="legal-link"
+              href="https://policies.google.com/privacy"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Privacy Policy
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>{" "}
+            and{" "}
+            <a
+              className="legal-link"
+              href="https://policies.google.com/terms"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Terms of Service
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>{" "}
+            apply.
+          </p>
+        )}
       </div>
     </form>
   );

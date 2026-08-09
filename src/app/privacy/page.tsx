@@ -251,6 +251,10 @@ export default function PrivacyPolicyPage() {
                     "Article 6(1)(b) — the same pre-agreement step",
                   ],
                   [
+                    "Preventing automated and abusive access requests",
+                    "Article 6(1)(f) — NORSTEC needs to protect the portal and its administrators from spam and abuse",
+                  ],
+                  [
                     "Running your membership: roles, teams, the member directory, and deciding what you may see",
                     "Article 6(1)(b) — the membership relationship between you and your organization",
                   ],
@@ -385,7 +389,7 @@ export default function PrivacyPolicyPage() {
                   ],
                   [
                     "Google",
-                    "Authenticates you, and for norstec.no accounts provides the Workspace directory",
+                    "Authenticates you, checks access requests for automated abuse, and for norstec.no accounts provides the Workspace directory",
                     "Google Ireland Limited, with onward transfer to Google LLC",
                   ],
                   [
@@ -402,6 +406,12 @@ export default function PrivacyPolicyPage() {
                 apply. Because you sign in with Google, Google also learns that
                 you signed in here, and processes that as its own controller
                 under its own privacy policy.
+              </p>
+              <p className="mt-7 leading-relaxed">
+                On the access request form, Google reCAPTCHA receives technical
+                information about the browser and interaction needed to assess
+                whether the submission is automated. The portal receives only
+                a short-lived result token and does not store it.
               </p>
               <p className="mt-7 leading-relaxed">
                 Resend receives only what an email needs: your name, the address
@@ -455,11 +465,13 @@ export default function PrivacyPolicyPage() {
 
             <Section id="cookies">
               <p className="mt-6 leading-relaxed">
-                The portal sets no advertising, tracking, or analytics cookies,
-                and loads no third-party scripts that would. What it does set is
-                strictly necessary for the portal to work, which under the
-                Norwegian Electronic Communications Act needs no consent — and
-                is why there is no cookie banner here.
+                The portal sets no advertising or analytics cookies. It loads
+                Google reCAPTCHA only on the access request form, where it sets
+                a security cookie to distinguish ordinary submissions from
+                automated abuse. The browser storage below is strictly necessary
+                for the portal to work, which under the Norwegian Electronic
+                Communications Act needs no consent — and is why there is no
+                cookie banner here.
               </p>
               <Table
                 caption="Everything the portal stores in your browser, and why."
@@ -475,6 +487,11 @@ export default function PrivacyPolicyPage() {
                     "Remembers whether you chose light or dark mode. Stored in your browser only and never sent to the server",
                     "Until you clear your browser storage",
                   ],
+                  [
+                    "_GRECAPTCHA",
+                    "Google reCAPTCHA assesses whether an access request is automated. It is set by recaptcha.net only on the request form",
+                    "Google controls its lifetime",
+                  ],
                 ]}
               />
             </Section>
@@ -484,11 +501,14 @@ export default function PrivacyPolicyPage() {
                 Signing in with a Google account on an organization&rsquo;s
                 approved email domain gives you a membership in that
                 organization without anyone reviewing it — the domain acts as
-                proof of membership. Every other decision, including approving
-                or declining an access request, is made by a person.
+                proof of membership. reCAPTCHA automatically stops an access
+                request when its security score indicates automated abuse; it
+                does not decide whether you receive access. Approving or
+                declining a request is always done by a person.
               </p>
               <p className="mt-5 leading-relaxed">
-                There is no profiling, and no automated decision producing legal
+                The reCAPTCHA score is used only to prevent automated
+                submissions. There is no automated decision producing legal
                 effects concerning you within the meaning of article 22.
               </p>
             </Section>

@@ -17,17 +17,19 @@ export function contentSecurityPolicy({
     "'self'",
     supabaseOrigin,
     supabaseWebSocketOrigin,
+    "https://www.recaptcha.net",
   ].filter(Boolean);
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.recaptcha.net/recaptcha/ https://www.gstatic.com/recaptcha/${
       development ? " 'unsafe-eval'" : ""
     }`,
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imageSources.join(" ")}`,
     "font-src 'self' data:",
     `connect-src ${connectionSources.join(" ")}`,
+    "frame-src https://www.recaptcha.net/recaptcha/ https://recaptcha.google.com/recaptcha/",
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",

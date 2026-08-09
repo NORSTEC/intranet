@@ -41,6 +41,13 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Google allows the badge to be hidden when its required attribution remains
+   visible in the form. The access request form carries that text by its submit
+   button, so the floating badge would only repeat it. */
+.grecaptcha-badge {
+  visibility: hidden;
+}
+
 @theme {
   --color-egg: #ede8da;
   --color-copper: #e8804c;

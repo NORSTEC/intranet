@@ -73,15 +73,35 @@ describe("every notification", () => {
     }
   });
 
-  // Apple Mail and Outlook invert an undeclared palette themselves, and their
-  // guess is not the portal's dark theme.
+  // Clients disagree about how much of <head> they keep. The modern scheme
+  // declarations and the old bgcolor fallback therefore have to agree.
   it("pins the colour scheme to the portal's dark canvas", () => {
     for (const email of rendered) {
       expect(email.html).toContain('name="color-scheme" content="dark"');
       expect(email.html).toContain('name="supported-color-schemes" content="dark"');
-      expect(email.html).toContain("background:#0f1118");
+      expect(email.html).toContain('name="theme-color" content="#0f1118"');
+      expect(email.html).toContain("color-scheme: only dark");
+      expect(email.html).toContain('bgcolor="#0f1118"');
+      expect(email.html).toContain("background-color:#0f1118");
+      expect(email.html).toContain('class="dark-canvas"');
+      expect(email.html).toContain("background-image:linear-gradient(#0f1118,#0f1118)");
+      expect(email.html).toContain('class="body dark-canvas"');
+      expect(email.html).toContain('class="gmail-blend-screen"');
+      expect(email.html).toContain('class="gmail-blend-difference"');
+      expect(email.html).toContain("u + .body .gmail-dark-wrap");
+      expect(email.html).toContain(
+        "background-image: linear-gradient(#000000, #000000) !important",
+      );
+      expect(email.html).toContain("mix-blend-mode: screen");
+      expect(email.html).toContain("mix-blend-mode: difference");
+      expect(email.html).toMatch(
+        /<div\s+class="dark-canvas gmail-dark-wrap"[\s\S]*?>\s*<div class="gmail-blend-screen">\s*<div class="gmail-blend-difference">[\s\S]*?<h1/,
+      );
       expect(email.html).toContain("#ede8da");
-      expect(email.html).toContain("Barlow, Arial, Helvetica, sans-serif");
+      expect(email.html).toContain(
+        "Barlow, 'Helvetica Neue', Roboto, Helvetica, Arial, sans-serif",
+      );
+      expect(email.html).not.toContain('font-family:Barlow, "Helvetica Neue"');
     }
   });
 
@@ -92,11 +112,20 @@ describe("every notification", () => {
     }
   });
 
+  it("keeps the heading thin when Gmail falls back to Helvetica", () => {
+    for (const email of rendered) {
+      expect(email.html).toContain('class="dark-copy email-heading"');
+      expect(email.html).toContain("font-weight:200!important");
+      expect(email.html).toContain("font-synthesis:none");
+      expect(email.html).toContain(".email-heading");
+    }
+  });
+
   it("gives every call to action a visible hover state", () => {
     for (const email of rendered) {
       expect(email.html).toContain('class="portal-button"');
       expect(email.html).toContain(".portal-button:hover");
-      expect(email.html).toContain("background:#ede8da");
+      expect(email.html).toContain("background-color:#ede8da");
     }
   });
 

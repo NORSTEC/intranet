@@ -14,6 +14,11 @@
 | Audit events | `audit_events` | security/accountability | authorized administrators |
 | Pending email payload | private notification queue | delivery/retry | not readable through Data API |
 
+The access-request form loads Google reCAPTCHA from `recaptcha.net`. Google
+processes browser and interaction signals for abuse detection and sets the
+necessary `_GRECAPTCHA` cookie. The portal verifies a short-lived token and
+does not store it.
+
 ## Directory choice
 
 Members can disable “Show me to other members” on profile edit. RLS then hides
