@@ -72,8 +72,13 @@ jobs:
       # same one developers do.
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
 
+      # This job uses Postgres directly. Starting Mailpit, Studio and the API
+      # services adds host ports and can collide with software on a hosted
+      # runner without testing anything this job depends on.
       - name: Start the local Supabase stack
-        run: supabase start
+        run: >-
+          supabase start --exclude
+          gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
       # Applies every migration to an empty database. This is the half that
       # catches a migration which only works against the deployed project — one
