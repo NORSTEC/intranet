@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(308);
+select plan(318);
 
 -- DNS itself is checked by the server action. Database tests exercise the
 -- two guarded RPCs with a fixed hash so no test can use the retired direct-add
@@ -33,7 +33,7 @@ begin
     repeat('a', 64)
   );
   return result || jsonb_build_object(
-    'addressCount',
+    'previewAddressCount',
     address_count
   );
 end;
@@ -3832,6 +3832,32 @@ select throws_ok(
 
 select throws_ok(
   $$
+    select public.start_organization_domain_verification(
+      (select id from public.organizations where slug = 'ignite'),
+      'unauthorized.example',
+      repeat('b', 64)
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot start a domain verification claim directly'
+);
+
+select throws_ok(
+  $$
+    select public.complete_organization_domain_verification(
+      (select id from public.organizations where slug = 'ignite'),
+      'unauthorized.example',
+      repeat('b', 64)
+    )
+  $$,
+  '42501',
+  'not_authorized',
+  'an ordinary member cannot complete a domain verification claim directly'
+);
+
+select throws_ok(
+  $$
     select public.list_organization_domains(
       (select id from public.organizations where slug = 'ignite')
     )
@@ -3868,11 +3894,81 @@ select throws_ok(
 );
 
 reset role;
+
+insert into private.organization_domain_verification_claims (
+  domain,
+  organization_id,
+  token_hash,
+  initiated_by_person_id
+)
+select
+  'claim-check.example',
+  organization.id,
+  repeat('c', 64),
+  account.person_id
+from public.organizations as organization
+cross join public.portal_accounts as account
+where organization.slug = 'ignite'
+  and account.auth_user_id = '11111111-1111-4111-8111-111111111111';
+
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
   '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
   true
+);
+
+select throws_ok(
+  $$
+    select public.complete_organization_domain_verification(
+      (select id from public.organizations where slug = 'ignite'),
+      'claim-check.example',
+      repeat('d', 64)
+    )
+  $$,
+  'P0001',
+  'domain_verification_expired',
+  'a mismatched DNS token cannot complete a verification claim'
+);
+
+select throws_ok(
+  $$
+    select public.complete_organization_domain_verification(
+      (select id from public.organizations where slug = 'norstec'),
+      'claim-check.example',
+      repeat('c', 64)
+    )
+  $$,
+  'P0001',
+  'domain_verification_expired',
+  'a verification claim cannot be completed for another organization'
+);
+
+reset role;
+
+update private.organization_domain_verification_claims
+set created_at = now() - interval '2 days',
+    expires_at = now() - interval '1 day'
+where domain = 'claim-check.example';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal2"}',
+  true
+);
+
+select throws_ok(
+  $$
+    select public.complete_organization_domain_verification(
+      (select id from public.organizations where slug = 'ignite'),
+      'claim-check.example',
+      repeat('c', 64)
+    )
+  $$,
+  'P0001',
+  'domain_verification_expired',
+  'an expired DNS verification claim cannot be completed'
 );
 
 select is(
@@ -3986,6 +4082,53 @@ select is(
   ),
   1::bigint,
   'registering a domain is on the record'
+);
+
+select is(
+  (
+    select (details ->> 'reclassified_address_count')::integer
+    from public.audit_events
+    where action = 'organization_domain.verified'
+      and details ->> 'domain' = 'ignite.no'
+  ),
+  0,
+  'domain verification audits only addresses whose type actually changed'
+);
+
+insert into private.organization_domains (
+  domain, organization_id, verified_at, verification_method
+)
+select 'legacy.ignite.no', id, null, 'legacy_admin_attestation'
+from public.organizations
+where slug = 'ignite';
+
+select is(
+  private.apply_domain_join(
+    (select id from public.people where full_name = 'Ignite Import'),
+    'legacy.ignite.no'
+  ) ->> 'outcome',
+  'domain_not_verified',
+  'a legacy administrator attestation cannot grant membership'
+);
+
+select is(
+  private.apply_domain_join(
+    (select id from public.people where full_name = 'Ignite Import'),
+    'unregistered.ignite.no'
+  ) ->> 'outcome',
+  'domain_not_verified',
+  'an unregistered hosted domain cannot grant membership'
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Ignite Import'
+  ),
+  0::bigint,
+  'refused domain proofs create no membership'
 );
 
 select is(
@@ -5315,6 +5458,31 @@ select is(
   ),
   null,
   'losing the latest signed hosted-domain claim removes stale membership proof'
+);
+
+update public.person_emails
+set provider_id = 'google-hosted-person'
+where email = 'hosted@example.com';
+
+create temporary table hosted_email_identity_version as
+select updated_at
+from public.person_emails
+where email = 'hosted@example.com';
+
+update auth.identities
+set last_sign_in_at = now(),
+    updated_at = now()
+where provider = 'google'
+  and provider_id = 'google-hosted-person';
+
+select is(
+  (
+    select updated_at
+    from public.person_emails
+    where email = 'hosted@example.com'
+  ),
+  (select updated_at from hosted_email_identity_version),
+  'a repeat sign-in does not rewrite an unchanged email identity binding'
 );
 
 set local role authenticated;

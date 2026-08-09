@@ -327,7 +327,8 @@ begin
   from public.portal_accounts as account
   where account.auth_user_id = new.user_id
     and address.person_id = account.person_id
-    and address.email = account.account_email;
+    and address.email = account.account_email
+    and address.provider_id is distinct from nullif(btrim(new.provider_id), '');
 
   return new;
 end;

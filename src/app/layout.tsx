@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Barlow } from "next/font/google";
+import { headers } from "next/headers";
 import { ThemeProvider } from "@/hooks/use-theme";
 import "./globals.css";
 
@@ -34,7 +35,11 @@ const themeInitScript = `
   })();
 `;
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" className={barlow.variable} suppressHydrationWarning>
       <head>
@@ -51,7 +56,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           rel="preload"
           type="font/woff2"
         />
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+          nonce={nonce}
+        />
       </head>
       <body><ThemeProvider>{children}</ThemeProvider></body>
     </html>

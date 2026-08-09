@@ -33,7 +33,7 @@ Open `http://localhost:3000`. Supabase Studio runs on
 pnpm dev:all     # local Supabase and Next.js
 pnpm check       # typecheck, lint, unit tests and build
 pnpm db:reset    # rebuild the local database from every migration
-pnpm db:test     # 307 database authorization assertions
+pnpm db:test     # 318 database authorization assertions
 pnpm db:stop
 ```
 

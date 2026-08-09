@@ -1,7 +1,8 @@
 /**
  * Transactional email templates in HTML and plain text.
  * The delivery contract is documented in `docs/integrations.md`.
- * All interpolated values are escaped by the `html` tag below.
+ * The `html` tag escapes scalar values and inserts only module-built
+ * `SafeHtml` fragments as markup.
  */
 
 // The theme, from `globals.css`. Changing one of these means changing both.

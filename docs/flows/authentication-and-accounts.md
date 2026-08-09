@@ -141,7 +141,7 @@ flowchart TD
     B -- "No" --> X1["Redirect to portal home"]
     B -- "Yes" --> C{"JWT assurance level is AAL2?"}
     C -- "Yes" --> D["Allow scoped administration"]
-    C -- "No" --> E["/profile/security?mfa=required"]
+    C -- "No" --> E["/profile/security?mfa=required with original route"]
     E --> F{"Verified TOTP factor exists?"}
     F -- "No" --> G["Enroll factor and show QR/secret"]
     G --> H["Verify six-digit code"]

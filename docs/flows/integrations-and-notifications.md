@@ -54,9 +54,11 @@ flowchart TD
     B -- "No" --> X1["Stop without database changes"]
     B -- "Yes" --> C["Exchange Vercel OIDC identity for short-lived Slack token"]
     C --> D["Read paginated users.list results"]
-    D --> E{"Rate limited once?"}
-    E -- "Yes" --> F["Wait Retry-After up to 30 seconds and retry once"]
-    F --> D
+    D --> E{"HTTP 429 rate limit?"}
+    E -- "Yes" --> F{"Already retried this request?"}
+    F -- "No" --> F2["Wait Retry-After up to 30 seconds"]
+    F2 --> D
+    F -- "Yes" --> X2
     E -- "No" --> G{"API or payload failure?"}
     G -- "Yes" --> X2["Stop; keep previous complete snapshot"]
     G -- "No" --> H["Exclude bots, apps and Slackbot"]

@@ -1,7 +1,9 @@
 import "server-only";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { safePortalReturnPath } from "@/lib/auth/return-path";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PortalAccessState,
@@ -214,6 +216,17 @@ export async function requirePortalAccess() {
   return access;
 }
 
+async function requireAdministratorMfa(assuranceLevel: "aal1" | "aal2") {
+  if (assuranceLevel === "aal2") return;
+
+  const returnTo = safePortalReturnPath(
+    (await headers()).get("x-portal-pathname"),
+  );
+  const query = new URLSearchParams({ mfa: "required" });
+  if (returnTo) query.set("returnTo", returnTo);
+  redirect(`/profile/security?${query}`);
+}
+
 export async function requireOrganizationAdminAccess() {
   const access = await requirePortalAccess();
   let administeredOrganizations: AdministeredOrganization[];
@@ -228,9 +241,7 @@ export async function requireOrganizationAdminAccess() {
     redirect("/");
   }
 
-  if (access.assuranceLevel !== "aal2") {
-    redirect("/profile/security?mfa=required");
-  }
+  await requireAdministratorMfa(access.assuranceLevel);
 
   if (access.isPortalAdmin) {
     const supabase = await createClient();
@@ -277,9 +288,7 @@ export async function requirePortalAdminAccess() {
     redirect("/");
   }
 
-  if (access.assuranceLevel !== "aal2") {
-    redirect("/profile/security?mfa=required");
-  }
+  await requireAdministratorMfa(access.assuranceLevel);
 
   return access;
 }

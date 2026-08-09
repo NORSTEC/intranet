@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   completeOrganizationDomainVerification,
   previewOrganizationDomain,
@@ -53,6 +53,15 @@ type DomainVerification = {
   token: string;
 };
 
+function verificationStatusLabel(
+  domain: OrganizationAccess["domains"][number],
+) {
+  if (!domain.verifiedAt) return "Not verified";
+  return domain.verificationMethod === "dns_txt"
+    ? "DNS verified"
+    : "Verified by administrator (legacy)";
+}
+
 export function OrganizationAccessSettings({
   organizations,
 }: {
@@ -63,6 +72,11 @@ export function OrganizationAccessSettings({
   const [previews, setPreviews] = useState<Record<number, Preview | null>>({});
   const [verification, setVerification] =
     useState<DomainVerification | null>(null);
+  const verificationPanelRef = useRef<HTMLDivElement>(null);
+  const [copiedField, setCopiedField] = useState<
+    "recordName" | "recordValue" | null
+  >(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<{
     domain: string;
     organizationName: string;
@@ -82,6 +96,22 @@ export function OrganizationAccessSettings({
     status: "success" | "error";
   } | null>(null);
   const [busy, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!verification) return;
+    const frame = window.requestAnimationFrame(() => {
+      const panel = verificationPanelRef.current;
+      if (!panel) return;
+      panel.focus({ preventScroll: true });
+      panel.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "nearest",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [verification]);
 
   function run(action: () => Promise<PortalManagementResult>) {
     startTransition(async () => {
@@ -139,64 +169,93 @@ export function OrganizationAccessSettings({
   }
 
   function beginVerification(organizationId: number, domain: string) {
+    const action = `start-verification:${organizationId}:${domain}`;
+    setPendingAction(action);
     startTransition(async () => {
-      const result = await startOrganizationDomainVerification({
-        domain,
-        organizationId,
-      });
-
-      if (
-        !result.ok ||
-        !result.domain ||
-        !result.recordName ||
-        !result.recordValue ||
-        !result.token
-      ) {
-        setToast({
-          id: Date.now(),
-          message: result.message,
-          status: "error",
+      try {
+        const result = await startOrganizationDomainVerification({
+          domain,
+          organizationId,
         });
-        return;
-      }
 
-      setVerification({
-        domain: result.domain,
-        organizationId,
-        recordName: result.recordName,
-        recordValue: result.recordValue,
-        token: result.token,
-      });
-      setToast({ id: Date.now(), message: result.message, status: "success" });
+        if (
+          !result.ok ||
+          !result.domain ||
+          !result.recordName ||
+          !result.recordValue ||
+          !result.token
+        ) {
+          setToast({
+            id: Date.now(),
+            message: result.message,
+            status: "error",
+          });
+          return;
+        }
+
+        setCopiedField(null);
+        setVerification({
+          domain: result.domain,
+          organizationId,
+          recordName: result.recordName,
+          recordValue: result.recordValue,
+          token: result.token,
+        });
+        setToast({ id: Date.now(), message: result.message, status: "success" });
+      } finally {
+        setPendingAction(null);
+      }
     });
   }
 
   function checkVerification() {
     if (!verification) return;
+    setPendingAction("check-verification");
     startTransition(async () => {
-      const result = await completeOrganizationDomainVerification({
-        domain: verification.domain,
-        organizationId: verification.organizationId,
-        token: verification.token,
-      });
-      setToast({
-        id: Date.now(),
-        message: result.message,
-        status: result.ok ? "success" : "error",
-      });
-      if (!result.ok) return;
+      try {
+        const result = await completeOrganizationDomainVerification({
+          domain: verification.domain,
+          organizationId: verification.organizationId,
+          token: verification.token,
+        });
+        setToast({
+          id: Date.now(),
+          message: result.message,
+          status: result.ok ? "success" : "error",
+        });
+        if (!result.ok) return;
 
-      setDomainDrafts((current) => ({
-        ...current,
-        [verification.organizationId]: "",
-      }));
-      setPreviews((current) => ({
-        ...current,
-        [verification.organizationId]: null,
-      }));
-      setVerification(null);
-      router.refresh();
+        setDomainDrafts((current) => ({
+          ...current,
+          [verification.organizationId]: "",
+        }));
+        setPreviews((current) => ({
+          ...current,
+          [verification.organizationId]: null,
+        }));
+        setVerification(null);
+        router.refresh();
+      } finally {
+        setPendingAction(null);
+      }
     });
+  }
+
+  async function copyDnsValue(
+    field: "recordName" | "recordValue",
+    value: string,
+  ) {
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+    } catch {
+      setToast((current) => ({
+        id: (current?.id ?? 0) + 1,
+        message: "The DNS value could not be copied. Select and copy it manually.",
+        status: "error",
+      }));
+    }
   }
 
   return (
@@ -299,7 +358,7 @@ export function OrganizationAccessSettings({
                         >
                           {domain.verifiedAt ? "verified" : "warning"}
                         </span>
-                        {domain.verifiedAt ? "DNS verified" : "Not verified"}
+                        {verificationStatusLabel(domain)}
                       </span>
                       {!domain.verifiedAt && (
                         <button
@@ -314,9 +373,15 @@ export function OrganizationAccessSettings({
                             aria-hidden="true"
                             className="material-symbols-outlined text-[1.1rem]"
                           >
-                            domain_verification
+                            {pendingAction ===
+                            `start-verification:${organization.id}:${domain.domain}`
+                              ? "progress_activity"
+                              : "domain_verification"}
                           </span>
-                          Verify ownership
+                          {pendingAction ===
+                          `start-verification:${organization.id}:${domain.domain}`
+                            ? "Preparing…"
+                            : "Verify ownership"}
                         </button>
                       )}
                       <button
@@ -351,7 +416,11 @@ export function OrganizationAccessSettings({
                 </ul>
 
                 {verification?.organizationId === organization.id && (
-                  <div className="mt-6 border-t border-moody/20 pt-6">
+                  <div
+                    className="mt-6 border-t border-moody/20 pt-6 outline-none"
+                    ref={verificationPanelRef}
+                    tabIndex={-1}
+                  >
                     <h3 className="text-xl font-medium">
                       Verify {verification.domain}
                     </h3>
@@ -362,14 +431,56 @@ export function OrganizationAccessSettings({
                     <dl className="mt-5 grid gap-4">
                       <div>
                         <dt className="section-label opacity-45">TXT name</dt>
-                        <dd className="mt-2 break-all bg-moody/5 p-3 font-mono text-sm">
-                          {verification.recordName}
+                        <dd className="mt-2 flex items-start gap-2 bg-moody/5 p-3">
+                          <code className="min-w-0 flex-1 break-all font-mono text-sm">
+                            {verification.recordName}
+                          </code>
+                          <button
+                            aria-label="Copy TXT name"
+                            className="portal-button shrink-0"
+                            onClick={() =>
+                              void copyDnsValue(
+                                "recordName",
+                                verification.recordName,
+                              )
+                            }
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              {copiedField === "recordName" ? "check" : "content_copy"}
+                            </span>
+                            {copiedField === "recordName" ? "Copied" : "Copy"}
+                          </button>
                         </dd>
                       </div>
                       <div>
                         <dt className="section-label opacity-45">TXT value</dt>
-                        <dd className="mt-2 break-all bg-moody/5 p-3 font-mono text-sm">
-                          {verification.recordValue}
+                        <dd className="mt-2 flex items-start gap-2 bg-moody/5 p-3">
+                          <code className="min-w-0 flex-1 break-all font-mono text-sm">
+                            {verification.recordValue}
+                          </code>
+                          <button
+                            aria-label="Copy TXT value"
+                            className="portal-button shrink-0"
+                            onClick={() =>
+                              void copyDnsValue(
+                                "recordValue",
+                                verification.recordValue,
+                              )
+                            }
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined text-[1.1rem]"
+                            >
+                              {copiedField === "recordValue" ? "check" : "content_copy"}
+                            </span>
+                            {copiedField === "recordValue" ? "Copied" : "Copy"}
+                          </button>
                         </dd>
                       </div>
                     </dl>
@@ -384,9 +495,13 @@ export function OrganizationAccessSettings({
                           aria-hidden="true"
                           className="material-symbols-outlined text-[1.1rem]"
                         >
-                          {busy ? "progress_activity" : "dns"}
+                          {pendingAction === "check-verification"
+                            ? "progress_activity"
+                            : "dns"}
                         </span>
-                        {busy ? "Checking DNS…" : "Check DNS and verify"}
+                        {pendingAction === "check-verification"
+                          ? "Checking DNS…"
+                          : "Check DNS and verify"}
                       </button>
                       <button
                         className="portal-button"
@@ -480,9 +595,15 @@ export function OrganizationAccessSettings({
                         aria-hidden="true"
                         className="material-symbols-outlined text-[1.1rem]"
                       >
-                        domain_verification
+                        {pendingAction ===
+                        `start-verification:${organization.id}:${preview.domain}`
+                          ? "progress_activity"
+                          : "domain_verification"}
                       </span>
-                      Verify ownership of {preview.domain}
+                      {pendingAction ===
+                      `start-verification:${organization.id}:${preview.domain}`
+                        ? `Preparing ${preview.domain}…`
+                        : `Verify ownership of ${preview.domain}`}
                     </button>
                   </div>
                 )}

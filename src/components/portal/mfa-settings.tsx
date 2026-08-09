@@ -27,7 +27,13 @@ function readableMfaError(message: string) {
   return "The authenticator could not be updated. Try again.";
 }
 
-export function MfaSettings({ required }: { required: boolean }) {
+export function MfaSettings({
+  required,
+  returnTo,
+}: {
+  required: boolean;
+  returnTo: string | null;
+}) {
   const router = useRouter();
   const [factor, setFactor] = useState<VerifiedFactor | null>(null);
   const [assuranceLevel, setAssuranceLevel] = useState<"aal1" | "aal2">(
@@ -136,7 +142,11 @@ export function MfaSettings({ required }: { required: boolean }) {
       setEnrollment(null);
       setCode("");
       await refresh();
-      router.refresh();
+      if (returnTo) {
+        router.replace(returnTo);
+      } else {
+        router.refresh();
+      }
     });
   }
 
@@ -225,7 +235,7 @@ export function MfaSettings({ required }: { required: boolean }) {
               aria-hidden="true"
               className="material-symbols-outlined text-[1.1rem]"
             >
-              qr_code_2
+              {busy ? "progress_activity" : "qr_code_2"}
             </span>
             {busy ? "Preparing…" : "Set up authenticator"}
           </button>

@@ -21,8 +21,10 @@ does not create Workspace accounts.
   reports that refusal.
 - Directory sync is administrator-triggered, idempotent and stored in
   `external_accounts`.
-- Google is called before the database records a suspension, avoiding a portal
-  state that says locked while Google still permits sign-in.
+- A portal lifecycle decision is committed first, including session revocation.
+  When a matching Workspace account must follow it, Google is called next and
+  `external_accounts` is updated only after Google succeeds. A Google failure
+  leaves the portal decision intact and reports that reconciliation is needed.
 
 Required variables are listed in [Operations](operations.md#vercel).
 
@@ -46,8 +48,9 @@ Notification kinds must agree in four places:
 3. `src/lib/email/templates.ts`.
 4. The public privacy inventory/page.
 
-Templates use the escaping `html` tagged template. Do not concatenate member or
-administrator input into HTML.
+Templates use the `html` tagged template: untrusted scalar values are escaped,
+while `SafeHtml` fragments built inside the template module are inserted as
+markup. Do not concatenate member or administrator input into HTML.
 
 ## Failure behavior
 

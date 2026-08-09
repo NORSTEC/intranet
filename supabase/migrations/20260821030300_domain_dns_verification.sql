@@ -190,6 +190,7 @@ declare
   claim record;
   existing_organization_id bigint;
   address_count integer;
+  reclassified_address_count integer;
 begin
   if actor_person_id is null or not (select private.is_portal_admin()) then
     raise exception using errcode = '42501', message = 'not_authorized';
@@ -244,6 +245,8 @@ begin
   where split_part(email, '@', 2) = target_domain
     and email_type <> 'organization';
 
+  get diagnostics reclassified_address_count = row_count;
+
   select count(*) into address_count
   from public.person_emails as address
   where split_part(address.email, '@', 2) = target_domain;
@@ -260,7 +263,7 @@ begin
     jsonb_build_object(
       'domain', target_domain,
       'verification_method', 'dns_txt',
-      'reclassified_address_count', address_count
+      'reclassified_address_count', reclassified_address_count
     )
   );
 
