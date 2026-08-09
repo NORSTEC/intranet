@@ -12,14 +12,15 @@ export default async function ProfileSecurityPage({
   const required = mfa === "required";
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       <h1 className="text-h2">Sign-in security</h1>
-      <p className="mt-4 max-w-[65ch] leading-relaxed opacity-65">
-        Use an authenticator app to add a second check after Google sign-in.
-        Administrator actions require this protection.
+      <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-65">
+        Use an authenticator app to verify administrator actions. Google
+        sign-in still opens the member portal; sensitive administration
+        requires a current six-digit code.
       </p>
 
-      <div className="mt-10">
+      <div className="mt-8">
         <MfaSettings
           required={required}
           returnTo={required ? safePortalReturnPath(returnTo) : null}

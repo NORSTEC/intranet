@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { NORSTEC_ORGANIZATION_SLUG } from "@/lib/portal/norstec";
 import { isStudyField } from "@/lib/profile/study-fields";
+import { verifyAccessRequestCaptcha } from "@/lib/security/recaptcha";
 import { createClient } from "@/lib/supabase/server";
 
 function optionalText(formData: FormData, key: string) {
@@ -51,6 +52,7 @@ export async function submitAccessRequest(formData: FormData) {
   const lastName = optionalText(formData, "lastName");
   const fieldOfStudy = optionalText(formData, "fieldOfStudy");
   const message = optionalText(formData, "message");
+  const recaptchaToken = optionalText(formData, "recaptchaToken");
   const studyYearValue = optionalText(formData, "studyYear");
   // Alumni are no longer studying, so a study year is optional for them.
   const studyYear = studyYearValue ? Number(studyYearValue) : null;
@@ -86,6 +88,12 @@ export async function submitAccessRequest(formData: FormData) {
 
   if (userError || !user) {
     redirect("/login");
+  }
+
+  const captcha = await verifyAccessRequestCaptcha(recaptchaToken);
+
+  if (!captcha.ok) {
+    redirect(`/access?error=captcha_${captcha.reason}`);
   }
 
   // The form never offers NORSTEC, so a request naming it was hand-made. It is

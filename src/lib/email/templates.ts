@@ -16,10 +16,12 @@ const INK_SECONDARY = "#c9c4b6";
 const INK_FOOTER = "#9f9b91";
 const DIVIDER = "#45464d";
 
-// Barlow is the portal's face. Clients which block webfonts get a proportional
-// sans rather than Arial Narrow, whose condensed metrics made the email look
-// unlike the portal even when everything else was correct.
-const FONT_STACK_VALUE = "Barlow, Arial, Helvetica, sans-serif";
+// Barlow is the portal's face, but Gmail and several Outlook variants remove
+// remote webfonts. Keep Barlow first for clients that support it, then choose
+// the native face that is closest on each major platform instead of dropping
+// straight to Arial (which is what made the delivered email look wrong).
+const FONT_STACK_VALUE =
+  "Barlow, 'Helvetica Neue', Roboto, Helvetica, Arial, sans-serif";
 
 const LOGO_SIZE = 44;
 
@@ -153,10 +155,12 @@ function scopeLabel(payload: Record<string, unknown>) {
 // is the whole job of a masthead.
 function masthead(siteUrl: string) {
   return html`<table
+    bgcolor="${MOODY}"
     cellpadding="0"
+    class="dark-canvas"
     cellspacing="0"
     role="presentation"
-    style="border-collapse:collapse;width:100%"
+    style="border-collapse:collapse;width:100%;background-color:${MOODY}"
   >
     <tr>
       <td style="padding:0">
@@ -173,11 +177,13 @@ function masthead(siteUrl: string) {
             </td>
             <td valign="middle">
               <div
+                class="dark-copy"
                 style="font-family:${FONT_STACK};font-size:20px;font-weight:300;letter-spacing:0.14em;line-height:1.1;text-transform:uppercase;color:${EGG}"
               >
                 NORSTEC
               </div>
               <div
+                class="dark-copy-secondary"
                 style="padding-top:4px;font-family:${FONT_STACK};font-size:11px;font-weight:500;letter-spacing:0.34em;line-height:1.1;text-transform:uppercase;color:${INK_SECONDARY}"
               >
                 Portal
@@ -190,11 +196,13 @@ function masthead(siteUrl: string) {
   </table>`;
 }
 
-// `text-h2`: Barlow, 300, uppercase. At an email's fixed measure it can reach
-// 36px without competing with the portal's larger page-level display type.
+// `text-h2`: Barlow, 300, uppercase. Requesting 200 keeps Barlow at its lowest
+// loaded weight (300), while Helvetica Neue can use its native Thin cut in
+// Gmail instead of looking like a default bold `h1`.
 function heading(content: string) {
   return html`<h1
-    style="margin:0;font-family:${FONT_STACK};font-size:36px;font-weight:300;letter-spacing:-0.02em;line-height:1.05;text-transform:uppercase;color:${EGG}"
+    class="dark-copy email-heading"
+    style="margin:0;font-family:${FONT_STACK};font-size:36px;font-weight:200!important;font-synthesis:none;letter-spacing:-0.02em;line-height:1.05;text-transform:uppercase;color:${EGG}"
   >
     ${content}
   </h1>`;
@@ -202,6 +210,7 @@ function heading(content: string) {
 
 function lead(content: string) {
   return html`<p
+    class="dark-copy-secondary"
     style="margin:18px 0 0;font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${INK_SECONDARY}"
   >
     ${content}
@@ -213,6 +222,7 @@ function lead(content: string) {
 // reviewer's note instead.
 function body(content: string, gap = 16) {
   return html`<p
+    class="dark-copy"
     style="margin:${gap}px 0 0;font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${EGG}"
   >
     ${content}
@@ -224,11 +234,13 @@ function field(label: string, value: string) {
   return html`<tr>
     <td style="padding:24px 0 0">
       <div
+        class="dark-copy-muted"
         style="font-family:${FONT_STACK};font-size:11px;font-weight:600;letter-spacing:0.12em;line-height:1.4;text-transform:uppercase;color:${INK_FOOTER}"
       >
         ${label}
       </div>
       <div
+        class="dark-copy"
         style="padding-top:6px;font-family:${FONT_STACK};font-size:15px;font-weight:400;line-height:1.6;color:${EGG}"
       >
         ${value}
@@ -257,13 +269,14 @@ function button(href: string, label: string) {
   return html`<table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse">
     <tr>
       <td
+        bgcolor="${EGG}"
         class="portal-button-shell"
-        style="border-radius:999px;background:${EGG}"
+        style="border-radius:999px;background-color:${EGG}"
       >
         <a
           class="portal-button"
           href="${href}"
-          style="display:inline-block;min-height:18px;padding:11px 20px;border:2px solid ${EGG};border-radius:999px;background:${EGG};font-family:${FONT_STACK};font-size:15px;font-weight:500;line-height:1.2;color:${MOODY};text-decoration:none;transition:background-color 180ms ease,color 180ms ease"
+          style="display:inline-block;min-height:18px;padding:11px 20px;border:2px solid ${EGG};border-radius:999px;background-color:${EGG};font-family:${FONT_STACK};font-size:15px;font-weight:500;line-height:1.2;color:${MOODY};text-decoration:none;transition:background-color 180ms ease,color 180ms ease"
           >${label}</a
         >
       </td>
@@ -282,12 +295,14 @@ function warning(headline: string, detail: string) {
   >
     <tr>
       <td
-        style="border:2px solid ${EGG};border-radius:32px;background:${MOODY};padding:22px 24px"
+        bgcolor="${MOODY}"
+        class="dark-canvas"
+        style="border:2px solid ${EGG};border-radius:32px;background-color:${MOODY};padding:22px 24px"
       >
-        <p style="margin:0;font-family:${FONT_STACK};font-size:18px;font-weight:400;line-height:1.4;color:${EGG}">
+        <p class="dark-copy" style="margin:0;font-family:${FONT_STACK};font-size:18px;font-weight:400;line-height:1.4;color:${EGG}">
           ${headline}
         </p>
-        <p style="margin:10px 0 0;font-family:${FONT_STACK};font-size:15px;font-weight:400;line-height:1.7;color:${INK_SECONDARY}">
+        <p class="dark-copy-secondary" style="margin:10px 0 0;font-family:${FONT_STACK};font-size:15px;font-weight:400;line-height:1.7;color:${INK_SECONDARY}">
           ${detail}
         </p>
       </td>
@@ -297,17 +312,19 @@ function warning(headline: string, detail: string) {
 
 function footer(siteUrl: string) {
   return html`<table
+    bgcolor="${MOODY}"
     cellpadding="0"
+    class="dark-canvas"
     cellspacing="0"
     role="presentation"
-    style="border-collapse:collapse;width:100%"
+    style="border-collapse:collapse;width:100%;background-color:${MOODY}"
   >
     <tr>
       <td style="padding:28px 0 0;border-top:1px solid ${DIVIDER}">
-        <p style="margin:0;font-family:${FONT_STACK};font-size:13px;font-weight:400;line-height:1.7;color:${INK_FOOTER}">
+        <p class="dark-copy-muted" style="margin:0;font-family:${FONT_STACK};font-size:13px;font-weight:400;line-height:1.7;color:${INK_FOOTER}">
           Sent by the NORSTEC Portal because a decision changed your access. It
           is not a newsletter and there is nothing to unsubscribe from.
-          <a class="email-link" href="${siteUrl}/privacy" style="color:${INK_SECONDARY};text-decoration:underline">How we handle your data</a>.
+          <a class="email-link dark-copy-secondary" href="${siteUrl}/privacy" style="color:${INK_SECONDARY};text-decoration:underline">How we handle your data</a>.
         </p>
       </td>
     </tr>
@@ -316,42 +333,107 @@ function footer(siteUrl: string) {
 
 function emailDocument(preheader: string, content: SafeHtml) {
   return html`<!doctype html>
-<html lang="en">
+<html lang="en" style="background-color:${MOODY};color:${EGG}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="dark" />
     <meta name="supported-color-schemes" content="dark" />
+    <meta name="theme-color" content="${MOODY}" />
     <link
       href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600&amp;display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        color-scheme: dark;
+        color-scheme: only dark;
         supported-color-schemes: dark;
       }
+      html,
       body {
         margin: 0;
         padding: 0;
         width: 100% !important;
-        background: ${MOODY} !important;
+        background-color: ${MOODY} !important;
+        color: ${EGG} !important;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+      .dark-canvas {
+        background-color: ${MOODY} !important;
+      }
+      .dark-copy {
+        color: ${EGG} !important;
+      }
+      .dark-copy-secondary {
+        color: ${INK_SECONDARY} !important;
+      }
+      .dark-copy-muted {
+        color: ${INK_FOOTER} !important;
+      }
+      .email-heading {
+        font-weight: 200 !important;
+        font-synthesis: none !important;
       }
       a {
         color: ${EGG};
       }
       .portal-button:hover,
       .portal-button:focus {
-        background: ${MOODY} !important;
+        background-color: ${MOODY} !important;
         color: ${EGG} !important;
       }
       .portal-button-shell:hover,
       .portal-button-shell:focus-within {
-        background: ${MOODY} !important;
+        background-color: ${MOODY} !important;
       }
       .email-link:hover,
       .email-link:focus {
         color: ${EGG} !important;
+      }
+      @media (prefers-color-scheme: dark) {
+        html,
+        body,
+        .dark-canvas {
+          background-color: ${MOODY} !important;
+        }
+        .dark-copy {
+          color: ${EGG} !important;
+        }
+        .dark-copy-secondary {
+          color: ${INK_SECONDARY} !important;
+        }
+        .dark-copy-muted {
+          color: ${INK_FOOTER} !important;
+        }
+      }
+      [data-ogsb] .dark-canvas {
+        background-color: ${MOODY} !important;
+      }
+      [data-ogsc] .dark-copy {
+        color: ${EGG} !important;
+      }
+      [data-ogsc] .dark-copy-secondary {
+        color: ${INK_SECONDARY} !important;
+      }
+      [data-ogsc] .dark-copy-muted {
+        color: ${INK_FOOTER} !important;
+      }
+      /* Gmail on iOS fully inverts even explicitly dark emails. Gmail leaves
+         gradient backgrounds alone and supports blend modes, so this
+         Gmail-only wrapper reverses that forced inversion without changing the
+         render in Apple Mail, Outlook or the browser preview. */
+      u + .body .gmail-dark-wrap {
+        background-color: #000000 !important;
+        background-image: linear-gradient(#000000, #000000) !important;
+      }
+      u + .body .gmail-blend-screen {
+        background-color: #000000;
+        mix-blend-mode: screen;
+      }
+      u + .body .gmail-blend-difference {
+        background-color: #000000;
+        mix-blend-mode: difference;
       }
       @media (max-width: 600px) {
         .shell {
@@ -366,38 +448,62 @@ function emailDocument(preheader: string, content: SafeHtml) {
       }
     </style>
   </head>
-  <body style="margin:0;padding:0;background:${MOODY}">
+  <body
+    bgcolor="${MOODY}"
+    class="body dark-canvas"
+    style="margin:0;padding:0;background-color:${MOODY};color:${EGG}"
+  >
     <div
-      style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px"
+      class="dark-canvas gmail-dark-wrap"
+      style="background-color:${MOODY};background-image:linear-gradient(${MOODY},${MOODY})"
     >
-      ${preheader}
-    </div>
-    <table
-      cellpadding="0"
-      cellspacing="0"
-      role="presentation"
-      style="border-collapse:collapse;width:100%;background:${MOODY}"
-    >
-      <tr>
-        <td align="center" class="shell" style="padding:40px 20px">
+      <div class="gmail-blend-screen">
+        <div class="gmail-blend-difference">
+          <div
+            style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;font-size:1px;line-height:1px"
+          >
+            ${preheader}
+          </div>
           <table
+            bgcolor="${MOODY}"
             cellpadding="0"
+            class="dark-canvas"
             cellspacing="0"
             role="presentation"
-            style="border-collapse:collapse;width:100%;max-width:600px;text-align:left"
-            width="600"
+            style="border-collapse:collapse;width:100%;background-color:${MOODY}"
           >
             <tr>
               <td
-                style="font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${EGG}"
+                align="center"
+                bgcolor="${MOODY}"
+                class="shell dark-canvas"
+                style="padding:40px 20px;background-color:${MOODY}"
               >
-                ${content}
+                <table
+                  bgcolor="${MOODY}"
+                  cellpadding="0"
+                  class="dark-canvas"
+                  cellspacing="0"
+                  role="presentation"
+                  style="border-collapse:collapse;width:100%;max-width:600px;text-align:left;background-color:${MOODY}"
+                  width="600"
+                >
+                  <tr>
+                    <td
+                      bgcolor="${MOODY}"
+                      class="dark-canvas dark-copy"
+                      style="background-color:${MOODY};font-family:${FONT_STACK};font-size:16px;font-weight:400;line-height:1.75;color:${EGG}"
+                    >
+                      ${content}
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
-        </td>
-      </tr>
-    </table>
+        </div>
+      </div>
+    </div>
   </body>
 </html>`.value;
 }
@@ -427,17 +533,24 @@ function shell({
     preheader,
     html`${masthead(siteUrl)}
       <table
+        bgcolor="${MOODY}"
         cellpadding="0"
+        class="dark-canvas"
         cellspacing="0"
         role="presentation"
-        style="border-collapse:collapse;width:100%"
+        style="border-collapse:collapse;width:100%;background-color:${MOODY}"
       >
         <tr>
-          <td class="main" style="padding:48px 0 52px">
+          <td
+            bgcolor="${MOODY}"
+            class="main dark-canvas"
+            style="padding:48px 0 52px;background-color:${MOODY}"
+          >
             <div class="display">${heading(headline)}</div>
             ${lead(greeting)} ${lead(intro)} ${detail}
             ${closing
               ? html`<p
+                  class="dark-copy-secondary"
                   style="margin:28px 0 0;font-family:${FONT_STACK};font-size:15px;font-weight:400;line-height:1.7;color:${INK_SECONDARY}"
                 >
                   ${closing}

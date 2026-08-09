@@ -45,6 +45,8 @@ decision is enforced end to end.
 - Server actions validate size, type, enum and relationship constraints before
   calling the database; the RPC repeats critical checks.
 - Avatar uploads validate MIME type, signature, size and person-scoped path.
+- Access requests require a server-verified reCAPTCHA v3 token with the
+  expected action and a score of at least 0.5.
 - Security headers block framing, sniffing, unnecessary browser capabilities
   and broad resource loading.
 - Secrets stay server-side. Browser code receives only the Supabase publishable

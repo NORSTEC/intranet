@@ -16,6 +16,23 @@ describe("content security policy", () => {
     expect(policy.match(/script-src[^;]*/)?.[0]).not.toContain("'unsafe-inline'");
   });
 
+  it("allows only the resources reCAPTCHA needs", () => {
+    const policy = contentSecurityPolicy({
+      development: false,
+      nonce: "request-nonce",
+      supabaseOrigin: "https://project.supabase.co",
+    });
+
+    expect(policy).toContain("https://www.recaptcha.net/recaptcha/");
+    expect(policy).toContain("https://www.gstatic.com/recaptcha/");
+    expect(policy).toContain(
+      "frame-src https://www.recaptcha.net/recaptcha/ https://recaptcha.google.com/recaptcha/",
+    );
+    expect(policy.match(/connect-src[^;]*/)?.[0]).toContain(
+      "https://www.recaptcha.net",
+    );
+  });
+
   it("allows the configured Supabase HTTP and realtime origins", () => {
     const policy = contentSecurityPolicy({
       development: false,
