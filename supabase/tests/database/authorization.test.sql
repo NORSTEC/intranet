@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(319);
+select plan(322);
 
 -- DNS itself is checked by the server action. Database tests exercise the
 -- two guarded RPCs with a fixed hash so no test can use the retired direct-add
@@ -5827,6 +5827,79 @@ select is(
   ),
   'new',
   'a merge keeps the freshest provider details'
+);
+
+reset role;
+
+insert into public.people (
+  full_name, portal_access_status, directory_visible, source
+) values (
+  'Unclaimed Directory Member', 'unclaimed', true, 'manual'
+);
+
+insert into public.person_emails (
+  person_id, email, email_type, is_primary, source
+)
+select person.id, 'unclaimed-directory@norstec.no', 'organization', true, 'manual'
+from public.people as person
+where person.full_name = 'Unclaimed Directory Member';
+
+insert into public.memberships (
+  person_id, organization_id, role, status, provisioning_method
+)
+select person.id, organization.id, 'member', 'active', 'manual'
+from public.people as person
+cross join public.organizations as organization
+where person.full_name = 'Unclaimed Directory Member'
+  and organization.slug = 'norstec';
+
+insert into public.team_memberships (
+  team_id, person_id, role_title, sort_order
+)
+select team.id, person.id, 'Team member', 0
+from public.teams as team
+cross join public.people as person
+where team.slug = 'pre-created-team'
+  and person.full_name = 'Unclaimed Directory Member';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","aal":"aal1"}',
+  true
+);
+
+select is(
+  (
+    select count(*)
+    from public.people
+    where full_name = 'Unclaimed Directory Member'
+  ),
+  1::bigint,
+  'an ordinary member can see a visible unclaimed member profile'
+);
+
+select is(
+  (
+    select count(*)
+    from public.memberships as membership
+    join public.people as person on person.id = membership.person_id
+    where person.full_name = 'Unclaimed Directory Member'
+      and membership.status = 'active'
+  ),
+  1::bigint,
+  'an ordinary member can see a visible unclaimed organization membership'
+);
+
+select is(
+  (
+    select count(*)
+    from public.team_memberships as team_membership
+    join public.people as person on person.id = team_membership.person_id
+    where person.full_name = 'Unclaimed Directory Member'
+  ),
+  1::bigint,
+  'an ordinary member can see a visible unclaimed team membership'
 );
 
 reset role;

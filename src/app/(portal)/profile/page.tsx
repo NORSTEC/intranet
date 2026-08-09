@@ -201,26 +201,15 @@ export default async function ProfilePage({
       <MemberProfileView
         accountSettings={<LoginAccountsSettings accounts={loginAccounts} />}
         action={
-          <div className="flex flex-wrap justify-end gap-3">
-            <Link className="portal-button" href="/profile/security">
-              <span
-                aria-hidden="true"
-                className="material-symbols-outlined text-[1.1rem]"
-              >
-                security
-              </span>
-              Sign-in security
-            </Link>
-            <Link className="portal-button" href="/profile/edit">
-              <span
-                aria-hidden="true"
-                className="material-symbols-outlined text-[1.1rem]"
-              >
-                edit
-              </span>
-              Edit profile
-            </Link>
-          </div>
+          <Link className="portal-button" href="/profile/edit">
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[1.1rem]"
+            >
+              edit
+            </span>
+            Edit profile
+          </Link>
         }
         avatarAlt={access.profile.avatarAlt}
         avatarUrl={avatarUrl}
