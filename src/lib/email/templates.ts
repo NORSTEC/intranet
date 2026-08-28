@@ -571,15 +571,23 @@ function plain(lines: (string | null)[]) {
   return lines.filter((line): line is string => line !== null).join("\n\n");
 }
 
+/**
+ * What the request asked to join, read as the tail of "the request you sent to
+ * join …". `scopeLabel` names the decider; this names the thing decided, which
+ * is what the approval line needs.
+ */
+function joinLabel(payload: Record<string, unknown>) {
+  if (payload.request_type === "alumni") return "with alumni access";
+  return text(payload.organization_name) ?? "an organization";
+}
+
 function approved({ payload, recipientName, siteUrl }: TemplateInput): RenderedEmail {
-  const scope = scopeLabel(payload);
   const note = text(payload.decision_note);
-  const requestedOn = formatMoment(payload.requested_at);
   const decidedOn = formatMoment(payload.decided_at);
 
-  const intro = requestedOn
-    ? `${scope} approved the request you sent on ${requestedOn}. You can sign in to the portal now.`
-    : `${scope} approved your request. You can sign in to the portal now.`;
+  // The date it was sent said nothing the recipient did not already know, and
+  // "you can sign in now" is what the button below it is for.
+  const intro = `The request you sent to join ${joinLabel(payload)} has been approved.`;
 
   return {
     html: shell({

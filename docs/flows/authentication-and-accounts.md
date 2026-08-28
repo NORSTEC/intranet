@@ -141,19 +141,19 @@ flowchart TD
     B -- "No" --> X1["Redirect to portal home"]
     B -- "Yes" --> C{"JWT assurance level is AAL2?"}
     C -- "Yes" --> D["Allow scoped administration"]
-    C -- "No" --> E["/profile/security?mfa=required with original route"]
+    C -- "No" --> E["unauthorized() renders the challenge on the same URL"]
     E --> F{"Verified TOTP factor exists?"}
     F -- "No" --> G["Enroll factor and show QR/secret"]
     G --> H["Verify six-digit code"]
     F -- "Yes" --> H
     H --> I{"Supabase accepts challenge?"}
     I -- "No" --> E
-    I -- "Yes" --> J["Session becomes AAL2"]
+    I -- "Yes" --> J["Session becomes AAL2; router.refresh() re-renders the route"]
     J --> D
-    D --> K{"User removes factor?"}
-    K -- "No" --> D
-    K -- "Yes" --> L["Unenroll factor and refresh token immediately"]
-    L --> M{"Refresh succeeds?"}
-    M -- "Yes" --> N["Session returns to AAL1; admin actions lock"]
-    M -- "No" --> O["Local sign-out and /login"]
 ```
+
+The challenge is an interrupt, not a navigation: `requireAdministratorMfa`
+calls `unauthorized()`, Next.js renders `src/app/(portal)/unauthorized.tsx` in
+place of the administration page, and the address bar keeps the route that was
+asked for. `/profile/security` holds the same component for setting an
+authenticator up before it is demanded.

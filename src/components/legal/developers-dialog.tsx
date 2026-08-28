@@ -169,6 +169,14 @@ export function DevelopersDialog() {
               ))}
             </ul>
 
+            {/* The dialog is on the login page too, where Slack is not
+                reachable and the address above is. Both are named, neither is
+                linked twice: the cards already carry the mail links. */}
+            <p className="mt-6 text-sm leading-relaxed opacity-65">
+              Have a recommendation, or spotted a bug? Write to us at the
+              addresses above, or send us a message on Slack.
+            </p>
+
             <div className="mt-7 flex justify-end">
               <button
                 className="portal-button"

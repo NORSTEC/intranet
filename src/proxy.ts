@@ -14,14 +14,10 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
 
   // These values are overwritten at the trusted request boundary. Pages can
-  // read them, while a caller cannot choose either a script nonce or a redirect
-  // target by sending their own headers.
+  // read them, while a caller cannot choose a script nonce by sending their
+  // own headers.
   requestHeaders.set("Content-Security-Policy", policy);
   requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set(
-    "x-portal-pathname",
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
-  );
 
   const response = await updateSession(request, requestHeaders);
   response.headers.set("Content-Security-Policy", policy);

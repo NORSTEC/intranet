@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { ConfirmDialog } from "@/components/portal/confirm-dialog";
 import { createClient } from "@/lib/supabase/client";
 
 type VerifiedFactor = {
@@ -27,13 +26,7 @@ function readableMfaError(message: string) {
   return "The authenticator could not be updated. Try again.";
 }
 
-export function MfaSettings({
-  required,
-  returnTo,
-}: {
-  required: boolean;
-  returnTo: string | null;
-}) {
+export function MfaSettings({ required = false }: { required?: boolean }) {
   const router = useRouter();
   const [factor, setFactor] = useState<VerifiedFactor | null>(null);
   const [assuranceLevel, setAssuranceLevel] = useState<"aal1" | "aal2">(
@@ -43,7 +36,6 @@ export function MfaSettings({
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [confirmRemoval, setConfirmRemoval] = useState(false);
   const [busy, startTransition] = useTransition();
 
   const refresh = useCallback(async () => {
@@ -142,41 +134,8 @@ export function MfaSettings({
       setEnrollment(null);
       setCode("");
       await refresh();
-      if (returnTo) {
-        router.replace(returnTo);
-      } else {
-        router.refresh();
-      }
-    });
-  }
-
-  function removeFactor() {
-    if (!factor) return;
-    setConfirmRemoval(false);
-    startTransition(async () => {
-      setError(null);
-      const supabase = createClient();
-      const { error: removalError } = await supabase.auth.mfa.unenroll({
-        factorId: factor.id,
-      });
-
-      if (removalError) {
-        setError(readableMfaError(removalError.message));
-        return;
-      }
-
-      // An access token issued at AAL2 remains valid until it is replaced.
-      // Refresh immediately so removing the factor also removes administrator
-      // authorization from this browser session.
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        await supabase.auth.signOut({ scope: "local" });
-        router.replace("/login");
-        router.refresh();
-        return;
-      }
-
-      await refresh();
+      // The page that demanded the code is behind this one on the same URL,
+      // so re-rendering the route is what reveals it.
       router.refresh();
     });
   }
@@ -200,17 +159,9 @@ export function MfaSettings({
               or Microsoft Authenticator.
             </p>
           </div>
-          {factor && (
-            <span
-              className={
-                assuranceLevel === "aal2"
-                  ? "portal-pill border-beachball bg-beachball text-moody-static"
-                  : "portal-pill"
-              }
-            >
-              {assuranceLevel === "aal2"
-                ? "Verified this session"
-                : "Authenticator added"}
+          {factor && assuranceLevel === "aal2" && (
+            <span className="portal-pill border-beachball bg-beachball text-moody-static">
+              Verified this session
             </span>
           )}
         </div>
@@ -294,42 +245,13 @@ export function MfaSettings({
         )}
 
         {factor && assuranceLevel === "aal2" && (
-          <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-moody/20 pt-7">
-            <p className="mr-auto text-sm font-medium">
+          <div className="mt-8 border-t border-moody/20 pt-7">
+            <p className="text-sm font-medium">
               Administrator actions are unlocked for this session.
             </p>
-            <button
-              className="portal-button"
-              disabled={busy}
-              onClick={() => setConfirmRemoval(true)}
-              type="button"
-            >
-              <span
-                aria-hidden="true"
-                className="material-symbols-outlined text-[1.1rem]"
-              >
-                delete
-              </span>
-              Remove authenticator
-            </button>
           </div>
         )}
       </section>
-
-      {confirmRemoval && (
-        <ConfirmDialog
-          busy={busy}
-          confirmIcon="delete"
-          confirmLabel="Remove authenticator"
-          danger
-          onCancel={() => setConfirmRemoval(false)}
-          onConfirm={removeFactor}
-          title="Remove two-step verification?"
-        >
-          Administrator actions will be locked until an authenticator is set
-          up and confirmed again.
-        </ConfirmDialog>
-      )}
     </>
   );
 }
