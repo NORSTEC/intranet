@@ -19,10 +19,14 @@ function DeveloperCardBody({
 }) {
   return (
     <>
+      {/* A picture somebody set on their own profile wins: it is the one they
+          chose, and it stays current without an edit here. The shipped
+          portrait is what a signed-out visitor sees, and what fills in for a
+          profile that has no avatar yet. */}
       <MemberAvatar
         name={developer.name}
         size="large"
-        src={developer.avatarUrl}
+        src={developer.avatarUrl ?? developer.photo}
       />
       {/* No `truncate`, unlike the dashboard's member cards: those sit in a
           grid the page sizes, these hold two known names and can afford to
