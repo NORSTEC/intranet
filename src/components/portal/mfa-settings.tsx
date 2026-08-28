@@ -26,7 +26,7 @@ function readableMfaError(message: string) {
   return "The authenticator could not be updated. Try again.";
 }
 
-export function MfaSettings({ required = false }: { required?: boolean }) {
+export function MfaSettings() {
   const router = useRouter();
   const [factor, setFactor] = useState<VerifiedFactor | null>(null);
   const [assuranceLevel, setAssuranceLevel] = useState<"aal1" | "aal2">(
@@ -154,10 +154,12 @@ export function MfaSettings({ required = false }: { required?: boolean }) {
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="max-w-3xl">
             <h2 className="text-h3">Authenticator app</h2>
-            <p className="mt-3 text-sm leading-relaxed opacity-60">
-              Codes work offline in apps such as Google Authenticator, 1Password,
-              or Microsoft Authenticator.
-            </p>
+            {factor && assuranceLevel === "aal1" && (
+              <p className="mt-3 text-sm leading-relaxed opacity-60">
+                Enter a current code to unlock administrator actions for this
+                session.
+              </p>
+            )}
           </div>
           {factor && assuranceLevel === "aal2" && (
             <span className="portal-pill border-beachball bg-beachball text-moody-static">
@@ -165,12 +167,6 @@ export function MfaSettings({ required = false }: { required?: boolean }) {
             </span>
           )}
         </div>
-
-        {required && assuranceLevel !== "aal2" && (
-          <p className="mt-6 max-w-3xl text-sm font-medium leading-relaxed">
-            Complete the step below to return to administration.
-          </p>
-        )}
 
         {error && (
           <p className="mt-6 text-sm font-medium text-copper" role="alert">
@@ -229,11 +225,6 @@ export function MfaSettings({ required = false }: { required?: boolean }) {
 
         {factor && assuranceLevel === "aal1" && (
           <div className="mt-8 border-t border-moody/20 pt-7">
-            <h3 className="text-xl font-medium">Confirm it is you</h3>
-            <p className="mt-3 max-w-[60ch] text-sm leading-relaxed opacity-60">
-              Enter a current code to unlock administrator actions for this
-              session.
-            </p>
             <CodeForm
               busy={busy}
               code={code}

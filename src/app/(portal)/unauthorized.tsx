@@ -10,13 +10,9 @@ export default function PortalUnauthorized() {
   return (
     <div>
       <h1 className="text-h2">Confirm it is you</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-65">
-        Administration needs a current six-digit code from your authenticator
-        app. Enter one to open this page.
-      </p>
 
       <div className="mt-8">
-        <MfaSettings required />
+        <MfaSettings />
       </div>
     </div>
   );
