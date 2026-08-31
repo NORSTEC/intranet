@@ -168,7 +168,7 @@ export function DirectoryVisibilitySettings({
                 aria-checked={draftVisible}
                 aria-describedby={descriptionId}
                 aria-labelledby={switchLabelId}
-                className="inline-flex h-11 w-16 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moody disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-11 w-16 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moody disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={pending}
                 onClick={() => setDraftVisible((current) => !current)}
                 role="switch"

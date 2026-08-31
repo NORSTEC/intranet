@@ -31,6 +31,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // `unauthorized()` is how an administrator page can demand a current
+    // six-digit code without moving the address bar off the page that was
+    // asked for. See src/app/(portal)/unauthorized.tsx.
+    authInterrupts: true,
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     // Optimized renditions are keyed by source URL, and a signature rotates

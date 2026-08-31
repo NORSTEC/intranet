@@ -59,22 +59,9 @@ export type PortalPulse = {
   joinedLastMonth: number;
 };
 
-/**
- * The approval that let this person in, still unread. It is shown once, on the
- * dashboard, because that is where an approved request lands them — /access
- * redirects straight through the moment access exists.
- */
-export type DashboardWelcome = {
-  decidedLabel: string | null;
-  note: string | null;
-  requestId: number;
-  reviewerName: string | null;
-};
-
 export type DashboardData = {
   actions: DashboardActions;
   avatarUrl: string | undefined;
-  welcome: DashboardWelcome | null;
   newMembers: DashboardNewMember[];
   organizations: DashboardOrganization[];
   pulse: PortalPulse;
@@ -182,14 +169,6 @@ export function formatMonth(isoDate: string) {
   });
 }
 
-/** A single day, formatted on the server so the markup hydrates identically. */
-function formatDay(isoMoment: string) {
-  return new Date(`${isoMoment.slice(0, 10)}T00:00:00Z`).toLocaleDateString(
-    "en-US",
-    { day: "numeric", month: "short", timeZone: "UTC", year: "numeric" },
-  );
-}
-
 /**
  * Profile fields the portal shows to other members. They drive the member
  * directory and the statistics page, so an empty one costs everybody, not just
@@ -227,7 +206,6 @@ export async function loadDashboard({
     portalMembershipsResult,
     accountsResult,
     accessRequestsResult,
-    welcomeResult,
     unmatchedWorkspaceResult,
     unmatchedSlackResult,
   ] = await Promise.all([
@@ -259,20 +237,6 @@ export async function loadDashboard({
           .eq("status", "pending")
           .neq("person_id", profile.personId)
       : Promise.resolve({ count: 0, error: null }),
-    // The approval that granted this access, if its note has not been read
-    // away yet. Row level security already limits access_requests to the
-    // person they belong to.
-    supabase
-      .from("access_requests")
-      .select(
-        "id, decision_note, reviewed_at, reviewer:people!access_requests_reviewed_by_person_id_fkey (full_name)",
-      )
-      .eq("person_id", profile.personId)
-      .eq("status", "approved")
-      .is("decision_acknowledged_at", null)
-      .order("reviewed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
     // Workspace accounts no portal profile claims. Only a portal administrator
     // can act on one, and only they can read the table, so for everybody else
     // the query is not merely hidden — it is never asked.
@@ -308,35 +272,11 @@ export async function loadDashboard({
     portalMembershipsResult.error ||
     accountsResult.error ||
     accessRequestsResult.error ||
-    welcomeResult.error ||
     unmatchedWorkspaceResult.error ||
     unmatchedSlackResult.error
   ) {
     throw new Error("Could not load dashboard");
   }
-
-  const welcomeRow = welcomeResult.data as {
-    decision_note: string | null;
-    id: number;
-    reviewed_at: string | null;
-    reviewer:
-      | { full_name: string | null }
-      | Array<{ full_name: string | null }>
-      | null;
-  } | null;
-  const welcome: DashboardWelcome | null = welcomeRow
-    ? {
-        decidedLabel: welcomeRow.reviewed_at
-          ? formatDay(welcomeRow.reviewed_at)
-          : null,
-        note: welcomeRow.decision_note,
-        requestId: welcomeRow.id,
-        // A portal administrator who decided an alumni request may share no
-        // organization with the requester, in which case row level security
-        // hides their name and the card simply omits it.
-        reviewerName: single(welcomeRow.reviewer)?.full_name ?? null,
-      }
-    : null;
 
   const membershipRows = (membershipsResult.data ?? []) as MembershipRow[];
   const ownTeamRows = (ownTeamsResult.data ?? []) as OwnTeamRow[];
@@ -539,6 +479,5 @@ export async function loadDashboard({
       joinedLastMonth,
     },
     teams,
-    welcome,
   };
 }

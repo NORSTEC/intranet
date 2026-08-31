@@ -173,12 +173,15 @@ describe("untrusted text", () => {
 });
 
 describe("an approved request", () => {
-  it("names who approved it and when it was asked for", () => {
+  it("names what was joined, not the date the request was sent", () => {
     const email = approved({
       organization_name: "Orbit NTNU",
       requested_at: "2026-07-14T09:00:00Z",
     });
-    expect(email.text).toContain("Orbit NTNU approved the request you sent on Jul 14, 2026");
+    expect(email.text).toContain(
+      "The request you sent to join Orbit NTNU has been approved.",
+    );
+    expect(email.text).not.toContain("Jul 14, 2026");
   });
 
   // Settled by the reviewed design: the address may be a shared one, and the
@@ -191,12 +194,16 @@ describe("an approved request", () => {
   // An alumni request belongs to no organization, so there is no name to use.
   it("says alumni access instead when there is no organization", () => {
     const email = approved({ organization_name: null, request_type: "alumni" });
-    expect(email.text).toContain("Alumni access approved");
+    expect(email.text).toContain(
+      "The request you sent to join with alumni access has been approved.",
+    );
   });
 
   it("falls back rather than naming nobody", () => {
     const email = approved({ organization_name: null });
-    expect(email.text).toContain("An organization approved");
+    expect(email.text).toContain(
+      "The request you sent to join an organization has been approved.",
+    );
   });
 
   // `formatMoment` pins Europe/Oslo. Without it these assertions pass or fail

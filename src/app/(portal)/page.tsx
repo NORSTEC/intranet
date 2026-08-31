@@ -1,5 +1,4 @@
 import { SLACK_ICON } from "@/components/portal/card-icon";
-import { AccessWelcome } from "@/components/portal/dashboard/access-welcome";
 import { DashboardHero } from "@/components/portal/dashboard/dashboard-hero";
 import { NewMemberCard } from "@/components/portal/dashboard/new-member-card";
 import { OrganizationCard } from "@/components/portal/dashboard/organization-card";
@@ -152,8 +151,6 @@ export default async function DashboardPage() {
         name={displayName}
         subtitle={subtitle}
       />
-
-      {dashboard.welcome && <AccessWelcome welcome={dashboard.welcome} />}
 
       <RecommendedActions actions={actions} />
 

@@ -10,6 +10,12 @@
 export type PortalDeveloper = {
   email: string;
   name: string;
+  /**
+   * A portrait shipped with the app, used when the portal has no avatar to
+   * give — which is every signed-out visitor, since `anon` cannot read
+   * `people` at all and the login page carries this dialog too.
+   */
+  photo: string;
   role: string;
 };
 
@@ -22,11 +28,13 @@ export const PORTAL_DEVELOPERS: PortalDeveloper[] = [
   {
     email: "eirik.engen.kvam@norstec.no",
     name: "Eirik Engen Kvam",
+    photo: "/images/developers/eirik-engen-kvam.jpg",
     role: "Intranet developer",
   },
   {
     email: "august.middelkoop@norstec.no",
     name: "August Solli Middelkoop",
+    photo: "/images/developers/august-solli-middelkoop.jpg",
     role: "Intranet developer",
   },
 ];

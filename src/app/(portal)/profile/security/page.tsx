@@ -1,15 +1,8 @@
 import { MfaSettings } from "@/components/portal/mfa-settings";
 import { requirePortalAccess } from "@/lib/auth/access";
-import { safePortalReturnPath } from "@/lib/auth/return-path";
 
-export default async function ProfileSecurityPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ mfa?: string; returnTo?: string }>;
-}) {
+export default async function ProfileSecurityPage() {
   await requirePortalAccess();
-  const { mfa, returnTo } = await searchParams;
-  const required = mfa === "required";
 
   return (
     <div>
@@ -21,10 +14,7 @@ export default async function ProfileSecurityPage({
       </p>
 
       <div className="mt-8">
-        <MfaSettings
-          required={required}
-          returnTo={required ? safePortalReturnPath(returnTo) : null}
-        />
+        <MfaSettings />
       </div>
     </div>
   );
