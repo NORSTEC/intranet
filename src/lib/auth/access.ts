@@ -1,9 +1,7 @@
 import "server-only";
 
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, unauthorized } from "next/navigation";
 import { cache } from "react";
-import { safePortalReturnPath } from "@/lib/auth/return-path";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PortalAccessState,
@@ -216,15 +214,15 @@ export async function requirePortalAccess() {
   return access;
 }
 
+/**
+ * Interrupts the render with the two-step challenge rather than navigating to
+ * it. The address bar keeps the page that was asked for, so confirming the
+ * code lands on that page instead of on the profile the challenge used to
+ * live under.
+ */
 async function requireAdministratorMfa(assuranceLevel: "aal1" | "aal2") {
   if (assuranceLevel === "aal2") return;
-
-  const returnTo = safePortalReturnPath(
-    (await headers()).get("x-portal-pathname"),
-  );
-  const query = new URLSearchParams({ mfa: "required" });
-  if (returnTo) query.set("returnTo", returnTo);
-  redirect(`/profile/security?${query}`);
+  unauthorized();
 }
 
 export async function requireOrganizationAdminAccess() {

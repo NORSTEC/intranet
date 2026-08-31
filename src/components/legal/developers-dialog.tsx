@@ -19,10 +19,14 @@ function DeveloperCardBody({
 }) {
   return (
     <>
+      {/* A picture somebody set on their own profile wins: it is the one they
+          chose, and it stays current without an edit here. The shipped
+          portrait is what a signed-out visitor sees, and what fills in for a
+          profile that has no avatar yet. */}
       <MemberAvatar
         name={developer.name}
         size="large"
-        src={developer.avatarUrl}
+        src={developer.avatarUrl ?? developer.photo}
       />
       {/* No `truncate`, unlike the dashboard's member cards: those sit in a
           grid the page sizes, these hold two known names and can afford to
@@ -168,6 +172,14 @@ export function DevelopersDialog() {
                 </li>
               ))}
             </ul>
+
+            {/* The dialog is on the login page too, where Slack is not
+                reachable and the address above is. Both are named, neither is
+                linked twice: the cards already carry the mail links. */}
+            <p className="mt-6 text-sm leading-relaxed opacity-65">
+              Have a recommendation, or spotted a bug? Write to us at the
+              addresses above, or send us a message on Slack.
+            </p>
 
             <div className="mt-7 flex justify-end">
               <button
