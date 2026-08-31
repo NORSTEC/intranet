@@ -270,6 +270,19 @@ function describe(action: string, details: Record<string, unknown> | null) {
   }
 }
 
+function notificationKindLabel(kind: string | null) {
+  switch (kind) {
+    case "access_request_approved":
+      return "Request approved";
+    case "access_request_rejected":
+      return "Request declined";
+    case "membership_ended":
+      return "Membership ended";
+    default:
+      return kind;
+  }
+}
+
 function mapRow(row: AuditEventRow): AuditLogEntry {
   const actor = single(row.actor);
   const target = single(row.target);
@@ -538,9 +551,20 @@ function buildFields(
     }
 
     case "notification.discarded": {
-      add("Email", text(details, "kind"));
-      add("Send attempts", String(number(details, "attempts") ?? 0));
-      add("Last failure", text(details, "last_error"));
+      const attempts = number(details, "attempts");
+      const failed = flag(details, "failed");
+      add("Email", notificationKindLabel(text(details, "kind")));
+      // No stored count is not the same fact as a stored zero, and rendering
+      // the first as "0" would report an attempt that never happened.
+      add("Send attempts", attempts === null ? null : String(attempts));
+      add(
+        "Why it was never sent",
+        failed === null
+          ? null
+          : failed
+            ? "The email provider refused it"
+            : "Nobody drained the queue before it expired",
+      );
       break;
     }
 

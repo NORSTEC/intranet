@@ -24,9 +24,21 @@ export default function PortalError({
       action={
         <>
           <button className="portal-button" onClick={reset} type="button">
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[1.1rem]"
+            >
+              refresh
+            </span>
             Try again
           </button>
           <Link className="portal-button" href="/">
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[1.1rem]"
+            >
+              home
+            </span>
             Back to the dashboard
           </Link>
         </>

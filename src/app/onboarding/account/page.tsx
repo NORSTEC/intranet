@@ -72,7 +72,9 @@ export default async function AccountOnboardingPage({
             clearParams={["accountLinkError", "error"]}
             message={
               accountLinkError
-                ? linkErrors[accountLinkError] ?? linkErrors.merge
+                ? (Object.hasOwn(linkErrors, accountLinkError)
+                    ? linkErrors[accountLinkError]
+                    : linkErrors.merge)
                 : "The profile could not be created. Please try again."
             }
             status="error"

@@ -269,7 +269,7 @@ export function SlackDirectory({
           Not in the intranet
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          These Slack accounts are not linked to an intranet profile.
+          These Slack accounts are not linked to anybody in the intranet.
           Check who it is in Slack before treating it as abandoned.
         </p>
 

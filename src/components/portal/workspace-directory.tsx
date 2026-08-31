@@ -344,7 +344,7 @@ export function WorkspaceDirectory({
           Not in the intranet
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Google accounts no intranet profile claims. A new Google account who has
+          Google accounts nobody in the intranet claims. A new Google account who has
           not signed in yet looks the same as an account nobody has cleaned up,
           so check each one in the Admin console before acting.
         </p>

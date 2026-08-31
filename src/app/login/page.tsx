@@ -62,7 +62,7 @@ export default async function LoginPage({
           )}
           {error === "deleted" && (
             <p className="mt-3 text-sm text-[#a33b2b]" role="alert">
-              This account has been deleted and is erased permanently 30 days after the deletion. Email intranet@norstec.no before then if you want it back.
+              This account has been deleted. It is erased permanently 30 days after that. Email intranet@norstec.no before then if you want it back.
             </p>
           )}
           {error === "suspended" && (

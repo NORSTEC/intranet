@@ -6,6 +6,12 @@ export default function NotFound() {
     <FailureNotice
       action={
         <Link className="portal-button" href="/">
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[1.1rem]"
+          >
+            home
+          </span>
           Go to the intranet
         </Link>
       }

@@ -25,6 +25,12 @@ export default function AppError({
     <FailureNotice
       action={
         <button className="portal-button" onClick={reset} type="button">
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[1.1rem]"
+          >
+            refresh
+          </span>
           Try again
         </button>
       }

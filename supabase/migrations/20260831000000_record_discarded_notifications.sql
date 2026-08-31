@@ -22,6 +22,13 @@
 -- transaction that queued their rejection — the event still records that an
 -- email was dropped, which is the part worth keeping.
 --
+-- `last_error` is not copied either, and for the same reason rather than a
+-- different one. It holds whatever the provider said, verbatim, and a provider
+-- rejecting an address tends to say the address back. Copying it would move the
+-- recipient out of the private queue and into the audit log by the back door.
+-- Whether the send had been tried and refused is the part an administrator
+-- needs, and `attempts` with a boolean carries it.
+--
 -- `actor_person_id` stays null: nobody did this, a schedule did.
 --
 
@@ -47,9 +54,9 @@ as $$
       'kind', discarded.kind,
       'queued_at', discarded.created_at,
       'attempts', discarded.attempts,
-      -- Null when the row was never claimed at all, which is a different
-      -- failure from one that was tried and refused.
-      'last_error', discarded.last_error
+      -- Distinguishes a row that was tried and refused from one that was never
+      -- claimed at all, without repeating what the provider said about it.
+      'failed', discarded.last_error is not null
     )
   from discarded;
 $$;
