@@ -30,11 +30,24 @@ const TIMEOUT_MS = 10_000;
 // separate from the Workspace mail real people send, and leaves the root
 // domain's existing SPF record alone.
 //
-// This is only the fallback — `PORTAL_EMAIL_FROM` is what production runs on —
-// but it names a domain Resend has to have verified, or it cannot send at all.
-// Verify `intranet.norstec.no` there before this ships. See the domain move in
-// docs/operations.md.
-const DEFAULT_FROM = "NORSTEC Intranet <noreply@intranet.norstec.no>";
+// `PORTAL_EMAIL_FROM` is unset, so this is not a fallback — it is the sender.
+// Resend refuses a From address on a domain it has not verified, and the
+// verified one is still `portal.norstec.no`. So the address lags the rename on
+// purpose: it moves in the same change that sets `intranet.norstec.no` live in
+// Resend, which is step 8 of the domain move in docs/operations.md, and not
+// before.
+const DEFAULT_FROM = "NORSTEC Intranet <noreply@portal.norstec.no>";
+
+// The rejection email ends "if you think this was a mistake, reply to this
+// email", and that promise is made to the one person with the best reason to
+// take it up — an applicant who has just been refused and whose profile was
+// erased in the same transaction. Without a reply-to, the reply goes to the
+// no-reply address and reaches nobody.
+//
+// So this has a default rather than falling back to null. A sentence in the
+// body of an email should not depend on somebody having remembered to set an
+// environment variable.
+const DEFAULT_REPLY_TO = "intranet@norstec.no";
 
 export type EmailMessage = {
   html: string;
@@ -66,7 +79,7 @@ function readConfig(): EmailConfig | null {
   return {
     apiKey,
     from: process.env.PORTAL_EMAIL_FROM || DEFAULT_FROM,
-    replyTo: process.env.PORTAL_EMAIL_REPLY_TO || null,
+    replyTo: process.env.PORTAL_EMAIL_REPLY_TO || DEFAULT_REPLY_TO,
   };
 }
 

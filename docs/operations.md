@@ -108,9 +108,13 @@ the replacement answers.
    in the same change.
 7. Supabase Auth: change Site URL to the new host, then remove the old redirect
    URLs.
-8. Vercel: set `PORTAL_EMAIL_FROM` and `PORTAL_EMAIL_REPLY_TO` to the new
-   subdomain, then send one real approval to yourself and confirm it arrives
-   and its links resolve.
+8. `DEFAULT_FROM` in `src/lib/email/transport.ts` to
+   `noreply@intranet.norstec.no`. Neither `PORTAL_EMAIL_FROM` nor
+   `PORTAL_EMAIL_REPLY_TO` is set in Vercel, so that constant is the sender
+   rather than a fallback — which is why it still names the old subdomain until
+   this step: Resend refuses a From address on a domain it has not verified.
+   Then send one real approval to yourself and confirm it arrives and its links
+   resolve.
 9. Only now: remove `portal.norstec.no` from the project's domains, and delete
    the `portal`, `send.portal` and `resend._domainkey.portal` records from the
    zone. Removing the Resend domain entry itself is the last step, after the
