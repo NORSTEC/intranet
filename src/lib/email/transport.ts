@@ -36,7 +36,7 @@ const TIMEOUT_MS = 10_000;
 // purpose: it moves in the same change that sets `intranet.norstec.no` live in
 // Resend, which is step 8 of the domain move in docs/operations.md, and not
 // before.
-const DEFAULT_FROM = "NORSTEC Intranet <noreply@portal.norstec.no>";
+const DEFAULT_FROM = "NORSTEC Intranet <noreply@intranet.norstec.no>";
 
 // The rejection email ends "if you think this was a mistake, reply to this
 // email", and that promise is made to the one person with the best reason to
