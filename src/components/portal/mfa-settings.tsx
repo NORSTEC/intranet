@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { Toast } from "@/components/portal/toast";
 import { createClient } from "@/lib/supabase/client";
 
 type VerifiedFactor = {
@@ -35,6 +36,9 @@ export function MfaSettings() {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Cleared before every attempt so a second one cannot show the first
+  // one's confirmation while it is still running.
+  const [confirmed, setConfirmed] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, startTransition] = useTransition();
 
@@ -71,6 +75,7 @@ export function MfaSettings() {
   function beginEnrollment() {
     startTransition(async () => {
       setError(null);
+      setConfirmed(null);
       const supabase = createClient();
       const factorsResult = await supabase.auth.mfa.listFactors();
 
@@ -96,7 +101,7 @@ export function MfaSettings() {
 
       const { data, error: enrollmentError } = await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "NORSTEC portal",
+        friendlyName: "NORSTEC intranet",
         issuer: "NORSTEC",
       });
 
@@ -120,8 +125,13 @@ export function MfaSettings() {
       return;
     }
 
+    // Read before the enrolment is cleared below, so the confirmation can say
+    // which of the two things just happened.
+    const wasEnrolling = Boolean(enrollment);
+
     startTransition(async () => {
       setError(null);
+      setConfirmed(null);
       const supabase = createClient();
       const { error: verificationError } =
         await supabase.auth.mfa.challengeAndVerify({ factorId, code });
@@ -133,6 +143,7 @@ export function MfaSettings() {
 
       setEnrollment(null);
       setCode("");
+      setConfirmed(wasEnrolling ? "Authenticator set up." : "Session verified.");
       await refresh();
       // The page that demanded the code is behind this one on the same URL,
       // so re-rendering the route is what reveals it.
@@ -150,6 +161,9 @@ export function MfaSettings() {
 
   return (
     <>
+      {confirmed && (
+        <Toast key={confirmed} message={confirmed} status="success" />
+      )}
       <section className="portal-surface p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="max-w-3xl">
@@ -196,7 +210,7 @@ export function MfaSettings() {
             <h3 className="text-xl font-medium">Scan and confirm</h3>
             <div className="mt-5 grid gap-6 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start">
               <Image
-                alt="QR code for the NORSTEC portal authenticator"
+                alt="QR code for the NORSTEC intranet authenticator"
                 className="rounded-xl bg-white p-3"
                 height={192}
                 src={enrollment.qrCode}

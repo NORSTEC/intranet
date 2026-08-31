@@ -266,10 +266,10 @@ export function SlackDirectory({
 
       <section aria-labelledby="slack-unmatched-heading" className="mt-14">
         <h2 className="text-h2" id="slack-unmatched-heading">
-          Not in the portal
+          Not in the intranet
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          These Slack accounts are not linked to a portal profile.
+          These Slack accounts are not linked to anybody in the intranet.
           Check who it is in Slack before treating it as abandoned.
         </p>
 
@@ -295,7 +295,7 @@ export function SlackDirectory({
             />
           </div>
           <SearchField
-            label="Search Slack accounts not in the portal"
+            label="Search Slack accounts not in the intranet"
             onChange={setUnmatchedQuery}
             placeholder="Search email or name"
             value={unmatchedQuery}
@@ -306,7 +306,7 @@ export function SlackDirectory({
           <div className="mt-8 overflow-x-auto">
             <table className="w-full min-w-[58rem] border-collapse">
               <caption className="sr-only">
-                Slack accounts with no matching person in the portal, what
+                Slack accounts with no matching person in the intranet, what
                 account type each is in Slack, and whether it is still active
               </caption>
               <thead>
@@ -362,7 +362,7 @@ export function SlackDirectory({
               ? "Nothing to show until Slack has been synced."
               : accounts.some((account) => account.personId === null)
                 ? "No unmatched accounts match these filters."
-                : "Every Slack account belongs to somebody in the portal."}
+                : "Every Slack account belongs to somebody in the intranet."}
           </p>
         )}
 
@@ -374,7 +374,7 @@ export function SlackDirectory({
           Linked to a person
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Slack accounts that belong to somebody in the portal.
+          Slack accounts that belong to somebody in the intranet.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -410,7 +410,7 @@ export function SlackDirectory({
           <div className="mt-8 overflow-x-auto">
             <table className="w-full min-w-[62rem] border-collapse">
               <caption className="sr-only">
-                Slack accounts linked to a person in the portal, what
+                Slack accounts linked to a person in the intranet, what
                 account type each is in Slack, and whether it is still active
               </caption>
               <thead>
@@ -491,7 +491,7 @@ export function SlackDirectory({
               ? "Nothing to show until Slack has been synced."
               : accounts.some((account) => account.personId !== null)
                 ? "No linked accounts match these filters."
-                : "No Slack account is linked to anybody in the portal."}
+                : "No Slack account is linked to anybody in the intranet."}
           </p>
         )}
 

@@ -11,7 +11,7 @@ export function PortalPulse({ pulse }: { pulse: PortalPulseData }) {
   return (
     <section aria-labelledby="pulse-heading" className="dashboard-rise">
       <h2 className="text-h2" id="pulse-heading">
-        Portal pulse
+        Intranet pulse
       </h2>
 
       <dl className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">

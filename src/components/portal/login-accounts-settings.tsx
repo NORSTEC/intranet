@@ -90,14 +90,14 @@ export function LoginAccountsSettings({
 
       {hasOnlyOneOrganizationAccount && (
         <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-65">
-          If you only use an organization Google account to sign in, you may lose access to the portal if your organization disables that account. Add an alternative Google account to keep access.
+          If you only use an organization Google account to sign in, you may lose access to the intranet if your organization disables that account. Add an alternative Google account to keep access.
         </p>
       )}
 
       {accounts.length > 1 && (
         <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-65">
           You can use any listed Google account to sign in to this profile. The
-          portal allows one per organization domain and one personal account.
+          intranet allows one per organization domain and one personal account.
         </p>
       )}
 
@@ -185,7 +185,7 @@ export function LoginAccountsSettings({
                 <>
                   <span className="font-medium">{unlinkTarget.email}</span> stops
                   signing you in and leaves your profile altogether. Nobody can
-                  reach you there through the portal afterwards, and signing in
+                  reach you there through the intranet afterwards, and signing in
                   with this Google account again starts a new profile instead of
                   bringing you back to this one.
                 </>

@@ -192,11 +192,11 @@ export function PersonAdminActions({
   }
 
   const accessLockReason = isSelf
-    ? "You cannot change your own portal access. Ask another portal administrator."
+    ? "You cannot change your own intranet access. Ask another intranet administrator."
     : accessStatus === "unclaimed"
       ? "This person has never signed in. Access opens the first time they do."
       : isPortalAdmin
-        ? "Revoke the portal administrator role before suspending this person."
+        ? "Revoke the intranet administrator role before suspending this person."
         : null;
 
   // Revoking the role stays available whatever the person's portal access is;
@@ -205,15 +205,15 @@ export function PersonAdminActions({
   // it checks them, so the button is never offered for a call that would come
   // straight back as `portal_access_required` or `norstec_domain_required`.
   const administratorLockReason = isSelf
-    ? "You cannot change your own role. Another portal administrator has to do it."
+    ? "You cannot change your own role. Another intranet administrator has to do it."
     : isPortalAdmin
       ? null
       : accessStatus === "unclaimed"
-        ? "This person has never signed in. They can be made a portal administrator once they do."
+        ? "This person has never signed in. They can be made an intranet administrator once they do."
         : isSuspended
-          ? "Portal access is suspended. Activate it again before making this person a portal administrator."
+          ? "Intranet access is suspended. Activate it again before making this person an intranet administrator."
           : !hasNorstecEmail(personEmails)
-            ? `Only people with a ${NORSTEC_EMAIL_DOMAIN} Google account can become portal administrators.`
+            ? `Only people with a ${NORSTEC_EMAIL_DOMAIN} Google account can become intranet administrators.`
             : null;
 
   return (
@@ -238,7 +238,7 @@ export function PersonAdminActions({
                   ? "Suspending signs the person out everywhere, blocks sign-in, and suspends their Norstec account in Google Workspace. Nothing is deleted and the change is reversible."
                   : "Suspending signs the person out everywhere and blocks sign-in. Nothing is deleted and the change is reversible."
             }
-            title="Portal access"
+            title="Intranet access"
           >
             {accessLockReason ? (
               <p className="text-sm leading-relaxed opacity-60">
@@ -259,7 +259,7 @@ export function PersonAdminActions({
                 >
                   {isSuspended ? "lock_open" : "lock"}
                 </span>
-                {isSuspended ? "Activate portal access" : "Suspend portal access"}
+                {isSuspended ? "Activate intranet access" : "Suspend intranet access"}
               </button>
             )}
           </ActionCard>
@@ -519,8 +519,8 @@ export function PersonAdminActions({
 
         <div className="mt-8 grid gap-6 xl:grid-cols-2">
           <ActionCard
-            description="Portal administrators administer every organization, decide alumni access, suspend and restore portal access, grant and revoke both administrator roles, merge duplicates, delete and purge people, and read the audit log. Keep the group small."
-            title="Portal administrator"
+            description="Intranet administrators administer every organization, decide alumni access, suspend and restore intranet access, grant and revoke both administrator roles, merge duplicates, delete and purge people, and read the audit log. Keep the group small."
+            title="Intranet administrator"
             tone="danger"
           >
             {administratorLockReason ? (
@@ -546,8 +546,8 @@ export function PersonAdminActions({
                   {isPortalAdmin ? "person_remove" : "admin_panel_settings"}
                 </span>
                 {isPortalAdmin
-                  ? "Revoke portal administrator"
-                  : "Grant portal administrator"}
+                  ? "Revoke intranet administrator"
+                  : "Grant intranet administrator"}
               </button>
             )}
           </ActionCard>
@@ -563,7 +563,7 @@ export function PersonAdminActions({
               </p>
             ) : isPortalAdmin ? (
               <p className="text-sm leading-relaxed opacity-60">
-                Revoke the portal administrator role before deleting this
+                Revoke the intranet administrator role before deleting this
                 person.
               </p>
             ) : (
@@ -610,7 +610,7 @@ export function PersonAdminActions({
           onCancel={() => setPendingAction(null)}
           onConfirm={confirmPendingAction}
           title={
-            isSuspended ? "Activate portal access?" : "Suspend portal access?"
+            isSuspended ? "Activate intranet access?" : "Suspend intranet access?"
           }
         >
           <p>
@@ -653,14 +653,14 @@ export function PersonAdminActions({
           onConfirm={confirmPendingAction}
           title={
             pendingAction.grant
-              ? "Grant the portal administrator role?"
-              : "Revoke the portal administrator role?"
+              ? "Grant the intranet administrator role?"
+              : "Revoke the intranet administrator role?"
           }
         >
           <p>
             {pendingAction.grant
-              ? `${personName} will administer every organization, decide alumni access, change anyone's portal access and roles, merge duplicates, delete and purge people, and read the audit log.`
-              : `${personName} keeps their portal access and memberships, but loses portal-wide administration.`}
+              ? `${personName} will administer every organization, decide alumni access, change anyone's intranet access and roles, merge duplicates, delete and purge people, and read the audit log.`
+              : `${personName} keeps their intranet access and memberships, but loses intranet-wide administration.`}
           </p>
           {pendingAction.grant && (
             <label className="mt-5 block">
@@ -743,7 +743,7 @@ export function PersonAdminActions({
           <p>
             <span className="font-medium">{pendingAction.email}</span> stops
             being one of {personName}&rsquo;s addresses. Nobody can reach them
-            there through the portal afterwards, and the address stops
+            there through the intranet afterwards, and the address stops
             identifying them — a Google account presenting it later lands on a
             new profile rather than on this one.
           </p>

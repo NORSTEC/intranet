@@ -160,7 +160,7 @@ export function PersonOrganizationRoles({
       {memberships.length > 0 &&
         (isSelf ? (
           <p className="mt-5 text-sm leading-relaxed opacity-55">
-            You cannot change your own organization roles. Ask another portal
+            You cannot change your own organization roles. Ask another intranet
             administrator.
           </p>
         ) : (
@@ -168,7 +168,7 @@ export function PersonOrganizationRoles({
             <p className="mt-5 text-sm leading-relaxed opacity-55">
               {accessStatus === "unclaimed"
                 ? "This person has never signed in. They can be made an organization administrator once they do."
-                : "Portal access is suspended. Activate it again before making this person an organization administrator."}
+                : "Intranet access is suspended. Activate it again before making this person an organization administrator."}
             </p>
           )
         ))}

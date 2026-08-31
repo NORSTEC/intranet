@@ -61,7 +61,7 @@ const SELECT_COLUMNS = `id, action, created_at, details, actor_person_id, target
 // pathological history cannot turn the page into a scroll of hundreds of rows.
 const MAX_EVENTS = 120;
 
-// A portal-wide history is longer-lived than one person's, so it gets its own,
+// An intranet-wide history is longer-lived than one person's, so it gets its own,
 // larger cap.
 const MAX_LOG_EVENTS = 200;
 
@@ -171,7 +171,7 @@ function requestTypeLabel(type: string | null) {
 // Every RPC stamps where it was called from, and the raw value is a database
 // token rather than something an administrator should have to read.
 function sourceLabel(source: string | null) {
-  if (source === "portal_management") return "Portal management";
+  if (source === "portal_management") return "Intranet management";
   if (source === "self_service") return "Requested by the person themselves";
   if (source === "database_admin") return "Database administrator";
   if (source === "retention_expiry") return "Automatic, retention period expired";
@@ -195,16 +195,16 @@ function yesNo(value: boolean | null) {
 function describe(action: string, details: Record<string, unknown> | null) {
   switch (action) {
     case "portal_access.active":
-      return "Portal access activated";
+      return "Intranet access activated";
     case "portal_access.suspended":
-      return "Portal access suspended";
+      return "Intranet access suspended";
     case "portal_access.deactivated":
-      return "Portal access deactivated";
+      return "Intranet access deactivated";
     case "portal_administrator.granted":
     case "portal_admin.assigned":
-      return "Portal administrator role granted";
+      return "Intranet administrator role granted";
     case "portal_administrator.revoked":
-      return "Portal administrator role revoked";
+      return "Intranet administrator role revoked";
     case "membership.role_changed":
       return text(details, "role") === "organization_admin"
         ? "Organization administrator role granted"
@@ -261,10 +261,25 @@ function describe(action: string, details: Record<string, unknown> | null) {
       return "Norstec account reactivated";
     case "workspace_directory.synced":
       return "Workspace directory synced";
+    case "notification.discarded":
+      return "Queued email discarded unsent";
     default:
       return action
         .replace(/[._]/g, " ")
         .replace(/^./, (first) => first.toUpperCase());
+  }
+}
+
+function notificationKindLabel(kind: string | null) {
+  switch (kind) {
+    case "access_request_approved":
+      return "Request approved";
+    case "access_request_rejected":
+      return "Request declined";
+    case "membership_ended":
+      return "Membership ended";
+    default:
+      return kind;
   }
 }
 
@@ -376,7 +391,7 @@ function buildFields(
     case "portal_access.suspended":
     case "portal_access.deactivated":
       add(
-        "Portal access change",
+        "Intranet access change",
         `${accessStatusLabel(text(details, "previous_status"))} → ${accessStatusLabel(
           row.action.slice("portal_access.".length),
         )}`,
@@ -386,12 +401,12 @@ function buildFields(
 
     case "portal_administrator.granted":
     case "portal_admin.assigned":
-      add("Role change", "Member → Portal administrator");
+      add("Role change", "Member → Intranet administrator");
       add("Performed from", sourceLabel(text(details, "source")));
       break;
 
     case "portal_administrator.revoked":
-      add("Role change", "Portal administrator → Member");
+      add("Role change", "Intranet administrator → Member");
       add("Performed from", sourceLabel(text(details, "source")));
       break;
 
@@ -508,7 +523,7 @@ function buildFields(
 
     case "person.restored":
       add(
-        "Portal access restored to",
+        "Intranet access restored to",
         accessStatusLabel(text(details, "restored_access_status")),
       );
       break;
@@ -532,6 +547,24 @@ function buildFields(
       add("Purged account email", purged?.email);
       add("Purged profile", purgedId === null ? null : `Person #${purgedId}`);
       add("Triggered by", sourceLabel(text(details, "source")));
+      break;
+    }
+
+    case "notification.discarded": {
+      const attempts = number(details, "attempts");
+      const failed = flag(details, "failed");
+      add("Email", notificationKindLabel(text(details, "kind")));
+      // No stored count is not the same fact as a stored zero, and rendering
+      // the first as "0" would report an attempt that never happened.
+      add("Send attempts", attempts === null ? null : String(attempts));
+      add(
+        "Why it was never sent",
+        failed === null
+          ? null
+          : failed
+            ? "The email provider refused it"
+            : "Nobody drained the queue before it expired",
+      );
       break;
     }
 

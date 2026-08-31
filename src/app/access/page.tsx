@@ -171,7 +171,7 @@ export default async function AccessPage({
           />
         </h1>
         <p className="mt-4 max-w-3xl text-sm opacity-60">
-          Signed in as {access.profile.email}. Your request must be approved before you can enter the portal.
+          Signed in as {access.profile.email}. Your request must be approved before you can enter the intranet.
         </p>
 
         {pendingRequest ? (

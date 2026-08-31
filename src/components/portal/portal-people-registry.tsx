@@ -75,7 +75,7 @@ function sortValue(person: RegistryPerson, key: SortKey) {
 
 export function PortalPeopleRegistry({
   currentPersonId,
-  emptyMessage = "No people exist in the portal yet.",
+  emptyMessage = "No people exist in the intranet yet.",
   people,
   statusOptions = memberStatuses,
 }: {
@@ -301,7 +301,7 @@ export function PortalPeopleRegistry({
         <div className="mt-8 overflow-x-auto">
           <table className="w-full min-w-[62rem] border-collapse">
             <caption className="sr-only">
-              People in the portal, with their organizations, access level,
+              People in the intranet, with their organizations, access level,
               membership status and last sign-in
             </caption>
             <thead>

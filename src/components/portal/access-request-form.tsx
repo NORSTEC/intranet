@@ -23,7 +23,7 @@ type Organization = { id: number; name: string };
 const requestTypes = [
   {
     description:
-      "You were a member of a NORSTEC organization and want to keep portal access. A portal administrator reviews the request.",
+      "You were a member of a NORSTEC organization and want to keep intranet access. An intranet administrator reviews the request.",
     label: "Alumni",
     value: "alumni",
   },
@@ -326,9 +326,9 @@ export function AccessRequestForm({
           year and message to{" "}
           {isOrganizationRequest
             ? "the administrators of the organization you selected"
-            : "NORSTEC portal administrators"}
+            : "NORSTEC intranet administrators"}
           , so that one of them can decide. If the request is declined, your
-          portal profile is deleted along with it — the name, the addresses and
+          intranet profile is deleted along with it — the name, the addresses and
           the Google sign-in — and only a record that a decision was made
           remains.{" "}
           <a

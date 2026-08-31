@@ -36,8 +36,8 @@ export function DeleteAccountSettings({ name }: { name: string }) {
         <h3 className="text-h3">Delete my account</h3>
         <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-65">
           Your profile, your sign-in accounts, and your memberships are removed
-          from the portal. You lose access straight away, and everything is
-          erased permanently 30 days later. Until then, email portal@norstec.no
+          from the intranet. You lose access straight away, and everything is
+          erased permanently 30 days later. Until then, email intranet@norstec.no
           if you change your mind.
         </p>
         {error && (
@@ -80,7 +80,7 @@ export function DeleteAccountSettings({ name }: { name: string }) {
           </p>
           <p className="mt-3">
             Your data is kept for 30 days and then erased permanently. Email
-            portal@norstec.no before then if you want the account back.
+            intranet@norstec.no before then if you want the account back.
           </p>
           <label className="mt-5 block">
             <span className="section-label mb-2 block opacity-50">

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createNewPortalProfile } from "@/app/onboarding/account/actions";
 import { PortalEntryShell } from "@/components/portal/portal-entry-shell";
+import { Toast } from "@/components/portal/toast";
 import { getPortalAccess } from "@/lib/auth/access";
 
 const linkErrors: Record<string, string> = {
@@ -8,9 +9,9 @@ const linkErrors: Record<string, string> = {
   limit: "That profile already has two connected Google accounts.",
   merge: "The profiles could not be connected. Please try again.",
   oauth: "Google sign-in could not be completed. Please try again.",
-  profile_has_data: "This organization account already contains portal data and must be merged by NORSTEC IT.",
-  same: "Choose the Google account you already used for your existing portal profile.",
-  source_inactive: "This organization account no longer has portal access. Contact NORSTEC IT.",
+  profile_has_data: "This organization account already contains intranet data and must be merged by NORSTEC IT.",
+  same: "Choose the Google account you already used for your existing intranet profile.",
+  source_inactive: "This organization account no longer has intranet access. Contact NORSTEC IT.",
   start: "Account linking could not be started. Please try again.",
 };
 
@@ -33,7 +34,7 @@ export default async function AccountOnboardingPage({
     <PortalEntryShell>
       <section>
         <h1 className="flex items-center gap-2 text-h2">
-          Do you already have a portal profile?
+          Do you already have an intranet profile?
           <span
             aria-hidden="true"
             className="entry-heading-star inline-block shrink-0"
@@ -63,12 +64,21 @@ export default async function AccountOnboardingPage({
           .
         </p>
 
+        {/* Both failures arrive by redirect, which is how every other page
+            here reports one — the toast clears its own parameter so a reload
+            does not repeat a message about an attempt that is over. */}
         {(accountLinkError || error) && (
-          <p className="mt-6 text-sm text-[#a33b2b]" role="alert">
-            {accountLinkError
-              ? linkErrors[accountLinkError] ?? linkErrors.merge
-              : "The profile could not be created. Please try again."}
-          </p>
+          <Toast
+            clearParams={["accountLinkError", "error"]}
+            message={
+              accountLinkError
+                ? (Object.hasOwn(linkErrors, accountLinkError)
+                    ? linkErrors[accountLinkError]
+                    : linkErrors.merge)
+                : "The profile could not be created. Please try again."
+            }
+            status="error"
+          />
         )}
 
         <div className="mt-8 grid max-w-4xl gap-5 md:grid-cols-2">
@@ -88,7 +98,7 @@ export default async function AccountOnboardingPage({
             <span className="material-symbols-outlined text-2xl">person_add</span>
             <h2 className="mt-5 text-h3 font-medium">Create new profile</h2>
             <p className="mt-3 flex-1 text-sm leading-relaxed opacity-65">
-              Choose this if this is your first time using the NORSTEC portal.
+              Choose this if this is your first time using the NORSTEC intranet.
             </p>
             <form action={createNewPortalProfile} className="mt-7">
               <button className="portal-button" type="submit">

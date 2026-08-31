@@ -22,10 +22,10 @@ const accountLinkErrors: Record<string, string> = {
     "You already have a sign-in account in that domain group. Use one account per organization domain and one personal account.",
   oauth: "Google sign-in could not be completed. Please try again.",
   profile_has_data:
-    "That account belongs to a portal profile with existing data. Contact NORSTEC IT to merge the profiles.",
+    "That account belongs to an intranet profile with existing data. Contact NORSTEC IT to merge the profiles.",
   same: "Choose a different Google account.",
   source_inactive:
-    "That account belongs to a portal profile without portal access. Contact NORSTEC IT.",
+    "That account belongs to an intranet profile without intranet access. Contact NORSTEC IT.",
   start: "Account linking could not be started. Please try again.",
 };
 

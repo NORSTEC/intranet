@@ -128,7 +128,7 @@ export function MobileLoginHeader() {
         <div>
           <p className="-ml-[0.06em] text-xl font-light uppercase tracking-[0.14em]">NORSTEC</p>
           <p className="mt-0.5 text-left text-xs font-medium uppercase tracking-[0.34em] opacity-55">
-            Portal
+            Intranet
           </p>
         </div>
       </div>

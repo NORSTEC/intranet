@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 const sections = [
   {
     description:
-      "Everyone who holds a membership or alumni access. Portal access, roles, merges, and deletion happen here.",
+      "Everyone who holds a membership or alumni access. Intranet access, roles, merges, and deletion happen here.",
     href: "/admin/people",
     icon: "person_edit",
     title: "Manage people",
@@ -21,14 +21,14 @@ const sections = [
   },
   {
     description:
-      "Every account in the norstec.no Google Workspace, and which of them belong to nobody in the portal.",
+      "Every account in the norstec.no Google Workspace, and which of them belong to nobody in the intranet.",
     href: "/admin/workspace",
     icon: "cloud",
     title: "Google accounts",
   },
   {
     description:
-      "Everyone in the Norstec Slack workspace, and which of them belong to nobody in the portal.",
+      "Everyone in the Norstec Slack workspace, and which of them belong to nobody in the intranet.",
     href: "/admin/slack",
     icon: SLACK_ICON,
     title: "Slack accounts",
@@ -42,7 +42,7 @@ const sections = [
   },
   {
     description:
-      "Every administrative decision in the portal, with who made it and when.",
+      "Every administrative decision in the intranet, with who made it and when.",
     href: "/admin/audit-log",
     icon: "history",
     title: "Audit log",
@@ -99,10 +99,10 @@ export default async function PortalManagementPage() {
           className="portal-surface mb-5 border-copper p-6 sm:p-7"
         >
           <h2 className="text-h3" id="stranded-administrators-heading">
-            Portal administrators without a Norstec account
+            Intranet administrators without a Norstec account
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed opacity-60">
-            Becoming a portal administrator requires a norstec.no Google
+            Becoming an intranet administrator requires a norstec.no Google
             account. These administrators no longer sign in with one, so the
             role now rests on nothing. Revoke it, or have them link the account
             again.

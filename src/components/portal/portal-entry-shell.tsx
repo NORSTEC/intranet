@@ -14,7 +14,7 @@ export function PortalEntryShell({
       <header className="border-b border-moody">
         <div className="mx-auto flex h-24 w-full max-w-[100rem] items-center justify-between px-5 sm:px-8 lg:px-16 xl:px-20 2xl:px-28">
           <Link
-            aria-label="NORSTEC portal"
+            aria-label="NORSTEC intranet"
             className="inline-flex w-fit items-center gap-4"
             href="/"
           >
@@ -33,7 +33,7 @@ export function PortalEntryShell({
                 NORSTEC
               </span>
               <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.34em] opacity-55">
-                Portal
+                Intranet
               </span>
             </span>
           </Link>

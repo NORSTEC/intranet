@@ -568,7 +568,7 @@ export function OrganizationAccessSettings({
                       {preview.addressCount === 1
                         ? "one address"
                         : `${preview.addressCount} addresses`}{" "}
-                      the portal already holds.{" "}
+                      the intranet already holds.{" "}
                       {organization.joinPolicy === "auto"
                         ? `At most ${
                             preview.wouldJoinCount === 1

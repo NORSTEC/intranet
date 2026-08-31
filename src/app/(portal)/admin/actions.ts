@@ -47,10 +47,10 @@ function revalidatePersonViews(personId: number) {
 
 function messageFor(error: { message: string }, fallback: string) {
   if (error.message.includes("not_authorized")) {
-    return "You are not a portal administrator.";
+    return "You are not an intranet administrator.";
   }
   if (error.message.includes("self_action_blocked")) {
-    return "You cannot run this on yourself. Ask another portal administrator.";
+    return "You cannot run this on yourself. Ask another intranet administrator.";
   }
   if (error.message.includes("person_not_found")) {
     return "This person no longer exists.";
@@ -68,16 +68,16 @@ function messageFor(error: { message: string }, fallback: string) {
     return "This person has never signed in, so there is no access to activate.";
   }
   if (error.message.includes("portal_admin_role_first")) {
-    return "Remove the portal administrator role first.";
+    return "Remove the intranet administrator role first.";
   }
   if (error.message.includes("last_portal_admin")) {
-    return "The portal must keep at least one administrator.";
+    return "The intranet must keep at least one administrator.";
   }
   if (error.message.includes("portal_access_required")) {
-    return "Only someone with active portal access can administer the portal.";
+    return "Only someone with active intranet access can administer the intranet.";
   }
   if (error.message.includes("norstec_domain_required")) {
-    return "Only people with a norstec.no Google account can become portal administrators.";
+    return "Only people with a norstec.no Google account can become intranet administrators.";
   }
   if (error.message.includes("last_organization_admin")) {
     return "This person is the last active administrator of an organization. Appoint another administrator first.";
@@ -137,7 +137,7 @@ function messageFor(error: { message: string }, fallback: string) {
     return "This is their only sign-in account. Removing it would lock them out.";
   }
   if (error.message.includes("portal_admin_requires_norstec_account")) {
-    return "Portal administrators must keep a norstec.no sign-in account. Revoke the role first.";
+    return "Intranet administrators must keep a norstec.no sign-in account. Revoke the role first.";
   }
   if (error.message.includes("membership_requires_account")) {
     return "An active organization membership rests on this account. End the membership first.";
@@ -149,7 +149,7 @@ function messageFor(error: { message: string }, fallback: string) {
     return "Pick two different people.";
   }
   if (error.message.includes("source_is_portal_administrator")) {
-    return "A portal administrator cannot be folded into someone else. Merge the duplicate into them instead, or revoke the role first.";
+    return "An intranet administrator cannot be folded into someone else. Merge the duplicate into them instead, or revoke the role first.";
   }
   if (error.message.includes("source_is_organization_administrator")) {
     return "This profile is an organization administrator. Hand over that role before merging it into another person.";
@@ -185,10 +185,10 @@ function workspaceMessageFor(
     return "Google Workspace is not configured on this server.";
   }
   if (error.status === 403 && intent === "write") {
-    return `Google refused to change this account: ${error.message} Check that the portal's role in the Google Admin console holds Admin API privileges › Users › Update, and that this account is not a super administrator — a delegated role cannot change one.`;
+    return `Google refused to change this account: ${error.message} Check that the intranet's role in the Google Admin console holds Admin API privileges › Users › Update, and that this account is not a super administrator — a delegated role cannot change one.`;
   }
   if (error.status === 403 || error.status === 401) {
-    return `Google refused the portal's service account: ${error.message}`;
+    return `Google refused the intranet's service account: ${error.message}`;
   }
   return `Google refused the request: ${error.message}`;
 }
@@ -254,7 +254,7 @@ export async function syncWorkspaceDirectory(): Promise<PortalManagementResult> 
   return {
     ok: true,
     message: summary
-      ? `Directory synced. ${summary.matched} matched, ${summary.unmatched} not in the portal.`
+      ? `Directory synced. ${summary.matched} matched, ${summary.unmatched} not in the intranet.`
       : "Directory synced.",
   };
 }
@@ -274,10 +274,10 @@ function slackMessageFor(error: unknown, fallback: string) {
     return "The Slack app is missing a permission. It needs users:read, users:read.email and team:read, and has to be reinstalled to the workspace after they are added.";
   }
   if (error.code === "not_authed" || error.code === "invalid_auth") {
-    return "Slack rejected the portal's token. Check the Vercel Connect connector is still installed in the workspace.";
+    return "Slack rejected the intranet's token. Check the Vercel Connect connector is still installed in the workspace.";
   }
   if (error.code === "ratelimited") {
-    return "Slack is rate limiting the portal. Wait a minute and sync again.";
+    return "Slack is rate limiting the intranet. Wait a minute and sync again.";
   }
   if (error.code) {
     return `Slack refused the request: ${error.code}`;
@@ -352,7 +352,7 @@ export async function syncSlackDirectory(): Promise<PortalManagementResult> {
   return {
     ok: true,
     message: summary
-      ? `Slack synced. ${summary.matched} matched, ${summary.unmatched} not in the portal.${guestNote}`
+      ? `Slack synced. ${summary.matched} matched, ${summary.unmatched} not in the intranet.${guestNote}`
       : "Slack synced.",
   };
 }
@@ -367,7 +367,7 @@ export async function changePortalAccess(input: {
     !isValidPersonId(input.personId) ||
     !portalAccessStatuses.includes(input.status)
   ) {
-    return { ok: false, message: "Portal access could not be changed." };
+    return { ok: false, message: "Intranet access could not be changed." };
   }
 
   const supabase = await createClient();
@@ -381,7 +381,7 @@ export async function changePortalAccess(input: {
   if (error) {
     return {
       ok: false,
-      message: messageFor(error, "Portal access could not be changed."),
+      message: messageFor(error, "Intranet access could not be changed."),
     };
   }
 
@@ -389,8 +389,8 @@ export async function changePortalAccess(input: {
 
   const suspending = input.status === "suspended";
   const baseMessage = suspending
-    ? "Portal access suspended. Open sessions were signed out."
-    : "Portal access restored.";
+    ? "Intranet access suspended. Open sessions were signed out."
+    : "Intranet access restored.";
 
   // Portal access and the Norstec account move together in both directions.
   // Suspending someone who keeps their Google sign-in has not really suspended
@@ -455,8 +455,8 @@ export async function changePortalAdministrator(input: {
   return {
     ok: true,
     message: input.isAdministrator
-      ? "Portal administrator role granted."
-      : "Portal administrator role revoked.",
+      ? "Intranet administrator role granted."
+      : "Intranet administrator role revoked.",
   };
 }
 
@@ -845,7 +845,7 @@ async function applyWorkspaceSuspension(input: {
       ok: false,
       message: messageFor(
         error,
-        "Google was updated, but the portal could not record it. Try again.",
+        "Google was updated, but the intranet could not record it. Try again.",
       ),
     };
   }
@@ -921,7 +921,7 @@ export async function setWorkspaceAccountSuspension(input: {
 }
 
 const SUPER_ADMIN_REFUSAL =
-  "This is a Google super administrator, and the portal's delegated role cannot change one. Do it in the Google Admin console, or remove the super administrator role there first.";
+  "This is a Google super administrator, and the intranet's delegated role cannot change one. Do it in the Google Admin console, or remove the super administrator role there first.";
 
 /**
  * Read from the portal's own copy rather than from Google. The directory has

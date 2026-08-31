@@ -410,7 +410,7 @@ export default async function PortalPersonPage({
           <Fact term="Contact email">{primaryEmail ?? "—"}</Fact>
           <Fact term="Field of study">{person.field_of_study ?? "—"}</Fact>
           <Fact term="Study year">{person.study_year ?? "—"}</Fact>
-          <Fact term="Added to the portal">{formatDate(person.created_at)}</Fact>
+          <Fact term="Added to the intranet">{formatDate(person.created_at)}</Fact>
           <Fact term="Last sign-in">
             {lastSignInAt ? formatDate(lastSignInAt) : "Never signed in"}
           </Fact>

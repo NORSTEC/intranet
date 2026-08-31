@@ -338,7 +338,7 @@ export function DeletedPeopleTable({ people }: { people: DeletedPerson[] }) {
           title="Restore this person?"
         >
           <p>
-            {pendingAction.person.name} becomes visible again with the portal
+            {pendingAction.person.name} becomes visible again with the intranet
             access they had before the deletion. Memberships that ended with the
             deletion stay ended; an organization administrator has to reactivate
             them.
