@@ -29,7 +29,7 @@ export function AccessWelcome({ welcome }: { welcome: DashboardWelcome }) {
           ? `${welcome.reviewerName} approved it${welcome.decidedLabel ? ` on ${welcome.decidedLabel}` : ""}.`
           : welcome.decidedLabel
             ? `Approved on ${welcome.decidedLabel}.`
-            : "Welcome to the portal."}
+            : "Welcome to the intranet."}
       </p>
 
       {welcome.note && (

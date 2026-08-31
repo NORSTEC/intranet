@@ -11,7 +11,7 @@ import {
 export const metadata: Metadata = {
   title: "Privacy policy",
   description:
-    "What personal data the NORSTEC portal stores about you, why, for how long, and what you can ask it to do about that.",
+    "What personal data the NORSTEC intranet stores about you, why, for how long, and what you can ask it to do about that.",
 };
 
 /**
@@ -23,11 +23,11 @@ export const metadata: Metadata = {
  */
 const sections = [
   { id: "controller", title: "Who is responsible" },
-  { id: "data", title: "What the portal stores about you" },
+  { id: "data", title: "What the intranet stores about you" },
   { id: "purposes", title: "Why we process it, and on what basis" },
   { id: "signing-in", title: "Signing in already creates a profile" },
   { id: "recipients", title: "Who can see your data" },
-  { id: "emails", title: "Emails the portal sends you" },
+  { id: "emails", title: "Emails the intranet sends you" },
   { id: "processors", title: "Where it is stored, and who else touches it" },
   { id: "retention", title: "How long we keep it" },
   { id: "cookies", title: "Cookies and local storage" },
@@ -125,12 +125,12 @@ export default function PrivacyPolicyPage() {
               />
             </h1>
             <p className="mt-6 max-w-[68ch] text-lg leading-relaxed opacity-70">
-              The NORSTEC portal is a membership system. It holds who you are,
+              The NORSTEC intranet is a membership system. It holds who you are,
               which organization you belong to, and what you are allowed to see.
               This page says what that means in data, and what you can ask us to
               do about it.
             </p>
-            {/* 0.6 rather than the portal's usual 0.45 for a `section-label`:
+            {/* 0.6 rather than the intranet's usual 0.45 for a `section-label`:
                 at 11.5px, 0.45 lands at 3.9:1 against the page background,
                 and this label carries content rather than naming a value
                 sitting next to it. */}
@@ -148,7 +148,7 @@ export default function PrivacyPolicyPage() {
             <Section id="controller">
               <p className="mt-6 leading-relaxed">
                 {PRIVACY_CONTROLLER.legalName} is the data controller for the
-                portal, and has not appointed a data protection officer.
+                intranet, and has not appointed a data protection officer.
               </p>
               <dl className="mt-7 grid max-w-[68ch] gap-5 text-sm sm:grid-cols-2">
                 <div>
@@ -180,7 +180,7 @@ export default function PrivacyPolicyPage() {
 
             <Section id="data">
               <Table
-                caption="Categories of personal data the portal stores, and where each category comes from."
+                caption="Categories of personal data the intranet stores, and where each category comes from."
                 headers={["Category", "Fields", "Where it comes from"]}
                 rows={[
                   [
@@ -216,7 +216,7 @@ export default function PrivacyPolicyPage() {
                   [
                     "Audit log",
                     "Administrative actions taken on your account: who did what, when, and to which record",
-                    "The portal, as administrators use it",
+                    "The intranet, as administrators use it",
                   ],
                   [
                     "Workspace directory",
@@ -226,7 +226,7 @@ export default function PrivacyPolicyPage() {
                 ]}
               />
               <p className="mt-7 leading-relaxed">
-                Signing in with Google gives the portal your name and email
+                Signing in with Google gives the intranet your name and email
                 address, and nothing else — not your password, and not your
                 mail, files, or calendar. No special categories of data are
                 stored, and none are asked for.
@@ -239,7 +239,7 @@ export default function PrivacyPolicyPage() {
                 of the GDPR. None of ours is consent.
               </p>
               <Table
-                caption="Each purpose the portal processes personal data for, and the legal basis under GDPR article 6 it relies on."
+                caption="Each purpose the intranet processes personal data for, and the legal basis under GDPR article 6 it relies on."
                 headers={["Purpose", "Legal basis"]}
                 rows={[
                   [
@@ -252,7 +252,7 @@ export default function PrivacyPolicyPage() {
                   ],
                   [
                     "Preventing automated and abusive access requests",
-                    "Article 6(1)(f) — NORSTEC needs to protect the portal and its administrators from spam and abuse",
+                    "Article 6(1)(f) — NORSTEC needs to protect the intranet and its administrators from spam and abuse",
                   ],
                   [
                     "Running your membership: roles, teams, the member directory, and deciding what you may see",
@@ -263,7 +263,7 @@ export default function PrivacyPolicyPage() {
                     "Article 6(1)(f) — NORSTEC needs to be able to account for decisions taken about its members. The log records the action and the record it touched, not your activity as a member",
                   ],
                   [
-                    "Keeping portal access and NORSTEC Google Workspace accounts in step",
+                    "Keeping intranet access and NORSTEC Google Workspace accounts in step",
                     "Article 6(1)(f) — an account that keeps working after access is withdrawn is a security problem for both of us",
                   ],
                 ]}
@@ -284,10 +284,10 @@ export default function PrivacyPolicyPage() {
 
             <Section id="signing-in">
               <p className="mt-6 leading-relaxed">
-                Completing Google sign-in creates a portal profile immediately —
+                Completing Google sign-in creates an intranet profile immediately —
                 before you request anything, and whether or not access is ever
                 granted. It holds the name and email address Google returns, and
-                the link to that Google account. It has to: the portal cannot
+                the link to that Google account. It has to: the intranet cannot
                 hold a pending access request, or tell you its outcome, without
                 a record of who is asking.
               </p>
@@ -301,16 +301,16 @@ export default function PrivacyPolicyPage() {
 
             <Section id="recipients">
               <p className="mt-6 leading-relaxed">
-                The portal is internal. Nothing in it is public or indexed by
+                The intranet is internal. Nothing in it is public or indexed by
                 search engines, and none of it is shared for advertising — the
-                portal runs no advertising and no analytics.
+                intranet runs no advertising and no analytics.
               </p>
               <Table
-                caption="Who can see your personal data inside the portal, and what each of them can see."
+                caption="Who can see your personal data inside the intranet, and what each of them can see."
                 headers={["Who", "What they can see"]}
                 rows={[
                   [
-                    "Other members of the portal",
+                    "Other members of the intranet",
                     "If you choose to be visible: your name, profile picture, field of study, study year, LinkedIn address, phone number if you entered one, your organization and team memberships, and your primary email address",
                   ],
                   [
@@ -318,7 +318,7 @@ export default function PrivacyPolicyPage() {
                     "The above, plus your membership history, roles, and any access request you made to that organization — including your message",
                   ],
                   [
-                    "Portal administrators (NORSTEC IT)",
+                    "Intranet administrators (NORSTEC IT)",
                     "The above for every organization, plus the audit log, deleted profiles inside the recovery window, and the Google accounts linked to your profile",
                   ],
                 ]}
@@ -333,14 +333,14 @@ export default function PrivacyPolicyPage() {
 
             <Section id="emails">
               <p className="mt-6 leading-relaxed">
-                The portal sends three kinds of email, and only when somebody
+                The intranet sends three kinds of email, and only when somebody
                 has decided something that changes what you can do here. There is no
                 newsletter, no announcement list, and nothing to unsubscribe
                 from — turning these off would mean not being told that your
                 access changed.
               </p>
               <Table
-                caption="The emails the portal sends, what causes each one, and where it is sent."
+                caption="The emails the intranet sends, what causes each one, and where it is sent."
                 headers={["When", "What it says", "Sent to"]}
                 rows={[
                   [
@@ -362,7 +362,7 @@ export default function PrivacyPolicyPage() {
               />
               <p className="mt-7 leading-relaxed">
                 Nothing else is emailed. Administrators are not notified about
-                you by email, and the portal never mails the member directory or
+                you by email, and the intranet never mails the member directory or
                 anything from your profile to anyone.
               </p>
             </Section>
@@ -374,7 +374,7 @@ export default function PrivacyPolicyPage() {
                 own purposes.
               </p>
               <Table
-                caption="Data processors used by the portal, what each one does, and where it stores data."
+                caption="Data processors used by the intranet, what each one does, and where it stores data."
                 headers={["Processor", "What it does", "Where"]}
                 rows={[
                   [
@@ -384,7 +384,7 @@ export default function PrivacyPolicyPage() {
                   ],
                   [
                     "Vercel",
-                    "Serves the portal and keeps short-lived request logs",
+                    "Serves the intranet and keeps short-lived request logs",
                     "EU region",
                   ],
                   [
@@ -394,7 +394,7 @@ export default function PrivacyPolicyPage() {
                   ],
                   [
                     "Resend",
-                    "Delivers the few emails the portal sends you",
+                    "Delivers the few emails the intranet sends you",
                     "Sent from Ireland; delivery records kept in the United States for 30 days",
                   ],
                 ]}
@@ -410,14 +410,14 @@ export default function PrivacyPolicyPage() {
               <p className="mt-7 leading-relaxed">
                 On the access request form, Google reCAPTCHA receives technical
                 information about the browser and interaction needed to assess
-                whether the submission is automated. The portal receives only
+                whether the submission is automated. The intranet receives only
                 a short-lived result token and does not store it.
               </p>
               <p className="mt-7 leading-relaxed">
                 Resend receives only what an email needs: your name, the address
                 it is going to, and what the message says — which may include an
                 administrator&rsquo;s written reason for a decision. It receives
-                nothing else about you, and the portal sends no newsletters and
+                nothing else about you, and the intranet sends no newsletters and
                 no marketing.
               </p>
               <p className="mt-7 leading-relaxed">
@@ -448,7 +448,7 @@ export default function PrivacyPolicyPage() {
                     "Hidden and signed out immediately; erased permanently 30 days later. Within those 30 days it can be restored if you ask",
                   ],
                   [
-                    "Membership history for a member who is still in the portal",
+                    "Membership history for a member who is still in the intranet",
                     "For as long as the membership relationship lasts, so that alumni status and past roles stay correct",
                   ],
                   [
@@ -465,21 +465,21 @@ export default function PrivacyPolicyPage() {
 
             <Section id="cookies">
               <p className="mt-6 leading-relaxed">
-                The portal sets no advertising or analytics cookies. It loads
+                The intranet sets no advertising or analytics cookies. It loads
                 Google reCAPTCHA only on the access request form, where it sets
                 a security cookie to distinguish ordinary submissions from
                 automated abuse. The browser storage below is strictly necessary
-                for the portal to work, which under the Norwegian Electronic
+                for the intranet to work, which under the Norwegian Electronic
                 Communications Act needs no consent — and is why there is no
                 cookie banner here.
               </p>
               <Table
-                caption="Everything the portal stores in your browser, and why."
+                caption="Everything the intranet stores in your browser, and why."
                 headers={["What", "Why", "How long"]}
                 rows={[
                   [
                     "Session cookies",
-                    "Keep you signed in between page loads. Without them the portal cannot tell that a request is yours",
+                    "Keep you signed in between page loads. Without them the intranet cannot tell that a request is yours",
                     "Until you sign out or the session expires",
                   ],
                   [
@@ -515,7 +515,7 @@ export default function PrivacyPolicyPage() {
 
             <Section id="rights">
               <p className="mt-6 leading-relaxed">
-                Some of these you can exercise in the portal without asking
+                Some of these you can exercise in the intranet without asking
                 anyone; for the rest, write to{" "}
                 <a
                   className="legal-link"
@@ -558,7 +558,7 @@ export default function PrivacyPolicyPage() {
               />
               <p className="mt-7 leading-relaxed">
                 Providing your data is not a legal obligation but a requirement
-                of using the portal: without a name and an email address there
+                of using the intranet: without a name and an email address there
                 is no membership record, and nothing for an administrator to
                 approve.
               </p>

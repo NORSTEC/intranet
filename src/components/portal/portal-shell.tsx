@@ -55,7 +55,7 @@ const administrationNavigation: NavigationItem[] = [
     admin: "organization",
   },
   {
-    label: "Portal management",
+    label: "Intranet management",
     href: "/admin",
     icon: "admin_panel_settings",
     admin: "portal",
@@ -63,7 +63,7 @@ const administrationNavigation: NavigationItem[] = [
 ];
 
 const breadcrumbLabels: Record<string, string> = {
-  admin: "Portal management",
+  admin: "Intranet management",
   administration: "Administration",
   "access-requests": "Access review",
   "audit-log": "Audit log",
@@ -123,7 +123,7 @@ function Navigation({
   if (desktop) {
     if (collapsed) {
       return (
-        <nav aria-label="Portal navigation" className="flex flex-col gap-2.5">
+        <nav aria-label="Intranet navigation" className="flex flex-col gap-2.5">
           {groups.flatMap((group) =>
             group.items.map(({ label, href, icon }) => {
               const isActive = isActiveNavigationItem(pathname, href);
@@ -148,7 +148,7 @@ function Navigation({
     }
 
     return (
-      <nav aria-label="Portal navigation" className="space-y-6">
+      <nav aria-label="Intranet navigation" className="space-y-6">
         {groups.map((group) => (
           <div key={group.label}>
             {group.label && (
@@ -180,7 +180,7 @@ function Navigation({
   }
 
   return (
-    <nav aria-label="Portal navigation" className="space-y-7">
+    <nav aria-label="Intranet navigation" className="space-y-7">
       {groups.map((group) => (
         <div key={group.label}>
           {group.label && (
@@ -378,7 +378,7 @@ function DesktopSidebar({
     >
       <div className="relative z-10 flex h-full w-full flex-col overflow-hidden px-[1.625rem] py-8">
         <div className="flex items-center">
-          <Link href="/" className="inline-flex w-fit items-center gap-4" aria-label="Portal dashboard">
+          <Link href="/" className="inline-flex w-fit items-center gap-4" aria-label="Intranet dashboard">
             <span className="portal-sidebar-brand-wrap" aria-hidden="true">
               <span className="portal-sidebar-brand-mark" />
               <Image
@@ -394,7 +394,7 @@ function DesktopSidebar({
                   NORSTEC
                 </span>
                 <span className="mt-0.5 block text-xs font-medium uppercase tracking-[0.34em] opacity-55">
-                  Portal
+                  Intranet
                 </span>
               </span>
           </Link>
@@ -500,14 +500,14 @@ export function PortalShell({
         />
         <div className="relative z-10 mx-auto w-full px-5">
           <div className="flex h-16 items-center justify-between">
-            <Link href="/" className="inline-flex items-center" aria-label="Portal dashboard">
+            <Link href="/" className="inline-flex items-center" aria-label="Intranet dashboard">
               <PortalLogoToggle open={menuOpen} />
               <span
                 className={`ml-3 text-xs font-medium uppercase tracking-[0.34em] transition-colors duration-200 ${
                   controlsLight ? "text-egg-static" : "text-moody"
                 }`}
               >
-                Portal
+                Intranet
               </span>
             </Link>
 

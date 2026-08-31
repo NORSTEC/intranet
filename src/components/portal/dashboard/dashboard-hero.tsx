@@ -22,7 +22,7 @@ export function DashboardHero({
 
   return (
     <section
-      aria-label="Your portal membership"
+      aria-label="Your intranet membership"
       className="dashboard-hero dashboard-rise portal-surface-strong px-6 py-9 sm:px-10 sm:py-12"
     >
       {/* A constellation rather than one mark: the geometry of each star lives

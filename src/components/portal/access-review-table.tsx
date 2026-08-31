@@ -201,12 +201,12 @@ function DecisionDialog({
   return (
     <DialogFrame labelledBy="access-decision-title" role="alertdialog">
       <h2 className="text-2xl font-medium" id="access-decision-title">
-        {approving ? "Grant portal access?" : "Decline this request?"}
+        {approving ? "Grant intranet access?" : "Decline this request?"}
       </h2>
       <p className="mt-4 leading-relaxed opacity-65">
         {approving
           ? request.requestType === "alumni"
-            ? `${request.requesterName} gets alumni access to the portal. No organization membership is created, and they get an email telling them they are in.`
+            ? `${request.requesterName} gets alumni access to the intranet. No organization membership is created, and they get an email telling them they are in.`
             : `${request.requesterName} becomes an active member of ${accessLabel(request)}, and gets an email telling them they are in.`
           : `${request.requesterName} keeps no access and can send a new request whenever they like. They get an email with your note.`}
       </p>

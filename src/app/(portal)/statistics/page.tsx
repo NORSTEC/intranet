@@ -40,7 +40,7 @@ export default async function StatisticsPage() {
 
   if (membershipsResult.error) {
     console.error("statistics memberships query failed", membershipsResult.error);
-    throw new Error(`Could not load portal statistics: ${membershipsResult.error.message}`);
+    throw new Error(`Could not load intranet statistics: ${membershipsResult.error.message}`);
   }
 
   const memberships = membershipsResult.data as MembershipRow[];
@@ -91,7 +91,7 @@ export default async function StatisticsPage() {
       : { data: [] as PersonRow[], error: null };
   if (peopleResult.error) {
     console.error("statistics people query failed", peopleResult.error);
-    throw new Error(`Could not load portal statistics: ${peopleResult.error.message}`);
+    throw new Error(`Could not load intranet statistics: ${peopleResult.error.message}`);
   }
 
   const activeProfiles = peopleResult.data as PersonRow[];

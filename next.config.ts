@@ -17,8 +17,14 @@ const securityHeaders = [
   ...(process.env.NODE_ENV === "production"
     ? [
         {
+          // `includeSubDomains` binds every subdomain of the host this is
+          // served from, for a year, with no way to shorten it from the
+          // browser's side. That is safe while the intranet has a host of its
+          // own — nothing lives under it. Moving it to an apex domain would
+          // extend the promise to every sibling service, so check what else
+          // answers there before that move, not after.
           key: "Strict-Transport-Security",
-          value: "max-age=31536000",
+          value: "max-age=31536000; includeSubDomains",
         },
       ]
     : []),

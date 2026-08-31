@@ -22,11 +22,11 @@ export const PORTAL_DEVELOPERS: PortalDeveloper[] = [
   {
     email: "eirik.engen.kvam@norstec.no",
     name: "Eirik Engen Kvam",
-    role: "Portal developer",
+    role: "Intranet developer",
   },
   {
     email: "august.middelkoop@norstec.no",
     name: "August Solli Middelkoop",
-    role: "Portal developer",
+    role: "Intranet developer",
   },
 ];

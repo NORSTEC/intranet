@@ -26,12 +26,15 @@ const ENDPOINT = "https://api.resend.com/emails";
 // platform kills the invocation.
 const TIMEOUT_MS = 10_000;
 
-// The portal is served from `portal.norstec.no` and sends from it too, so the
-// address a member is written from matches the address they visit. Sending
-// from a subdomain rather than `norstec.no` keeps this reputation separate
-// from the Workspace mail real people send, and leaves the root domain's
-// existing SPF record alone.
-const DEFAULT_FROM = "NORSTEC Portal <noreply@portal.norstec.no>";
+// Sending from a subdomain rather than `norstec.no` keeps this reputation
+// separate from the Workspace mail real people send, and leaves the root
+// domain's existing SPF record alone.
+//
+// This is only the fallback — `PORTAL_EMAIL_FROM` is what production runs on —
+// but it names a domain Resend has to have verified, or it cannot send at all.
+// Verify `intranet.norstec.no` there before this ships. See the domain move in
+// docs/operations.md.
+const DEFAULT_FROM = "NORSTEC Intranet <noreply@intranet.norstec.no>";
 
 export type EmailMessage = {
   html: string;

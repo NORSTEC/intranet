@@ -85,7 +85,7 @@ export function NorstecAccountCard({
           <ActionCard
             description={
               account
-                ? "Their account in the norstec.no Google Workspace. Suspending it suspends it both in this portal and in Google Workspace."
+                ? "Their account in the norstec.no Google Workspace. Suspending it suspends it both in this intranet and in Google Workspace."
                 : "No account in the norstec.no Google Workspace is linked to this person."
             }
             title="Google Workspace"
@@ -157,7 +157,7 @@ export function NorstecAccountCard({
                 {/* Read from Google at the last sync, not now — so how old the
                     answer is belongs on the card. As its own sentence, though:
                     hung off the value it read as a badge, which is not a thing
-                    this portal does anywhere else. */}
+                    this intranet does anywhere else. */}
                 {account.lastSyncedAt && (
                   <p className="text-sm leading-relaxed opacity-55">
                     Last synced from Google {formatDate(account.lastSyncedAt)}.
@@ -185,8 +185,8 @@ export function NorstecAccountCard({
         >
           <p>
             {isSuspended
-              ? `${personName} can sign in to Google and to the portal again, and reaches their mail and files as before.`
-              : `${personName} is signed out of Google everywhere and cannot sign in — to Google or to this portal. Their mail and files are kept and nothing is deleted.`}
+              ? `${personName} can sign in to Google and to the intranet again, and reaches their mail and files as before.`
+              : `${personName} is signed out of Google everywhere and cannot sign in — to Google or to this intranet. Their mail and files are kept and nothing is deleted.`}
           </p>
         </ConfirmDialog>
       )}

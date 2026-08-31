@@ -111,7 +111,7 @@ export default async function WorkspaceAccountsPage() {
     <>
       <p className="max-w-2xl text-sm opacity-55">
         What the norstec.no Google Workspace contains, and how much of it the
-        portal recognises. Account type and account status are both from Google Workspace, and neither says anything about portal access.
+        intranet recognises. Account type and account status are both from Google Workspace, and neither says anything about intranet access.
       </p>
 
       <div className="mt-10">

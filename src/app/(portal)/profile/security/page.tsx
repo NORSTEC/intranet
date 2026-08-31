@@ -16,7 +16,7 @@ export default async function ProfileSecurityPage({
       <h1 className="text-h2">Sign-in security</h1>
       <p className="mt-3 max-w-3xl text-sm leading-relaxed opacity-65">
         Use an authenticator app to verify administrator actions. Google
-        sign-in still opens the member portal; sensitive administration
+        sign-in still opens the member intranet; sensitive administration
         requires a current six-digit code.
       </p>
 

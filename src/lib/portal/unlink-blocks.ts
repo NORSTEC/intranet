@@ -22,8 +22,8 @@ export function unlinkBlockMessage(
   }
   if (reason.includes("portal_admin_requires_norstec_account")) {
     return voice === "self"
-      ? "Portal administrators sign in with a norstec.no account. Hand the role over before removing it."
-      : "Portal administrators sign in with a norstec.no account. Revoke the role first.";
+      ? "Intranet administrators sign in with a norstec.no account. Hand the role over before removing it."
+      : "Intranet administrators sign in with a norstec.no account. Revoke the role first.";
   }
   if (reason.includes("membership_requires_account")) {
     return voice === "self"

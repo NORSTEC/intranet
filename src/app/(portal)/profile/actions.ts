@@ -69,11 +69,11 @@ export async function unlinkLoginAccount(
     const message = error.message.includes("last_portal_account")
       ? "You must keep at least one sign-in account."
       : error.message.includes("portal_admin_requires_norstec_account")
-        ? "Portal administrators must keep a norstec.no sign-in account. Hand over the role first."
+        ? "Intranet administrators must keep a norstec.no sign-in account. Hand over the role first."
         : error.message.includes("membership_requires_account")
           ? "An active organization membership rests on this account. Ask an organization administrator to end the membership first."
           : error.message.includes("organization_email_requires_admin")
-            ? "This address belongs to an organization, so a portal administrator has to release it. Write to portal@norstec.no."
+            ? "This address belongs to an organization, so an intranet administrator has to release it. Write to intranet@norstec.no."
             : error.message.includes("member_must_keep_email")
               ? "An active member must keep at least one address, and this is your last one."
               : "That sign-in account could not be removed.";
@@ -114,10 +114,10 @@ export async function deleteOwnAccount(): Promise<DeleteOwnAccountResult> {
 
   if (error) {
     const message = error.message.includes("portal_admin_transfer_required")
-      ? "Hand your portal administrator responsibility to somebody else before deleting your account."
+      ? "Hand your intranet administrator responsibility to somebody else before deleting your account."
       : error.message.includes("last_organization_admin")
         ? "You are the last active administrator of an organization. Appoint another administrator before deleting your account."
-        : "Your account could not be deleted. Email portal@norstec.no for help.";
+        : "Your account could not be deleted. Email intranet@norstec.no for help.";
     return { ok: false, message };
   }
 

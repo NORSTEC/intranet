@@ -186,7 +186,7 @@ function masthead(siteUrl: string) {
                 class="dark-copy-secondary"
                 style="padding-top:4px;font-family:${FONT_STACK};font-size:11px;font-weight:500;letter-spacing:0.34em;line-height:1.1;text-transform:uppercase;color:${INK_SECONDARY}"
               >
-                Portal
+                Intranet
               </div>
             </td>
           </tr>
@@ -322,7 +322,7 @@ function footer(siteUrl: string) {
     <tr>
       <td style="padding:28px 0 0;border-top:1px solid ${DIVIDER}">
         <p class="dark-copy-muted" style="margin:0;font-family:${FONT_STACK};font-size:13px;font-weight:400;line-height:1.7;color:${INK_FOOTER}">
-          Sent by the NORSTEC Portal because a decision changed your access. It
+          Sent by the NORSTEC Intranet because a decision changed your access. It
           is not a newsletter and there is nothing to unsubscribe from.
           <a class="email-link dark-copy-secondary" href="${siteUrl}/privacy" style="color:${INK_SECONDARY};text-decoration:underline">How we handle your data</a>.
         </p>
@@ -565,7 +565,7 @@ function shell({
 }
 
 const FOOTER_TEXT = (siteUrl: string) =>
-  `Sent by the NORSTEC Portal because a decision changed your access. How we handle your data: ${siteUrl}/privacy`;
+  `Sent by the NORSTEC Intranet because a decision changed your access. How we handle your data: ${siteUrl}/privacy`;
 
 function plain(lines: (string | null)[]) {
   return lines.filter((line): line is string => line !== null).join("\n\n");
@@ -578,12 +578,12 @@ function approved({ payload, recipientName, siteUrl }: TemplateInput): RenderedE
   const decidedOn = formatMoment(payload.decided_at);
 
   const intro = requestedOn
-    ? `${scope} approved the request you sent on ${requestedOn}. You can sign in to the portal now.`
-    : `${scope} approved your request. You can sign in to the portal now.`;
+    ? `${scope} approved the request you sent on ${requestedOn}. You can sign in to the intranet now.`
+    : `${scope} approved your request. You can sign in to the intranet now.`;
 
   return {
     html: shell({
-      action: button(siteUrl, "Open the portal"),
+      action: button(siteUrl, "Open the intranet"),
       closing: "Sign in with the same Google account you applied with.",
       greeting: `Hi ${firstName(recipientName)},`,
       detail: fields([
@@ -598,14 +598,14 @@ function approved({ payload, recipientName, siteUrl }: TemplateInput): RenderedE
     // Deliberately not naming the organization: the reviewed design settled
     // that, because the address may be a shared or a family one and the
     // requester already knows what they asked for.
-    subject: "Your NORSTEC Portal request was approved",
+    subject: "Your NORSTEC Intranet request was approved",
     text: plain([
       `Hi ${firstName(recipientName)},`,
       intro,
       decidedOn ? `Decided: ${decidedOn}` : null,
       note ? `Note from the reviewer:\n\n  ${note}` : null,
       "Sign in with the same Google account you applied with.",
-      `Open the portal: ${siteUrl}`,
+      `Open the intranet: ${siteUrl}`,
       FOOTER_TEXT(siteUrl),
     ]),
   };
@@ -645,7 +645,7 @@ function rejected({ payload, recipientName, siteUrl }: TemplateInput): RenderedE
       preheader: intro,
       siteUrl,
     }),
-    subject: "Your NORSTEC Portal request was declined",
+    subject: "Your NORSTEC Intranet request was declined",
     text: plain([
       `Hi ${firstName(recipientName)},`,
       intro,
@@ -670,13 +670,13 @@ function membershipEnded({
   // string is not a reason to tell somebody they are about to be locked out.
   const workspaceOnly = payload.workspace_sign_in_only === true;
 
-  const intro = `${organization} has ended your membership, and it was your last active one. You are an alumnus in the portal from now on.`;
+  const intro = `${organization} has ended your membership, and it was your last active one. You are an alumnus in the intranet from now on.`;
   const keeps =
     "You keep access. Your profile, your membership history and the roles you held all stay as they are, and you can still see the member directory.";
   const warningHeadline =
     "You sign in with your norstec.no account, and only that account.";
   const warningDetail =
-    "If that Google Workspace account is suspended or deleted, you lose the portal with it — and you cannot add another sign-in once you are locked out. Add a personal Google account to your profile while you still can.";
+    "If that Google Workspace account is suspended or deleted, you lose the intranet with it — and you cannot add another sign-in once you are locked out. Add a personal Google account to your profile while you still can.";
   const action = workspaceOnly ? "Add a personal Google account" : "Open your profile";
 
   return {

@@ -60,8 +60,8 @@ export default async function DashboardPage() {
   const sharedMonth = membershipMonths.every((month) => month === membershipMonths[0]);
   const membershipSentence = isAlumni
     ? lastEnded?.until
-      ? `You hold alumni access to the portal. Your membership in ${lastEnded.name} ended ${formatMonth(lastEnded.until)}.`
-      : "You hold alumni access to the portal."
+      ? `You hold alumni access to the intranet. Your membership in ${lastEnded.name} ended ${formatMonth(lastEnded.until)}.`
+      : "You hold alumni access to the intranet."
     : sharedMonth
       ? `Member of ${organizationNames} since ${membershipMonths[0]}.`
       : `Member of ${sentenceList(
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
           ),
         )}.`;
   const roleSentence = access.isPortalAdmin
-    ? " You administer the portal."
+    ? " You administer the intranet."
     : !isAlumni && activeOrganizations.some((organization) => organization.role === "organization_admin")
       ? ` You administer ${sentenceList(
           activeOrganizations
@@ -93,8 +93,8 @@ export default async function DashboardPage() {
     actions.push({
       description:
         unmatchedWorkspaceAccounts === 1
-          ? "1 account in the norstec.no Google Workspace belongs to nobody in the portal."
-          : `${unmatchedWorkspaceAccounts} accounts in the norstec.no Google Workspace belong to nobody in the portal.`,
+          ? "1 account in the norstec.no Google Workspace belongs to nobody in the intranet."
+          : `${unmatchedWorkspaceAccounts} accounts in the norstec.no Google Workspace belong to nobody in the intranet.`,
       href: "/admin/workspace",
       icon: "cloud",
       title: "Google accounts to review",
@@ -104,8 +104,8 @@ export default async function DashboardPage() {
     actions.push({
       description:
         unmatchedSlackAccounts === 1
-          ? "1 account in the Norstec Slack workspace belongs to nobody in the portal."
-          : `${unmatchedSlackAccounts} accounts in the Norstec Slack workspace belong to nobody in the portal.`,
+          ? "1 account in the Norstec Slack workspace belongs to nobody in the intranet."
+          : `${unmatchedSlackAccounts} accounts in the Norstec Slack workspace belong to nobody in the intranet.`,
       href: "/admin/slack",
       icon: SLACK_ICON,
       title: "Slack accounts to review",
@@ -115,8 +115,8 @@ export default async function DashboardPage() {
     actions.push({
       description:
         pendingAccessRequests === 1
-          ? "1 person is waiting for a decision on portal access."
-          : `${pendingAccessRequests} people are waiting for a decision on portal access.`,
+          ? "1 person is waiting for a decision on intranet access."
+          : `${pendingAccessRequests} people are waiting for a decision on intranet access.`,
       href: "/administration/access-requests",
       icon: "person_check",
       title: "Access requests waiting",

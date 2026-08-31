@@ -31,7 +31,7 @@ describe("deriveAccessLevel", () => {
     ).toBe("suspended");
   });
 
-  it("ranks portal admin above organization admin", () => {
+  it("ranks intranet admin above organization admin", () => {
     expect(
       deriveAccessLevel({
         ...base,

@@ -1,14 +1,14 @@
 /**
  * The facts the privacy policy states about NORSTEC as an organization, rather
- * than about the portal as software. Everything else on `/privacy` is written
+ * than about the intranet as software. Everything else on `/privacy` is written
  * from what the code and the migrations actually do and does not belong here.
  *
- * The placeholders below are the only parts of the policy that cannot be read
- * out of this repository. They must be filled in before the portal is opened
- * to members: GDPR article 13(1)(a) requires the controller's identity and
+ * These are the only parts of the policy that cannot be read out of this
+ * repository, which is why they are stated once, here, rather than written into
+ * the page: GDPR article 13(1)(a) requires the controller's identity and
  * contact details, and a policy that names neither does not satisfy it.
  */
-export const PRIVACY_CONTACT_EMAIL = "portal@norstec.no";
+export const PRIVACY_CONTACT_EMAIL = "intranet@norstec.no";
 
 export const PRIVACY_CONTROLLER = {
   legalName: "NORSTEC",
@@ -23,8 +23,7 @@ export const PRIVACY_CONTROLLER = {
  * requires this to be stated when data leaves the EU/EEA, but naming the
  * region is the cheapest way to make that question answerable.
  */
-export const PRIVACY_HOSTING_REGION =
-  "[Supabase project region — fill in before launch]";
+export const PRIVACY_HOSTING_REGION = "Stockholm, Sweden (eu-north-1)";
 
 /**
  * Bumped whenever the policy changes in substance. Article 12 requires

@@ -151,7 +151,7 @@ function SuspensionButton({
       onClick={onClick}
       title={
         blocked
-          ? "A Google super administrator cannot be changed from the portal. Do it in the Admin console."
+          ? "A Google super administrator cannot be changed from the intranet. Do it in the Admin console."
           : undefined
       }
       type="button"
@@ -341,10 +341,10 @@ export function WorkspaceDirectory({
 
       <section aria-labelledby="workspace-unmatched-heading" className="mt-14">
         <h2 className="text-h2" id="workspace-unmatched-heading">
-          Not in the portal
+          Not in the intranet
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Google accounts no portal profile claims. A new Google account who has
+          Google accounts no intranet profile claims. A new Google account who has
           not signed in yet looks the same as an account nobody has cleaned up,
           so check each one in the Admin console before acting.
         </p>
@@ -371,7 +371,7 @@ export function WorkspaceDirectory({
             />
           </div>
           <SearchField
-            label="Search accounts not in the portal"
+            label="Search accounts not in the intranet"
             onChange={setUnmatchedQuery}
             placeholder="Search email or name"
             value={unmatchedQuery}
@@ -382,7 +382,7 @@ export function WorkspaceDirectory({
           <div className="mt-8 overflow-x-auto">
             <table className="w-full min-w-[64rem] border-collapse">
               <caption className="sr-only">
-                Google Workspace accounts with no matching person in the portal,
+                Google Workspace accounts with no matching person in the intranet,
                 what each account is in Google, its status, and the actions available on it
               </caption>
               <thead>
@@ -449,7 +449,7 @@ export function WorkspaceDirectory({
               ? "Nothing to show until the directory has been synced."
               : accounts.some((account) => account.personId === null)
                 ? "No unmatched accounts match these filters."
-                : "Every Workspace account belongs to somebody in the portal."}
+                : "Every Workspace account belongs to somebody in the intranet."}
           </p>
         )}
 
@@ -461,7 +461,7 @@ export function WorkspaceDirectory({
           Linked to a person
         </h2>
         <p className="mt-3 max-w-2xl text-sm opacity-55">
-          Google accounts that belong to somebody in the portal.
+          Google accounts that belong to somebody in the intranet.
         </p>
 
         <div className="mt-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -497,7 +497,7 @@ export function WorkspaceDirectory({
           <div className="mt-8 overflow-x-auto">
             <table className="w-full min-w-[68rem] border-collapse">
               <caption className="sr-only">
-                Google Workspace accounts linked to a person in the portal,
+                Google Workspace accounts linked to a person in the intranet,
                 what each account is in Google, its status, and the actions available on it
               </caption>
               <thead>
@@ -585,7 +585,7 @@ export function WorkspaceDirectory({
               ? "Nothing to show until the directory has been synced."
               : accounts.some((account) => account.personId !== null)
                 ? "No linked accounts match these filters."
-                : "No Workspace account is linked to anybody in the portal."}
+                : "No Workspace account is linked to anybody in the intranet."}
           </p>
         )}
 
@@ -608,8 +608,8 @@ export function WorkspaceDirectory({
         >
           <p>
             {pendingAccount.suspended
-              ? `${pendingAccount.accountEmail} can sign in to Google and to this portal again, and reaches their mail and files as before.`
-              : `${pendingAccount.accountEmail} is signed out of Google everywhere and cannot sign in — to Google or to this portal. Their mail and files are kept and nothing is deleted.`}
+              ? `${pendingAccount.accountEmail} can sign in to Google and to this intranet again, and reaches their mail and files as before.`
+              : `${pendingAccount.accountEmail} is signed out of Google everywhere and cannot sign in — to Google or to this intranet. Their mail and files are kept and nothing is deleted.`}
           </p>
           {/* Suspending an administrator takes the Admin console away from
               whoever was using it, which is not obvious from an address. Said
