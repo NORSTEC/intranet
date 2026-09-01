@@ -27,7 +27,19 @@ function readableMfaError(message: string) {
   return "The authenticator could not be updated. Try again.";
 }
 
-export function MfaSettings() {
+export function MfaSettings({
+  revealPageOnVerify = false,
+}: {
+  /**
+   * Set by the `unauthorized()` boundary, where this panel stands in for a
+   * page the server refused to render. Confirming a code there has to produce
+   * that page, and the refused render is a 401 the client router holds on to —
+   * so the session's new authority only reaches the server on a fresh request.
+   * On the security page there is no refused page to reveal, and re-rendering
+   * the route in place keeps the confirmation visible.
+   */
+  revealPageOnVerify?: boolean;
+} = {}) {
   const router = useRouter();
   const [factor, setFactor] = useState<VerifiedFactor | null>(null);
   const [assuranceLevel, setAssuranceLevel] = useState<"aal1" | "aal2">(
@@ -145,8 +157,17 @@ export function MfaSettings() {
       setCode("");
       setConfirmed(wasEnrolling ? "Authenticator set up." : "Session verified.");
       await refresh();
-      // The page that demanded the code is behind this one on the same URL,
-      // so re-rendering the route is what reveals it.
+
+      if (revealPageOnVerify) {
+        // A full load rather than `router.refresh()`. The page behind this one
+        // was refused before the session carried AAL2, and asking the server
+        // again from the same document leaves that refusal in place — which is
+        // why confirming a code appeared to do nothing until the person
+        // reloaded by hand. Doing it for them costs one navigation, once.
+        window.location.reload();
+        return;
+      }
+
       router.refresh();
     });
   }
