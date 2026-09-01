@@ -12,7 +12,7 @@ export default function PortalUnauthorized() {
       <h1 className="text-h2">Confirm it is you</h1>
 
       <div className="mt-8">
-        <MfaSettings />
+        <MfaSettings revealPageOnVerify />
       </div>
     </div>
   );
