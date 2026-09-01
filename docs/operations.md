@@ -63,6 +63,15 @@ Set production-only values for:
 - Google Workload Identity values and `GOOGLE_WORKSPACE_DOMAIN`
 - `SLACK_CONNECT_CONNECTOR`
 
+Functions are pinned to `arn1` (Stockholm) in `vercel.json`, because the
+Supabase project is in `eu-north-1` and a page load makes several database round
+trips one after another — the account, then the memberships, then whatever the
+page itself asks for, then the signed avatar URLs. Unpinned, those functions
+default to a region on the other side of the Atlantic and every one of those
+hops costs about a hundred milliseconds instead of a handful. It is the single
+setting with the largest effect on how fast the intranet feels, and it is here
+rather than in the dashboard so it cannot drift without a review.
+
 Preview deployments are disabled because there is no separate hosted database.
 
 ### GitHub
